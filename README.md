@@ -1,43 +1,49 @@
-Oxy_FL
-  - There are 2 Powershell scripts
-  - oxyflf lists folders (no subfolder) into a text file
-  - oxyfl lists files (subfolder included) into multiple text files (one by target)
-  - No requirements
-   - Update the path
-  - Lets run !
+# Oxytools
 
-Oxy_JXL
-  - There are 3 Powershell scripts
-  - oxyj converts in a lossless mode
-  - oxyjf force the conversion
-  - oxyjp converts into png before JXL
-  - Requirements
-   - CJXL
-    - Update the path:
-     - you treat > $SRC = "", CJXL > $CJXL = ""
-  - Let's run !
+Collection of utility scripts before maybe impplmentation into Oxyon
 
-Oxy_Wall
-  - Python Script to get some 1080 and 2160 wallpaper
-  - Requirements:
-   - Python,"python-dotenv", "requests".
-   - Pexels, Pixabay and Unsplash Api Key in a .env next to the script
-    - Update the path
-	  - Let's run !
+## Oxy_FL
 
-Oxy_Watch
-  - Rust module under construction:
-  - The purpose is copy the Jellyfin workflow to know if a movie is watched.
-  - 1 Check the VLC flow if the status is more than 90%.
-  - 2 Then send it to a text file automatically for next tagging.
-  - Requirements
-   - VLC
+- 2 PowerShell scripts
+- `oxyflf` lists folders (no subfolder) into a text file
+- `oxyfl` lists files (subfolder included) into multiple text files (one per target)
+- No requirements
+- Update the paths, then run
 
-Oxy_Zip 
-  - 2 Powershel scripts
-  - oxyz converts a folder in a zip
-  - oxyzm converts multiple folders in multiple zip
-  - Requirements:
-   - 7-Zip Extra
-    - Update the path
-  - Let's run !
+## Oxy_JXL
+
+- 3 PowerShell scripts
+- `oxyj` converts in lossless mode
+- `oxyjf` forces the conversion
+- `oxyjp` converts into PNG before JXL
+- Requirements: [CJXL](https://github.com/niclasr/cjxl)
+  - Paths: source folder `$SRC` and CJXL binary `$CJXL`
+- Update the paths, then run
+
+## Oxy_Wall
+
+- Python script to fetch 1080p and 4K wallpapers
+- Requirements: Python, `python-dotenv`, `requests`
+- Create a `.env` file next to the script with your API keys:
+  - `PEXELS_API_KEY`
+  - `PIXABAY_API_KEY`
+  - `UNSPLASH_API_KEY`
+- Update the paths, then run
+
+## Oxy_Watch
+
+> 🚧 Rust module — under construction
+
+- Replicates the Jellyfin workflow to track watched movies
+  1. Checks VLC playback status (>90% = watched)
+  2. Writes the result to a text file for later tagging
+- Requirements: VLC
+
+## Oxy_Zip
+
+- 2 PowerShell scripts
+- `oxyz` compresses a folder into a ZIP
+- `oxyzm` compresses multiple folders into multiple ZIPs
+- Requirements: [7-Zip Extra](https://www.7-zip.org/)
+  - Update the paths
+- Update the paths, then run
