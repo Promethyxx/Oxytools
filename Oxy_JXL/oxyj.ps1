@@ -1,4 +1,4 @@
-$SRC = "C:\Users\peter\kDrive\Images\NEW"
+$SRC = "C:\Users\peter\Downloads\Compressed"
 $CJXL = "C:\Users\peter\kDrive\Soft_WIN\jxl\bin\cjxl.exe"
 
 # On récupère uniquement les sources, on ignore les .jxl

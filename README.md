@@ -1,5 +1,5 @@
 Oxy_FL
-  - There are 2 scripts
+  - There are 2 Powershell scripts
   - oxyflf lists folders (no subfolder) into a text file
   - oxyfl lists files (subfolder included) into multiple text files (one by target)
   - No requirements
@@ -7,7 +7,7 @@ Oxy_FL
   - Lets run !
 
 Oxy_JXL
-  - There are 3 scripts Powershell
+  - There are 3 Powershell scripts
   - oxyj converts in a lossless mode
   - oxyjf force the conversion
   - oxyjp converts into png before JXL
@@ -34,7 +34,7 @@ Oxy_Watch
    - VLC
 
 Oxy_Zip 
-  - 2 Powershel script
+  - 2 Powershel scripts
   - oxyz converts a folder in a zip
   - oxyzm converts multiple folders in multiple zip
   - Requirements:
