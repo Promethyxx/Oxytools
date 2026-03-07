@@ -14,7 +14,7 @@ Oxy_Wall
   - You need Pexels, Pixabay and Unsplash Api Key in a .env next to the script
   - Let's run !
 
-Oxy_watch
+Oxy_Watch
   - Rust module
   - Is under construction:
   - I try to copy the Plex /Jellyfin / Kodi workflow.
