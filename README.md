@@ -1,4 +1,4 @@
-TOJXL
+Oxy_JXL
 There are 3 scripts Powershell
   - tojxl converts in a lossless mode
   - tojxlf force the conversion
