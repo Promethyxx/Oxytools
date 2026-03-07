@@ -15,7 +15,7 @@ Oxy_Wall
   - Let's run !
 
 Oxy_watch
-  - Rusto module
+  - Rust module
   - Is under construction:
   - I try to copy the Pley /Jellyfin /Kodi workflow.
   - The purpose is to catch especially VLC flow to know if a movie (or else) is watched more than 90%.
