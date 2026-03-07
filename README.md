@@ -1,8 +1,8 @@
 Oxy_JXL
 There are 3 scripts Powershell
   - Oxy_jxl converts in a lossless mode
-  - Oxy_jxlf force the conversion
-  - Oxy_jxlp converts into png before JXL
+  - Oxy_jxf force the conversion
+  - Oxy_jxp converts into png before JXL
   - You must have cjxl on your pc
   - Fill in the following fields
   - Here is the folder you treat > $SRC = ""
