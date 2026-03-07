@@ -1,5 +1,5 @@
 Oxy_JXL
-There are 3 scripts Powershell
+- There are 3 scripts Powershell
   - Oxy_jxl converts in a lossless mode
   - Oxy_jxf force the conversion
   - Oxy_jxp converts into png before JXL
@@ -21,3 +21,6 @@ Oxy_Watch
   - The purpose is to catch especially VLC flow to know if a movie (or else) is watched more than 90%.
   - Then send it to a text file or whatever automatically.
   - Oxyon, my other soft (or the one you prefer) will be ready to tag these files.
+
+Oxy_Zip
+- Tiny Powershel script to convert multiple folder into multiple zip instead of one.
