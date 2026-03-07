@@ -17,7 +17,7 @@ Oxy_Wall
 Oxy_watch
   - Rust module
   - Is under construction:
-  - I try to copy the Pley /Jellyfin /Kodi workflow.
+  - I try to copy the Plex /Jellyfin / Kodi workflow.
   - The purpose is to catch especially VLC flow to know if a movie (or else) is watched more than 90%.
   - Then send it to a text file or whatever automatically.
   - Oxyon, my other soft (or the one you prefer) will be ready to tag these files.
