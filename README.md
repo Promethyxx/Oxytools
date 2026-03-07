@@ -5,10 +5,10 @@ Oxy_Backup
   - Let's run !
 
 Oxy_FL
-  - There a re 3 scripts
-  - Oxy_FLF allows you to list folder into a text file to keep them
+  - There are 3 scripts
+  - Oxy_FLF allows you to list folder into a text file
   - Oxy_Fl allows you to list files from the folder and subfolder you design into multiple text files (one by target)
-  - OXY_FL_Run is the vbs script to run these script through the planner silently
+  - OXY_FL_Run is the vbs script to run these script silently
   - Update the path
   - Lets run !
 
@@ -37,7 +37,7 @@ Oxy_Watch
   - Oxyon, my other soft (or the one you prefer) will be ready to tag these files.
 
 Oxy_Zip
-- Tiny Powershel script to convert multiple folder into multiple zip instead of one.
+  - Tiny Powershel script to convert multiple folder into multiple zip instead of one.
   - You need 7-Zip Extra
   - Update the path
   - Let's run !
