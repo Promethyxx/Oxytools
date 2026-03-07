@@ -1,6 +1,6 @@
 # Oxytools
 
-Collection of utility scripts before maybe impplmentation into Oxyon
+Collection of utility scripts
 
 ## Oxy_FL
 
@@ -10,15 +10,6 @@ Collection of utility scripts before maybe impplmentation into Oxyon
 - No requirements
 - Update the paths, then run
 
-## Oxy_JXL
-
-- 3 PowerShell scripts
-- `oxyj` converts in lossless mode
-- `oxyjf` forces the conversion
-- `oxyjp` converts into PNG before JXL
-- Requirements: [CJXL](https://github.com/niclasr/cjxl)
-  - Paths: source folder `$SRC` and CJXL binary `$CJXL`
-- Update the paths, then run
 
 ## Oxy_Wall
 
@@ -38,12 +29,3 @@ Collection of utility scripts before maybe impplmentation into Oxyon
   1. Checks VLC playback status (>90% = watched)
   2. Writes the result to a text file for later tagging
 - Requirements: VLC
-
-## Oxy_Zip
-
-- 2 PowerShell scripts
-- `oxyz` compresses a folder into a ZIP
-- `oxyzm` compresses multiple folders into multiple ZIPs
-- Requirements: [7-Zip Extra](https://www.7-zip.org/)
-  - Update the paths
-- Update the paths, then run
