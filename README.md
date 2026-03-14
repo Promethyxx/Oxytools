@@ -2,13 +2,15 @@
 
 Collection of utility scripts
 
-## Oxy_FL
+## Oxycash
+- Python GUI budget app
+- Monthly view
+- Webdav, you can use it locally indeed
 
-- 2 PowerShell scripts
-- `oxyflf` lists folders (no subfolder) into a text file
-- `oxyfl` lists files (subfolder included) into multiple text files (one per target)
-- No requirements
-- Update the paths, then run
+
+## Oxyshop
+- Python GUI shopping app
+- Webdav, you can use it locally indeed
 
 
 ## Oxy_Wall
@@ -20,6 +22,7 @@ Collection of utility scripts
   - `PIXABAY_API_KEY`
   - `UNSPLASH_API_KEY`
 - Update the paths, then run
+
 
 ## Oxy_Watch
 
