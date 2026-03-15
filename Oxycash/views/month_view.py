@@ -33,14 +33,27 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
     storage_frais = [frais]  # mutable ref so _sync_frais sees updates
 
     def _sync_frais(sec_key, idx):
-        from core.model import sync_frais_from_line
+        """Sync a line's budget to the Frais annual table."""
+        from core.model import FraisLine, MONTHS as _MONTHS
         if storage_frais[0] is None:
             return
         line = month.section(sec_key)[idx]
-        class _D:
-            months = all_months
-            frais  = storage_frais[0]
-        sync_frais_from_line(_D(), month_key, sec_key, line)
+        if sec_key == 'revenus':
+            return  # revenus don't go in frais
+        # Determine frais category
+        if sec_key == 'fixes':
+            frais_cat = 'fixes'
+        elif sec_key == 'retraits':
+            frais_cat = 'retraits'
+        else:
+            frais_cat = 'ponctuels'
+        mi = _MONTHS.index(month_key)
+        frais_list = storage_frais[0].setdefault(frais_cat, [])
+        fl = next((f for f in frais_list if f.name == line.name), None)
+        if fl is None:
+            fl = FraisLine(name=line.name, monthly=[0.0]*12)
+            frais_list.append(fl)
+        fl.monthly[mi] = line.banque + line.cash
 
     # ── widget helpers ──────────────────────────────────────────────────────
 
@@ -53,7 +66,7 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
         if no_wrap:  kw['no_wrap']  = True
         return ft.Text(str(s), **kw)
 
-    def num_field(value, on_change, width=60, col='text'):
+    def num_field(value, on_blur_cb, width=60, col='text'):
         return ft.TextField(
             value=value, width=width, height=34,
             text_size=12, text_align=ft.TextAlign.RIGHT,
@@ -61,7 +74,8 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
             border_color=c('card_border'),
             focused_border_color=c('gold'),
             content_padding=P.symmetric(horizontal=6, vertical=2),
-            on_change=on_change,
+            on_blur=on_blur_cb,
+            on_submit=on_blur_cb,
             keyboard_type=ft.KeyboardType.NUMBER,
         )
 
@@ -342,19 +356,13 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
         def del_var(e, _s=sec_key, _i=idx):
             month.section(_s).pop(_i); on_save(); rebuild(); on_toast(T['toast_deleted'])
 
-        # name widget
-        if is_var:
-            name_w = ft.TextField(
-                value=line.name, expand=True, height=34, text_size=12,
-                bgcolor='transparent', border_color='transparent',
-                content_padding=P.symmetric(horizontal=0, vertical=2),
-                on_blur=upd_name, color=c('text'),
-            )
-        else:
-            name_w = ft.Row([
-                txt(line.name, size=12, weight=ft.FontWeight.W_500, col='text',
-                    expand=True, overflow=ft.TextOverflow.ELLIPSIS, no_wrap=True),
-            ], spacing=4, expand=True)
+        # name widget — editable for ALL sections
+        name_w = ft.TextField(
+            value=line.name, expand=True, height=34, text_size=12,
+            bgcolor='transparent', border_color='transparent',
+            content_padding=P.symmetric(horizontal=4, vertical=2),
+            on_blur=upd_name, color=c('text'),
+        )
 
         def open_recurring_dialog(e, _s=sec_key, _i=idx):
             from core.model import apply_recurring
@@ -428,13 +436,40 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
             page_ref[0].show_dialog(dlg)
 
         def _apply_rec(_s, _i, freq):
-            from core.model import apply_recurring
+            from core.model import apply_recurring, MONTHS, mk_line
             src2 = month.section(_s)[_i]
             src2.recurring = {'freq': freq, 'start': month_key}
-            # propagate to all months
+
+            # Manually propagate current values to target months
+            start_idx = MONTHS.index(month_key) if month_key in MONTHS else 0
+            for step in range(1, 12):
+                target_idx = start_idx + step
+                if target_idx >= 12:
+                    break
+                if step % freq != 0:
+                    continue
+                target_key = MONTHS[target_idx]
+                if target_key not in all_months:
+                    continue
+                target_section = all_months[target_key].section(_s)
+                # Find matching line by name or create it
+                existing = next((l for l in target_section if l.name == src2.name), None)
+                if existing is None:
+                    new_line = mk_line(src2.name, banque=src2.banque, cash=src2.cash)
+                    new_line.recurring = {'freq': freq, 'start': month_key}
+                    target_section.append(new_line)
+                else:
+                    existing.banque = src2.banque
+                    existing.cash = src2.cash
+                    existing.recurring = {'freq': freq, 'start': month_key}
+
+            # Also call model's apply_recurring for any extra logic
             class _D:
                 months = all_months
-            apply_recurring(_D())
+            try:
+                apply_recurring(_D())
+            except Exception:
+                pass
             on_save()
             page_ref[0].pop_dialog()
             on_toast(T.fmt('rec_active', n=freq))
@@ -457,22 +492,40 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
                 style=ft.ButtonStyle(padding=P.all(2)),
             )
         ]
-        # Suppression uniquement pour les variables
-        if is_var:
-            trailing.append(ft.IconButton(
-                ft.Icons.DELETE_OUTLINE, icon_size=16, icon_color=c('danger'),
-                on_click=del_var,
-                style=ft.ButtonStyle(padding=P.all(2)),
-            ))
+        # Suppression pour toutes les sections
+        trailing.append(ft.IconButton(
+            ft.Icons.DELETE_OUTLINE, icon_size=16, icon_color=c('danger'),
+            on_click=del_var,
+            style=ft.ButtonStyle(padding=P.all(2)),
+        ))
 
-        row_content = ft.Row([
-            name_w,
-            num_field(fmt(line.banque), upd_banque, col='blue'),
-            num_field(fmt(line.cash),   upd_cash,   col='amber'),
-            ro_field(fmt(etat),   col='teal'),
-            ro_field(fmt(solde),  col=sc, width=54),
-            *trailing,
-        ], spacing=4, vertical_alignment=ft.CrossAxisAlignment.CENTER)
+        # Responsive layout: single row on desktop, stacked on mobile
+        is_narrow = page_ref[0] is not None and hasattr(page_ref[0], 'width') and (page_ref[0].width or 800) < 500
+
+        if is_narrow:
+            row_content = ft.Column([
+                ft.Row([
+                    name_w,
+                    *trailing,
+                ], spacing=4, vertical_alignment=ft.CrossAxisAlignment.CENTER),
+                ft.Row([
+                    txt('B', size=8, col='blue', weight=ft.FontWeight.W_600),
+                    num_field(fmt(line.banque), upd_banque, col='blue', width=56),
+                    txt('C', size=8, col='amber', weight=ft.FontWeight.W_600),
+                    num_field(fmt(line.cash),   upd_cash,   col='amber', width=56),
+                    ro_field(fmt(etat),   col='teal', width=52),
+                    ro_field(fmt(solde),  col=sc, width=48),
+                ], spacing=2, vertical_alignment=ft.CrossAxisAlignment.CENTER),
+            ], spacing=2)
+        else:
+            row_content = ft.Row([
+                name_w,
+                num_field(fmt(line.banque), upd_banque, col='blue'),
+                num_field(fmt(line.cash),   upd_cash,   col='amber'),
+                ro_field(fmt(etat),   col='teal'),
+                ro_field(fmt(solde),  col=sc, width=54),
+                *trailing,
+            ], spacing=4, vertical_alignment=ft.CrossAxisAlignment.CENTER)
 
         header = ft.Container(
             row_content,
@@ -499,9 +552,8 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
         col_ref = ft.Column([], spacing=4)
 
         def rebuild():
-            col_ref.controls.clear()
-            col_ref.controls.extend(section_body(sec_key))
-            col_ref.update()
+            # Refresh entire dashboard so summary cards update too
+            refresh_main()
 
         def section_body(sk):
             lines    = month.section(sk)
@@ -529,15 +581,18 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
             )
 
             parts = [header]
+            _narrow = page_ref[0] is not None and hasattr(page_ref[0], 'width') and (page_ref[0].width or 800) < 500
+
             if is_open:
-                # legend
-                parts.append(ft.Row([
-                    ft.Container(expand=True),
-                    ft.Container(txt(T['col_bank'], size=9, col='blue', weight=ft.FontWeight.W_600, align=ft.TextAlign.CENTER), width=60),
-                    ft.Container(txt(T['col_cash'],   size=9, col='amber', weight=ft.FontWeight.W_600, align=ft.TextAlign.CENTER), width=60),
-                    ft.Container(txt(T['col_state'],   size=9, col='teal', weight=ft.FontWeight.W_600, align=ft.TextAlign.CENTER), width=60),
-                    ft.Container(txt(T['col_balance'],  size=9, col='gold', weight=ft.FontWeight.W_600, align=ft.TextAlign.CENTER), width=54),
-                ], spacing=4))
+                # legend — only shown on wide layout (narrow has inline B/C labels)
+                if not _narrow:
+                    parts.append(ft.Row([
+                        ft.Container(expand=True),
+                        ft.Container(txt(T['col_bank'], size=9, col='blue', weight=ft.FontWeight.W_600, align=ft.TextAlign.CENTER), width=60),
+                        ft.Container(txt(T['col_cash'],   size=9, col='amber', weight=ft.FontWeight.W_600, align=ft.TextAlign.CENTER), width=60),
+                        ft.Container(txt(T['col_state'],   size=9, col='teal', weight=ft.FontWeight.W_600, align=ft.TextAlign.CENTER), width=60),
+                        ft.Container(txt(T['col_balance'],  size=9, col='gold', weight=ft.FontWeight.W_600, align=ft.TextAlign.CENTER), width=54),
+                    ], spacing=4))
 
                 for i, ln in enumerate(month.section(sk)):
                     parts.append(line_row(sk, i, ln, rebuild))
@@ -552,7 +607,7 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
                 def make_add(sk2=sk):
                     def _add(e):
                         from core.model import mk_line as _mk
-                        month.section(sk2).append(_mk('New' if True else ''))
+                        month.section(sk2).append(_mk(T['new_entry']))
                         on_save(); rebuild(); on_toast(T['toast_added'])
                     return _add
                 parts.append(ft.Container(
@@ -566,18 +621,31 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
 
                 # section total
                 sc2 = 'green' if tot_sol >= 0 else 'danger'
-                parts.append(ft.Container(
-                    ft.Row([
-                        txt(T['col_total'], size=11, weight=ft.FontWeight.W_700, col='text2', expand=True),
-                        ft.Container(txt(fmt(tot_b),    size=11, weight=ft.FontWeight.W_700, col=ck2,    align=ft.TextAlign.RIGHT), width=60),
-                        ft.Container(width=60),
-                        ft.Container(txt(fmt(tot_etat), size=11, weight=ft.FontWeight.W_700, col='teal', align=ft.TextAlign.RIGHT), width=60),
-                        ft.Container(txt(fmt(tot_sol),  size=11, weight=ft.FontWeight.W_700, col=sc2,    align=ft.TextAlign.RIGHT), width=54),
-                    ], spacing=4),
-                    padding=P.symmetric(horizontal=12, vertical=6),
-                    border=B.only(top=BS(1, c('card_border'))),
-                    margin=M.only(top=4),
-                ))
+                if _narrow:
+                    parts.append(ft.Container(
+                        ft.Row([
+                            txt(T['col_total'], size=11, weight=ft.FontWeight.W_700, col='text2', expand=True),
+                            txt(f"B {fmt(tot_b)}", size=10, weight=ft.FontWeight.W_700, col=ck2),
+                            txt(f"É {fmt(tot_etat)}", size=10, weight=ft.FontWeight.W_700, col='teal'),
+                            txt(f"S {fmt(tot_sol)}", size=10, weight=ft.FontWeight.W_700, col=sc2),
+                        ], spacing=8),
+                        padding=P.symmetric(horizontal=12, vertical=6),
+                        border=B.only(top=BS(1, c('card_border'))),
+                        margin=M.only(top=4),
+                    ))
+                else:
+                    parts.append(ft.Container(
+                        ft.Row([
+                            txt(T['col_total'], size=11, weight=ft.FontWeight.W_700, col='text2', expand=True),
+                            ft.Container(txt(fmt(tot_b),    size=11, weight=ft.FontWeight.W_700, col=ck2,    align=ft.TextAlign.RIGHT), width=60),
+                            ft.Container(width=60),
+                            ft.Container(txt(fmt(tot_etat), size=11, weight=ft.FontWeight.W_700, col='teal', align=ft.TextAlign.RIGHT), width=60),
+                            ft.Container(txt(fmt(tot_sol),  size=11, weight=ft.FontWeight.W_700, col=sc2,    align=ft.TextAlign.RIGHT), width=54),
+                        ], spacing=4),
+                        padding=P.symmetric(horizontal=12, vertical=6),
+                        border=B.only(top=BS(1, c('card_border'))),
+                        margin=M.only(top=4),
+                    ))
             return parts
 
         col_ref.controls.extend(section_body(sec_key))

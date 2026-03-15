@@ -132,6 +132,7 @@ _EN = {
     'exp_title':        'Annual expenses',
     'exp_fixed':        '📌 Fixed expenses',
     'exp_occasional':   '🗓️ Occasional expenses',
+    'exp_withdrawals':  '🏧 Withdrawals',
     'exp_add_line':     'Add a line',
     'exp_post':         'Item',
     'exp_total':        'Total',
@@ -194,6 +195,10 @@ _EN = {
     'cfg_switch':       'Use',
     'cfg_add_profile':  '+ Add',
     'cfg_profile_hint': 'New profile name',
+    'cfg_theme':        'Theme',
+    'cfg_dark':         'Dark',
+    'cfg_light':        'Light',
+    'new_entry':        'New',
 
 
     # ── Toasts ──
@@ -333,6 +338,7 @@ _FR = {
     'exp_title':        'Frais annuels',
     'exp_fixed':        '📌 Frais fixes',
     'exp_occasional':   '🗓️ Frais ponctuels',
+    'exp_withdrawals':  '🏧 Retraits',
     'exp_add_line':     'Ajouter une ligne',
     'exp_post':         'Poste',
     'exp_total':        'Total',
@@ -395,6 +401,10 @@ _FR = {
     'cfg_switch':       'Utiliser',
     'cfg_add_profile':  '+ Ajouter',
     'cfg_profile_hint': 'Nom du nouveau profil',
+    'cfg_theme':        'Thème',
+    'cfg_dark':         'Sombre',
+    'cfg_light':        'Clair',
+    'new_entry':        'Nouveau',
 
 
     # ── Toasts ──
@@ -417,6 +427,11 @@ class _T:
     def __getitem__(self, key: str) -> str:
         d = _TRANSLATIONS[_current_lang[0]]
         return d.get(key, _EN.get(key, key))
+
+    def get(self, key: str, default: str = '') -> str:
+        d = _TRANSLATIONS[_current_lang[0]]
+        val = d.get(key, _EN.get(key, None))
+        return val if val is not None else default
 
     def fmt(self, key: str, **kwargs) -> str:
         return self[key].format(**kwargs)

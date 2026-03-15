@@ -5,7 +5,6 @@ Build: flet build windows / linux / apk
 """
 from __future__ import annotations
 import flet as ft
-import threading
 
 from core.model   import MONTHS, MNAMES, ALL_TABS, detect_budget_month
 from core.storage import Storage
@@ -46,7 +45,6 @@ def main(page: ft.Page):
     storage  = Storage()
     theme    = Theme(dark=True)
     state    = {'tab': detect_budget_month()}
-    _toast_timer = [None]
 
     def c(k): return theme.c(k)
 
@@ -64,15 +62,16 @@ def main(page: ft.Page):
     def show_toast(msg: str):
         toast_txt.value  = msg
         toast_box.visible = True
-        try: toast_txt.update(); toast_box.update()
+        try: page.update()
         except: pass
-        if _toast_timer[0]: _toast_timer[0].cancel()
-        def hide():
+        async def _hide_later():
+            import asyncio
+            await asyncio.sleep(2.5)
             toast_box.visible = False
-            try: toast_box.update()
+            try: page.update()
             except: pass
-        _toast_timer[0] = threading.Timer(2.2, hide)
-        _toast_timer[0].start()
+        try: page.run_task(_hide_later)
+        except: pass
 
     # ── badge ───────────────────────────────────────────────────────────────
     badge_txt = ft.Text('💾 Local', size=10, font_family='DM Sans',
@@ -168,10 +167,8 @@ def main(page: ft.Page):
         content_col.controls.append(
             ft.Container(view, padding=P.symmetric(horizontal=14, vertical=12), expand=True)
         )
-        try:
-            content_col.update()
-            page.update()
-        except: pass
+        content_col.update()
+        page.update()
 
     def _apply_theme():
         page.bgcolor = c('bg')
@@ -228,21 +225,31 @@ def main(page: ft.Page):
             storage.cfg['font_scale'] = font_scale[0]
             from core.storage import save_config
             save_config(storage.cfg)
-            render()
+            async def _defer():
+                import asyncio
+                render()
+                await asyncio.sleep(0.1)
+                show_toast(f'Police {"+" if delta > 0 else ""}{delta}')
+            page.run_task(_defer)
         return _h
 
     def _do_lang(e):
         from core.i18n import toggle_lang, get_lang
         toggle_lang()
         storage.set_lang(get_lang())
-        lang_text.value = _lang_display()
-        try: lang_text.update()
-        except: pass
-        render()
+        async def _defer():
+            import asyncio
+            render()
+            lang_text.value = _lang_display()
+            await asyncio.sleep(0.05)
+            page.update()
+            show_toast('🌐 EN' if get_lang() == 'en' else '🌐 FR')
+        page.run_task(_defer)
 
     def _do_profile(e):
         state['tab'] = 'Config'
         render()
+        page.update()
 
     top_bar = ft.Container(
         ft.Column([
@@ -262,7 +269,7 @@ def main(page: ft.Page):
                     ft.Container(
                         ft.Text('A-', size=11, font_family='DM Sans',
                                 weight=ft.FontWeight.W_700, color=c('text2')),
-                        width=28, height=28,
+                        width=36, height=36,
                         border=B.all(1, c('card_border')), border_radius=6,
                         alignment=ft.Alignment(0, 0),
                         on_click=_do_scale(-2), ink=True,
@@ -270,20 +277,20 @@ def main(page: ft.Page):
                     ft.Container(
                         ft.Text('A+', size=11, font_family='DM Sans',
                                 weight=ft.FontWeight.W_700, color=c('text2')),
-                        width=28, height=28,
+                        width=36, height=36,
                         border=B.all(1, c('card_border')), border_radius=6,
                         alignment=ft.Alignment(0, 0),
                         on_click=_do_scale(+2), ink=True,
                     ),
                     ft.Container(
                         lang_text,
-                        padding=P.symmetric(horizontal=8, vertical=7),
+                        padding=P.symmetric(horizontal=10, vertical=8),
                         border=B.all(1, c('gold')), border_radius=8,
                         on_click=_do_lang, ink=True,
                     ),
                     ft.Container(
-                        theme_icon, width=32, height=32,
-                        border_radius=16,
+                        theme_icon, width=36, height=36,
+                        border_radius=18,
                         border=B.all(1, c('card_border')),
                         alignment=ft.Alignment(0, 0),
                         on_click=toggle_theme, ink=True,
@@ -320,11 +327,17 @@ def main(page: ft.Page):
         try: page.update()
         except: pass
 
-    # Small delay so the page is fully mounted before rendering
+    # Ensure page is fully mounted before rendering — retry if needed
     async def start():
         import asyncio
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(0.15)
         await do_load_async()
+        # Force a second update pass to ensure all widgets are visible
+        await asyncio.sleep(0.1)
+        try:
+            render()
+            page.update()
+        except: pass
 
     page.run_task(start)
 

@@ -33,8 +33,14 @@ def build_charts_view(data: AppData, t, currency: str) -> ft.Column:
         if m is None:
             revenues.append(0); expenses.append(0); balances.append(cumul)
             continue
-        rev = sum(l.etat() for l in m.revenus)
-        exp = sum(l.etat() for l in m.fixes + m.variables) + sum(l.etat() for l in m.retraits)
+        # Use budgeted amounts (banque+cash), not just payments received
+        rev_budget = sum(l.banque + l.cash for l in m.revenus)
+        rev_paid   = sum(l.etat() for l in m.revenus)
+        exp_budget = sum(l.banque + l.cash for l in m.fixes + m.variables) + sum(l.banque + l.cash for l in m.retraits)
+        exp_paid   = sum(l.etat() for l in m.fixes + m.variables) + sum(l.etat() for l in m.retraits)
+        # Show whichever is greater: budget or actual payments
+        rev = max(rev_budget, rev_paid)
+        exp = max(exp_budget, exp_paid)
         revenues.append(rev)
         expenses.append(exp)
         cumul += rev - exp

@@ -197,6 +197,7 @@ class AppData:
         fr = {
             'fixes':     [x.to_dict() for x in self.frais.get('fixes', [])],
             'ponctuels': [x.to_dict() for x in self.frais.get('ponctuels', [])],
+            'retraits':  [x.to_dict() for x in self.frais.get('retraits', [])],
         }
         return {
             'months': {k: v.to_dict() for k, v in self.months.items()},
@@ -228,6 +229,7 @@ class AppData:
         frais = {
             'fixes':     [FraisLine.from_dict(x) for x in fr_raw.get('fixes', [])],
             'ponctuels': [FraisLine.from_dict(x) for x in fr_raw.get('ponctuels', [])],
+            'retraits':  [FraisLine.from_dict(x) for x in fr_raw.get('retraits', [])],
         }
         viabilite = [ViabilitePalier.from_dict(x) for x in d.get('viabilite', [])]
         return AppData(months=months, dettes=dettes, epargne=epargne, frais=frais, viabilite=viabilite)
@@ -259,7 +261,7 @@ def default_data() -> AppData:
         d.months[m] = _def_month(i)
 
     d.dettes    = []
-    d.frais     = {'fixes': [], 'ponctuels': []}
+    d.frais     = {'fixes': [], 'ponctuels': [], 'retraits': []}
     d.epargne   = {'sondages': [], 'wishlists': [], 'pc_legacy': []}
     d.viabilite = []
     return d
@@ -338,11 +340,20 @@ def sync_frais_from_line(data, month_key: str, sec_key: str, line) -> None:
     Update ONE cell in Frais for a recurring line in a specific month.
     Call after user edits banque/cash on a recurring line.
     Never touches other months.
+    Mapping: fixes → frais.fixes, variables → frais.ponctuels, retraits → frais.retraits
+    Revenus are NOT synced to frais.
     """
     if not line.recurring or data.frais is None:
         return
-    mi        = MONTHS.index(month_key)
-    frais_cat = 'fixes' if sec_key in ('fixes', 'retraits', 'revenus') else 'ponctuels'
+    if sec_key == 'revenus':
+        return  # revenus never go into frais
+    mi = MONTHS.index(month_key)
+    if sec_key == 'fixes':
+        frais_cat = 'fixes'
+    elif sec_key == 'retraits':
+        frais_cat = 'retraits'
+    else:
+        frais_cat = 'ponctuels'
     frais_list = data.frais.setdefault(frais_cat, [])
     fl = next((f for f in frais_list if f.name == line.name), None)
     if fl is None:

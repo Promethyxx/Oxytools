@@ -382,8 +382,9 @@ def build_frais_view(data: AppData, t, on_save, on_toast, on_reload=None):
         return [
             _t(T['exp_title'], size=20, weight=ft.FontWeight.W_700,
                family='Playfair Display', col=c('text')),
-            table('fixes',     T['exp_fixed'],    'blue'),
+            table('fixes',     T['exp_fixed'],       'blue'),
             table('ponctuels', T['exp_occasional'],  'amber'),
+            table('retraits',  T['exp_withdrawals'], 'teal'),
             ft.Container(height=40),
         ]
 
@@ -528,6 +529,11 @@ def build_config_view(storage, t, on_save, on_toast, on_reload, on_theme_toggle,
     _font_scale[0] = t.scale
     cfg = storage.cfg
 
+    def _pupd():
+        try:
+            if page: page.update()
+        except: pass
+
     def field(label, value, hint='', password=False):
         lbl = _t(label, size=11, col=c('text2'))
         tf  = ft.TextField(
@@ -571,113 +577,116 @@ def build_config_view(storage, t, on_save, on_toast, on_reload, on_theme_toggle,
     def save_cfg(e):
         storage.save_config(url_tf.value.strip(), usr_tf.value.strip(), pw_tf.value)
         status_txt.value = T['cfg_saved']; status_txt.color = c('green')
-        status_txt.update(); on_toast(T['cfg_saved'])
+        on_toast(T['cfg_saved']); _pupd()
 
     def test_cfg(e):
         storage.save_config(url_tf.value.strip(), usr_tf.value.strip(), pw_tf.value)
         ok, msg = storage.test_dav()
         status_txt.value = msg
         status_txt.color = c('green') if ok else c('danger')
-        status_txt.update()
+        on_toast(f'✓ {msg}' if ok else f'✗ {msg}'); _pupd()
 
     def clear_cfg(e):
         storage.clear_config()
         url_tf.value=''; usr_tf.value=''; pw_tf.value=''
         status_txt.value=T['cfg_cleared']; status_txt.color=c('text2')
-        for w in [url_tf, usr_tf, pw_tf, status_txt]: w.update()
+        on_toast(T['cfg_cleared']); _pupd()
 
     def do_export(e):
         import pathlib, datetime
         path = pathlib.Path.home() / f"oxycash-{datetime.date.today()}.json"
         path.write_text(storage.export_json(), encoding='utf-8')
-        on_toast(T.fmt('cfg_exported', name=path.name))
+        on_toast(T.fmt('cfg_exported', name=path.name)); _pupd()
 
-    def _open_native_picker():
-        """Try to open a native file dialog. Returns path string or None."""
-        import sys, subprocess
-        try:
-            if sys.platform == 'win32':
-                script = (
-                    'Add-Type -AssemblyName System.Windows.Forms; '
-                    '$f = New-Object System.Windows.Forms.OpenFileDialog; '
-                    '$f.Filter = "JSON files (*.json)|*.json|All files (*.*)|*.*"; '
-                    '$f.Title = "Importer oxycash.json"; '
-                    'if ($f.ShowDialog() -eq "OK") { Write-Output $f.FileName }'
-                )
-                r = subprocess.run(
-                    ['powershell', '-NoProfile', '-NonInteractive', '-Command', script],
-                    capture_output=True, text=True, timeout=60,
-                )
-                path = r.stdout.strip()
-                return path if path else None
+    # ── File picker (created at build time for Android reliability) ─────────
+    _file_picker = [None]
+    _picked_content = [None]
+
+    def _on_pick(ev: ft.FilePickerResultEvent):
+        if ev.files and len(ev.files) > 0:
+            picked = ev.files[0]
+            fpath = picked.path
+            if fpath:
+                import_path_tf.value = fpath
+                try:
+                    import pathlib
+                    raw = pathlib.Path(fpath).read_text(encoding='utf-8')
+                    _picked_content[0] = raw
+                    on_toast('Fichier chargé ✓')
+                except Exception:
+                    _picked_content[0] = None
+                    on_toast('Fichier sélectionné — cliquer Importer')
             else:
-                # Linux: try zenity, then kdialog
-                for cmd in [
-                    ['zenity', '--file-selection', '--title=Importer oxycash.json',
-                     '--file-filter=*.json'],
-                    ['kdialog', '--getopenfilename', '.', '*.json'],
-                ]:
-                    try:
-                        r = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-                        path = r.stdout.strip()
-                        if path:
-                            return path
-                    except FileNotFoundError:
-                        continue
-        except Exception:
-            pass
-        return None
+                import_path_tf.value = picked.name or ''
+                _picked_content[0] = None
+                on_toast('Fichier sélectionné')
+        else:
+            on_toast('Aucun fichier sélectionné')
+        _pupd()
+
+    # Create picker immediately if page is available
+    if page is not None:
+        _file_picker[0] = ft.FilePicker(on_result=_on_pick)
+        page.overlay.append(_file_picker[0])
 
     def do_browse(e):
-        """Open native file picker in a thread, then fill import_path_tf."""
-        import threading
-        def _pick():
-            path = _open_native_picker()
-            if path:
-                import_path_tf.value = path
-                try: import_path_tf.update()
-                except: pass
-            else:
-                on_toast(T['cfg_import_na'])
-        threading.Thread(target=_pick, daemon=True).start()
+        """Open Flet FilePicker — async for Android reliability."""
+        if page is None or _file_picker[0] is None:
+            on_toast(T['cfg_import_na']); _pupd()
+            return
+        _picked_content[0] = None
+        async def _do_pick():
+            import asyncio
+            # Ensure overlay is mounted
+            page.update()
+            await asyncio.sleep(0.2)
+            try:
+                _file_picker[0].pick_files(
+                    dialog_title='Importer oxycash.json',
+                    allowed_extensions=['json'],
+                    allow_multiple=False,
+                )
+            except Exception as ex:
+                on_toast(f'Erreur: {str(ex)[:40]}'); _pupd()
+        page.run_task(_do_pick)
 
     def do_import(e):
-        path = import_path_tf.value.strip()
-        if not path:
-            on_toast(T['cfg_import_nopath'])
-            return
-        import pathlib
+        # First try content already loaded by picker (Android workaround)
+        raw = _picked_content[0]
+        if raw is None:
+            path = import_path_tf.value.strip()
+            if not path:
+                on_toast(T['cfg_import_nopath']); _pupd()
+                return
+            import pathlib
+            try:
+                raw = pathlib.Path(path).read_text(encoding='utf-8')
+            except FileNotFoundError:
+                on_toast(T['cfg_import_notfound']); _pupd()
+                return
+            except Exception as ex:
+                on_toast(f'Erreur: {str(ex)[:40]}'); _pupd()
+                return
         try:
-            raw = pathlib.Path(path).read_text(encoding='utf-8')
-            ok  = storage.import_json(raw)
+            ok = storage.import_json(raw)
             if ok:
-                import_status.value = T.fmt('cfg_import_ok', name=pathlib.Path(path).name)
+                import_status.value = 'Import réussi ✓'
                 import_status.color = c('green')
-                try: import_status.update()
-                except: pass
+                _picked_content[0] = None
                 on_reload()
-                on_toast(f'Importe!')
+                on_toast('Import réussi !')
             else:
                 import_status.value = T['cfg_import_invalid']
                 import_status.color = c('danger')
-                try: import_status.update()
-                except: pass
                 on_toast(T['cfg_import_invalid'])
-        except FileNotFoundError:
-            import_status.value = T['cfg_import_notfound']
-            import_status.color = c('danger')
-            try: import_status.update()
-            except: pass
-            on_toast(T['cfg_import_notfound'])
         except Exception as ex:
             import_status.value = str(ex)[:60]
             import_status.color = c('danger')
-            try: import_status.update()
-            except: pass
             on_toast('Erreur import')
+        _pupd()
 
     def do_reset(e):
-        storage.reset(); on_reload(); on_toast(T['cfg_reset_done'])
+        storage.reset(); on_reload(); on_toast(T['cfg_reset_done']); _pupd()
 
     def mk_card(title, *children):
         return ft.Container(
@@ -704,7 +713,7 @@ def build_config_view(storage, t, on_save, on_toast, on_reload, on_theme_toggle,
                     on_toast('Cannot delete last profile')
                     return
                 storage.delete_profile(slug)
-                on_reload()
+                on_reload(); _pupd()
 
             name_ref = ft.Ref[ft.TextField]()
 
@@ -764,12 +773,16 @@ def build_config_view(storage, t, on_save, on_toast, on_reload, on_theme_toggle,
                 on_toast(T['toast_label_req']); return
             slug = storage.add_profile(name)
             storage.switch_profile(slug)
-            on_reload()
+            new_name_tf.value = ''
+            try: new_name_tf.update()
+            except: pass
+            on_toast(f'Profil « {name} » créé ✓')
+            on_reload(); _pupd()
 
         return mk_card(T['cfg_profiles'],
                        *rows,
                        ft.Container(height=4),
-                       ft.Row([
+                       ft.Column([
                            new_name_tf,
                            ft.ElevatedButton(T['cfg_add_profile'], on_click=add_profile,
                                              height=36,
@@ -777,7 +790,7 @@ def build_config_view(storage, t, on_save, on_toast, on_reload, on_theme_toggle,
                                                  bgcolor=c('teal'), color='#1a1a1a',
                                                  shape=ft.RoundedRectangleBorder(radius=8),
                                                  padding=P.symmetric(horizontal=12))),
-                       ], spacing=8))
+                       ], spacing=6))
 
     # ── WebDAV per active profile ─────────────────────────────────────────────
     prof    = storage.active_profile
@@ -791,16 +804,20 @@ def build_config_view(storage, t, on_save, on_toast, on_reload, on_theme_toggle,
                                   usr_tf.value.strip(),
                                   pw_tf.value)
         status_txt.value = T['cfg_saved']; status_txt.color = c('green')
-        status_txt.update(); on_toast(T['cfg_saved'])
+        on_toast(T['cfg_saved']); _pupd()
 
     def test_cfg_profile(e):
-        storage.save_profile_dav(storage.active_slug,
-                                  url_tf.value.strip(),
-                                  usr_tf.value.strip(),
-                                  pw_tf.value)
+        url = url_tf.value.strip()
+        usr = usr_tf.value.strip()
+        pw  = pw_tf.value
+        if not url or not usr or not pw:
+            on_toast('⚠️ Remplir les 3 champs'); _pupd()
+            return
+        on_toast('⏳ Test en cours…'); _pupd()
+        storage.save_profile_dav(storage.active_slug, url, usr, pw)
         ok, msg = storage.test_dav()
         status_txt.value = msg; status_txt.color = c('green') if ok else c('danger')
-        status_txt.update()
+        on_toast(f'✓ {msg}' if ok else f'✗ {msg}'); _pupd()
 
     # ── Currency ──────────────────────────────────────────────────────────────
     currency_tf = ft.TextField(
@@ -811,24 +828,43 @@ def build_config_view(storage, t, on_save, on_toast, on_reload, on_theme_toggle,
     )
     def save_currency(e):
         storage.set_currency(currency_tf.value.strip() or 'CHF')
-        on_toast(T['cfg_saved'])
+        on_toast(T['cfg_saved']); _pupd()
 
     currency_card = mk_card(T['cfg_currency'],
         ft.Row([currency_tf,
                 abtn(T['cfg_save'], 'gold', save_currency)], spacing=8))
+
+    # ── Theme toggle card ─────────────────────────────────────────────────
+    theme_card = mk_card(T['cfg_theme'],
+        ft.Container(
+            ft.Row([
+                _t('🌙' if t.is_dark else '☀️', size=18),
+                _t(T['cfg_dark'] if t.is_dark else T['cfg_light'],
+                   size=13, weight=ft.FontWeight.W_600, col=c('text')),
+            ], spacing=8),
+            on_click=lambda e: on_theme_toggle(),
+            ink=True, padding=P.symmetric(horizontal=8, vertical=8),
+            border=B.all(1, c('card_border')), border_radius=8,
+        ))
+
+    # ── Lang switch card ──────────────────────────────────────────────────
+    lang_card = _lang_switch_card(storage, on_reload, c, T)
 
     return ft.Column([
         _t(T['cfg_title'], size=20, weight=ft.FontWeight.W_700,
            family='Playfair Display', col=c('text')),
         profile_card(),
         currency_card,
+        theme_card,
+        lang_card,
         mk_card(T['cfg_webdav'],
                 url_lbl, url_tf, ft.Container(height=2),
                 usr_lbl, usr_tf, ft.Container(height=2),
                 pw_lbl,  pw_tf,  ft.Container(height=6),
                 ft.Row([abtn(T['cfg_save'],'gold',save_cfg_profile),
                         abtn(T['cfg_test'],'teal',test_cfg_profile),
-                        abtn(T['cfg_clear'],'card',clear_cfg)], spacing=8),
+                        abtn(T['cfg_clear'],'card',clear_cfg)],
+                       spacing=8, wrap=True),
                 status_txt),
         mk_card(T['cfg_export'],
                 abtn(T['cfg_export_lbl'], 'card', do_export),
@@ -839,7 +875,8 @@ def build_config_view(storage, t, on_save, on_toast, on_reload, on_theme_toggle,
                 import_path_tf,
                 ft.Container(height=6),
                 ft.Row([abtn(T['cfg_browse'], 'card', do_browse),
-                        abtn(T['cfg_import_btn'], 'teal', do_import)], spacing=8),
+                        abtn(T['cfg_import_btn'], 'teal', do_import)],
+                       spacing=8, wrap=True),
                 import_status),
         mk_card(T['cfg_data'], abtn(T['cfg_reset'],'',do_reset,danger=True)),
         ft.Container(height=40),
