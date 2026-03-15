@@ -55,14 +55,12 @@ def _sec_hdr(icon, label, total_str, col_key, c):
 
 
 def _add_btn(label, on_click, c):
-    return ft.GestureDetector(
-        content=ft.Container(
-            ft.Row([ft.Icon(ft.Icons.ADD, size=14, color=c('text3')),
-                    _t(label, size=12, col='text3')], spacing=6),
-            padding=P.symmetric(horizontal=12, vertical=8),
-            border=B.all(1, c('card_border')), border_radius=10,
-        ),
-        on_tap=on_click,
+    return ft.Container(
+        ft.Row([ft.Icon(ft.Icons.ADD, size=14, color=c('text3')),
+                _t(label, size=12, col='text3')], spacing=6),
+        padding=P.symmetric(horizontal=12, vertical=8),
+        border=B.all(1, c('card_border')), border_radius=10,
+        on_click=on_click, ink=True,
     )
 
 
@@ -75,7 +73,7 @@ def _del_btn(on_click, c):
 
 # ═══ DETTES ════════════════════════════════════════════════════════
 
-def build_dettes_view(data: AppData, t, on_save, on_toast):
+def build_dettes_view(data: AppData, t, on_save, on_toast, on_reload=None):
     def c(k): return t.c(k)
     _font_scale[0] = t.scale
     col = ft.Column([], spacing=8, scroll=ft.ScrollMode.AUTO, expand=True)
@@ -85,6 +83,7 @@ def build_dettes_view(data: AppData, t, on_save, on_toast):
         col.controls.extend(_build())
         try: col.update()
         except: pass
+        if on_reload: on_reload()
 
     def _build():
         total_du = sum(d.solde   for d in data.dettes)
@@ -179,7 +178,7 @@ def build_dettes_view(data: AppData, t, on_save, on_toast):
 
 # ═══ EPARGNE ════════════════════════════════════════════════════════
 
-def build_epargne_view(data: AppData, t, on_save, on_toast):
+def build_epargne_view(data: AppData, t, on_save, on_toast, on_reload=None):
     def c(k): return t.c(k)
     _font_scale[0] = t.scale
     col = ft.Column([], spacing=6, scroll=ft.ScrollMode.AUTO, expand=True)
@@ -189,6 +188,7 @@ def build_epargne_view(data: AppData, t, on_save, on_toast):
         col.controls.extend(_build())
         try: col.update()
         except: pass
+        if on_reload: on_reload()
 
     def _build():
         ep = data.epargne
@@ -276,7 +276,7 @@ def build_epargne_view(data: AppData, t, on_save, on_toast):
 
 # ═══ FRAIS ══════════════════════════════════════════════════════════
 
-def build_frais_view(data: AppData, t, on_save, on_toast):
+def build_frais_view(data: AppData, t, on_save, on_toast, on_reload=None):
     def c(k): return t.c(k)
     _font_scale[0] = t.scale
     col = ft.Column([], spacing=12, scroll=ft.ScrollMode.AUTO, expand=True)
@@ -286,6 +286,7 @@ def build_frais_view(data: AppData, t, on_save, on_toast):
         col.controls.extend(_build())
         try: col.update()
         except: pass
+        if on_reload: on_reload()
 
     def _build():
         def table(cat, label, col_key):
@@ -392,7 +393,7 @@ def build_frais_view(data: AppData, t, on_save, on_toast):
 
 # ═══ VIABILITE ══════════════════════════════════════════════════════
 
-def build_viabilite_view(data: AppData, t, on_save, on_toast):
+def build_viabilite_view(data: AppData, t, on_save, on_toast, on_reload=None):
     def c(k): return t.c(k)
     _font_scale[0] = t.scale
     col = ft.Column([], spacing=10, scroll=ft.ScrollMode.AUTO, expand=True)
@@ -402,6 +403,7 @@ def build_viabilite_view(data: AppData, t, on_save, on_toast):
         col.controls.extend(_build())
         try: col.update()
         except: pass
+        if on_reload: on_reload()
 
     def _build():
         COLS = [(T['via_salary'],'gold',60),(T['via_rent'],'text3',None),(T['via_insurance'],'text3',None),
@@ -511,9 +513,9 @@ def _lang_switch_card(storage, on_reload, c, T_ref):
         ft.Column([
             _t(T_ref['cfg_lang'], size=11, weight=ft.FontWeight.W_600, col=c('text3')),
             ft.Container(height=6),
-            ft.GestureDetector(
-                content=ft.Row([en_indicator, fr_indicator], spacing=0),
-                on_tap=switch,
+            ft.Container(
+                ft.Row([en_indicator, fr_indicator], spacing=0),
+                on_click=switch, ink=True,
             ),
         ], spacing=2),
         padding=14, bgcolor=c('card'),
@@ -728,15 +730,13 @@ def build_config_view(storage, t, on_save, on_toast, on_reload, on_theme_toggle,
                         content_padding=P.symmetric(horizontal=4, vertical=2),
                         on_blur=rename,
                     ),
-                    ft.GestureDetector(
-                        content=ft.Container(
-                            _t('✓' if is_act else T['cfg_switch'], size=10,
-                               col=c('teal') if is_act else c('text2')),
-                            padding=P.symmetric(horizontal=6, vertical=4),
-                            border=B.all(1, c('teal') if is_act else c('card_border')),
-                            border_radius=6,
-                        ),
-                        on_tap=switch,
+                    ft.Container(
+                        _t('✓' if is_act else T['cfg_switch'], size=10,
+                           col=c('teal') if is_act else c('text2')),
+                        padding=P.symmetric(horizontal=6, vertical=4),
+                        border=B.all(1, c('teal') if is_act else c('card_border')),
+                        border_radius=6,
+                        on_click=switch, ink=True,
                     ),
                     ft.IconButton(
                         ft.Icons.DELETE_OUTLINE, icon_size=14,

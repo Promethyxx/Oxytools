@@ -99,10 +99,13 @@ def main(page: ft.Page):
     content_col = ft.Column(expand=True, scroll=ft.ScrollMode.AUTO)
 
     def on_save():
-        def _do():
-            storage.save()
+        async def _do_async():
+            import asyncio
+            await asyncio.get_event_loop().run_in_executor(None, storage.save)
             update_badge()
-        threading.Thread(target=_do, daemon=True).start()
+            try: page.update()
+            except: pass
+        page.run_task(_do_async)
 
     def render():
         theme.scale = font_scale[0]
@@ -110,6 +113,7 @@ def main(page: ft.Page):
 
         # rebuild tabs
         tabs = []
+        _tabs_built = True
         for i, key in enumerate(get_all_tabs()):
             is_act  = key == tab
             is_spec = i >= len(MONTHS)
@@ -120,21 +124,22 @@ def main(page: ft.Page):
                     state['tab'] = k
                     render()
                 return _tap
-            tabs.append(ft.GestureDetector(
-                content=ft.Container(
-                    ft.Text(get_tab_labels()[i], size=11, weight=ft.FontWeight.W_600,
-                            font_family='DM Sans', no_wrap=True,
-                            color='#1a1a1a' if is_act else norm_fg),
-                    padding=P.symmetric(horizontal=14, vertical=6),
-                    bgcolor=act_bg if is_act else 'transparent',
-                    border_radius=8,
-                ),
-                on_tap=make_tap(key),
+            tabs.append(ft.Container(
+                ft.Text(get_tab_labels()[i], size=11, weight=ft.FontWeight.W_600,
+                        font_family='DM Sans', no_wrap=True,
+                        color='#1a1a1a' if is_act else norm_fg),
+                padding=P.symmetric(horizontal=14, vertical=6),
+                bgcolor=act_bg if is_act else 'transparent',
+                border_radius=8,
+                on_click=make_tap(key), ink=True,
             ))
 
         tab_row.controls.clear()
         tab_row.controls.extend(tabs)
-        try: tab_row.update()
+        try:
+            tab_row.update()
+            profile_text.value = storage.active_profile['name']
+            profile_text.update()
         except: pass
 
         # rebuild content
@@ -143,13 +148,13 @@ def main(page: ft.Page):
         if mi >= 0:
             view = build_month_view(tab, storage.data.months[tab], theme, on_save, show_toast, all_months=storage.data.months, page=page, frais=storage.data.frais)
         elif tab == 'Debts':
-            view = build_dettes_view(storage.data, theme, on_save, show_toast)
+            view = build_dettes_view(storage.data, theme, on_save, show_toast, render)
         elif tab == 'Savings':
-            view = build_epargne_view(storage.data, theme, on_save, show_toast)
+            view = build_epargne_view(storage.data, theme, on_save, show_toast, render)
         elif tab == 'Expenses':
-            view = build_frais_view(storage.data, theme, on_save, show_toast)
+            view = build_frais_view(storage.data, theme, on_save, show_toast, render)
         elif tab == 'Viability':
-            view = build_viabilite_view(storage.data, theme, on_save, show_toast)
+            view = build_viabilite_view(storage.data, theme, on_save, show_toast, render)
         elif tab == 'Charts':
             view = build_charts_view(storage.data, theme, storage.currency)
         elif tab == 'Config':
@@ -163,49 +168,34 @@ def main(page: ft.Page):
         content_col.controls.append(
             ft.Container(view, padding=P.symmetric(horizontal=14, vertical=12), expand=True)
         )
-        try: content_col.update()
+        try:
+            content_col.update()
+            page.update()
         except: pass
 
     def _apply_theme():
         page.bgcolor = c('bg')
         top_bar.bgcolor = c('bg2')
-        try: page.update()
+        try: top_bar.update(); page.update()
         except: pass
 
     # ── profile switcher ────────────────────────────────────────────────────
     def _profile_btn():
         prof = storage.active_profile
-        return ft.GestureDetector(
-            content=ft.Container(
-                ft.Text(prof['name'], size=10, font_family='DM Sans',
-                        weight=ft.FontWeight.W_600, color=c('teal'),
-                        no_wrap=True),
-                padding=P.symmetric(horizontal=8, vertical=4),
-                border=B.all(1, c('teal')), border_radius=6,
-            ),
-            on_tap=lambda e: state.update({'tab': 'Config'}) or render(),
+        def _go_config(e):
+            state['tab'] = 'Config'
+            render()
+        return ft.Container(
+            ft.Text(prof['name'], size=10, font_family='DM Sans',
+                    weight=ft.FontWeight.W_600, color=c('teal'),
+                    no_wrap=True),
+            padding=P.symmetric(horizontal=8, vertical=4),
+            border=B.all(1, c('teal')), border_radius=6,
+            on_click=_go_config, ink=True,
         )
 
     # ── font scale ──────────────────────────────────────────────────────────
     font_scale = [0]   # offset in px, persisted in config
-
-    def _scale_btn(label, delta):
-        def _tap(e):
-            font_scale[0] = max(-6, min(8, font_scale[0] + delta))
-            storage.cfg['font_scale'] = font_scale[0]
-            from core.storage import save_config
-            save_config(storage.cfg)
-            render()
-        return ft.GestureDetector(
-            content=ft.Container(
-                ft.Text(label, size=11, font_family='DM Sans',
-                        weight=ft.FontWeight.W_700, color=c('text2')),
-                width=28, height=28,
-                border=B.all(1, c('card_border')), border_radius=6,
-                alignment=ft.Alignment(0, 0),
-            ),
-            on_tap=_tap,
-        )
 
     font_scale[0] = storage.cfg.get('font_scale', 0)
 
@@ -213,12 +203,6 @@ def main(page: ft.Page):
     def _lang_display():
         from core.i18n import get_lang
         return 'FR' if get_lang() == 'en' else 'EN'
-
-    def do_toggle_lang(e):
-        from core.i18n import toggle_lang, get_lang
-        toggle_lang()
-        storage.set_lang(get_lang())
-        render()
 
     # ── theme toggle ────────────────────────────────────────────────────────
     theme_icon = ft.Text('🌙', size=16)
@@ -230,8 +214,35 @@ def main(page: ft.Page):
         try: theme_icon.update()
         except: pass
 
-    # ── top bar ─────────────────────────────────────────────────────────────
-    tab_row = ft.Row([], spacing=2, scroll=ft.ScrollMode.AUTO)
+    # ── top bar — all widgets are persistent (never recreated) ─────────────
+    tab_row    = ft.Row([], spacing=2, scroll=ft.ScrollMode.AUTO)
+    lang_text  = ft.Text(_lang_display(), size=10, font_family='DM Sans',
+                         weight=ft.FontWeight.W_700, color=c('gold'))
+    profile_text = ft.Text(storage.active_profile['name'], size=10,
+                           font_family='DM Sans', weight=ft.FontWeight.W_600,
+                           color=c('teal'), no_wrap=True)
+
+    def _do_scale(delta):
+        def _h(e):
+            font_scale[0] = max(-6, min(8, font_scale[0] + delta))
+            storage.cfg['font_scale'] = font_scale[0]
+            from core.storage import save_config
+            save_config(storage.cfg)
+            render()
+        return _h
+
+    def _do_lang(e):
+        from core.i18n import toggle_lang, get_lang
+        toggle_lang()
+        storage.set_lang(get_lang())
+        lang_text.value = _lang_display()
+        try: lang_text.update()
+        except: pass
+        render()
+
+    def _do_profile(e):
+        state['tab'] = 'Config'
+        render()
 
     top_bar = ft.Container(
         ft.Column([
@@ -240,19 +251,35 @@ def main(page: ft.Page):
                     ft.Text('Oxycash', size=18, weight=ft.FontWeight.W_700,
                             font_family='Playfair Display', color=c('text')),
                     badge,
-                    _profile_btn(),
+                    ft.Container(
+                        profile_text,
+                        padding=P.symmetric(horizontal=8, vertical=4),
+                        border=B.all(1, c('teal')), border_radius=6,
+                        on_click=_do_profile, ink=True,
+                    ),
                 ], spacing=6, vertical_alignment=ft.CrossAxisAlignment.CENTER),
                 ft.Row([
-                    _scale_btn('A-', -2),
-                    _scale_btn('A+', +2),
-                    ft.GestureDetector(
-                        content=ft.Container(
-                            ft.Text(_lang_display(), size=10, font_family='DM Sans',
-                                    weight=ft.FontWeight.W_700, color=c('gold')),
-                            padding=P.symmetric(horizontal=8, vertical=7),
-                            border=B.all(1, c('gold')), border_radius=8,
-                        ),
-                        on_tap=do_toggle_lang,
+                    ft.Container(
+                        ft.Text('A-', size=11, font_family='DM Sans',
+                                weight=ft.FontWeight.W_700, color=c('text2')),
+                        width=28, height=28,
+                        border=B.all(1, c('card_border')), border_radius=6,
+                        alignment=ft.Alignment(0, 0),
+                        on_click=_do_scale(-2), ink=True,
+                    ),
+                    ft.Container(
+                        ft.Text('A+', size=11, font_family='DM Sans',
+                                weight=ft.FontWeight.W_700, color=c('text2')),
+                        width=28, height=28,
+                        border=B.all(1, c('card_border')), border_radius=6,
+                        alignment=ft.Alignment(0, 0),
+                        on_click=_do_scale(+2), ink=True,
+                    ),
+                    ft.Container(
+                        lang_text,
+                        padding=P.symmetric(horizontal=8, vertical=7),
+                        border=B.all(1, c('gold')), border_radius=8,
+                        on_click=_do_lang, ink=True,
                     ),
                     ft.Container(
                         theme_icon, width=32, height=32,
@@ -270,21 +297,36 @@ def main(page: ft.Page):
         padding=P.only(left=12, right=12, top=10, bottom=0),
         border=B.only(bottom=BS(1, c('card_border'))),
     )
+    top_bar_container = top_bar
 
     # ── root ────────────────────────────────────────────────────────────────
-    page.add(ft.Column([
-        top_bar,
-        ft.Container(content_col, expand=True),
-        ft.Container(toast_box, alignment=ft.Alignment(0, 0)),
-    ], expand=True, spacing=0))
+    page.add(ft.SafeArea(
+        ft.Column([
+            top_bar_container,
+            ft.Container(content_col, expand=True),
+            ft.Container(toast_box, alignment=ft.Alignment(0, 0)),
+        ], expand=True, spacing=0),
+        expand=True,
+    ))
 
     # ── initial load ────────────────────────────────────────────────────────
-    def do_load():
-        storage.load()
+    async def do_load_async():
+        import asyncio
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, storage.load)
         storage.load_lang()
         update_badge()
         render()
-    threading.Thread(target=do_load, daemon=True).start()
+        try: page.update()
+        except: pass
+
+    # Small delay so the page is fully mounted before rendering
+    async def start():
+        import asyncio
+        await asyncio.sleep(0.1)
+        await do_load_async()
+
+    page.run_task(start)
 
 
 if __name__ == '__main__':

@@ -474,19 +474,17 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
             *trailing,
         ], spacing=4, vertical_alignment=ft.CrossAxisAlignment.CENTER)
 
-        header = ft.GestureDetector(
-            content=ft.Container(
-                row_content,
-                padding=P.symmetric(horizontal=12, vertical=8),
-                bgcolor=c('card'),
-                border=B.all(1, c('gold') if is_exp else c('card_border')),
-                border_radius=BR.only(
-                    top_left=10, top_right=10,
-                    bottom_left=0 if is_exp else 10,
-                    bottom_right=0 if is_exp else 10,
-                ),
+        header = ft.Container(
+            row_content,
+            padding=P.symmetric(horizontal=12, vertical=8),
+            bgcolor=c('card'),
+            border=B.all(1, c('gold') if is_exp else c('card_border')),
+            border_radius=BR.only(
+                top_left=10, top_right=10,
+                bottom_left=0 if is_exp else 10,
+                bottom_right=0 if is_exp else 10,
             ),
-            on_tap=toggle,
+            on_click=toggle, ink=True,
         )
 
         parts = [header]
@@ -517,19 +515,17 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
                 expanded[f'sec-{month_key}-{sk}'] = not is_open
                 rebuild()
 
-            header = ft.GestureDetector(
-                content=ft.Container(
-                    ft.Row([
-                        txt(icon2, size=16, col='text'),
-                        txt(lbl2, size=13, weight=ft.FontWeight.W_700,
-                            family='Playfair Display', col='text', expand=True),
-                        txt(f"{fmt(tot_b)} CHF", size=12, weight=ft.FontWeight.W_700, col=ck2),
-                        ft.Icon(ft.Icons.EXPAND_MORE if is_open else ft.Icons.CHEVRON_RIGHT,
-                                size=16, color=c('text3')),
-                    ], spacing=8, vertical_alignment=ft.CrossAxisAlignment.CENTER),
-                    padding=P.symmetric(vertical=10),
-                ),
-                on_tap=toggle_sec,
+            header = ft.Container(
+                ft.Row([
+                    txt(icon2, size=16, col='text'),
+                    txt(lbl2, size=13, weight=ft.FontWeight.W_700,
+                        family='Playfair Display', col='text', expand=True),
+                    txt(f"{fmt(tot_b)} CHF", size=12, weight=ft.FontWeight.W_700, col=ck2),
+                    ft.Icon(ft.Icons.EXPAND_MORE if is_open else ft.Icons.CHEVRON_RIGHT,
+                            size=16, color=c('text3')),
+                ], spacing=8, vertical_alignment=ft.CrossAxisAlignment.CENTER),
+                padding=P.symmetric(vertical=10),
+                on_click=toggle_sec, ink=True,
             )
 
             parts = [header]
@@ -559,15 +555,13 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
                         month.section(sk2).append(_mk('New' if True else ''))
                         on_save(); rebuild(); on_toast(T['toast_added'])
                     return _add
-                parts.append(ft.GestureDetector(
-                    content=ft.Container(
-                        ft.Row([ft.Icon(ft.Icons.ADD, size=14, color=c('text3')),
-                                txt(T[_ADD_LABELS[sk]], size=12, col='text3')], spacing=6),
-                        padding=P.symmetric(horizontal=12, vertical=8),
-                        border=B.all(1, c('card_border')), border_radius=10,
-                        margin=M.only(top=4),
-                    ),
-                    on_tap=make_add(),
+                parts.append(ft.Container(
+                    ft.Row([ft.Icon(ft.Icons.ADD, size=14, color=c('text3')),
+                            txt(T[_ADD_LABELS[sk]], size=12, col='text3')], spacing=6),
+                    padding=P.symmetric(horizontal=12, vertical=8),
+                    border=B.all(1, c('card_border')), border_radius=10,
+                    margin=M.only(top=4),
+                    on_click=make_add(), ink=True,
                 ))
 
                 # section total
@@ -728,17 +722,15 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
                         try: sec_btns_col.update()
                         except: pass
                     return _s
-                sec_btns_col.controls.append(ft.GestureDetector(
-                    content=ft.Container(
-                        ft.Text(lbl, size=10, font_family='DM Sans',
-                                color='#1a1a1a' if is_sel else c(ck),
-                                weight=ft.FontWeight.W_600),
-                        padding=P.symmetric(horizontal=8, vertical=5),
-                        bgcolor=c(ck) if is_sel else 'transparent',
-                        border=B.all(1, c(ck)),
-                        border_radius=6,
-                    ),
-                    on_tap=make_sel(key),
+                sec_btns_col.controls.append(ft.Container(
+                    ft.Text(lbl, size=10, font_family='DM Sans',
+                            color='#1a1a1a' if is_sel else c(ck),
+                            weight=ft.FontWeight.W_600),
+                    padding=P.symmetric(horizontal=8, vertical=5),
+                    bgcolor=c(ck) if is_sel else 'transparent',
+                    border=B.all(1, c(ck)),
+                    border_radius=6,
+                    on_click=make_sel(key), ink=True,
                 ))
 
         render_sec_btns()
@@ -809,15 +801,13 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
         def toggle_sort(e):
             sort_asc[0] = not sort_asc[0]
             refresh_registre(sort_asc, root_col)
-        return [ft.GestureDetector(
-            content=ft.Container(
-                ft.Text(sort_label, size=11, color=c('teal'),
-                        font_family='DM Sans', weight=ft.FontWeight.W_600),
-                padding=P.symmetric(horizontal=10, vertical=6),
-                border=B.all(1, c('teal')), border_radius=8,
-                alignment=ft.Alignment(0, 0),
-            ),
-            on_tap=toggle_sort,
+        return [ft.Container(
+            ft.Text(sort_label, size=11, color=c('teal'),
+                    font_family='DM Sans', weight=ft.FontWeight.W_600),
+            padding=P.symmetric(horizontal=10, vertical=6),
+            border=B.all(1, c('teal')), border_radius=8,
+            alignment=ft.Alignment(0, 0),
+            on_click=toggle_sort, ink=True,
         )]
 
     # ── assemble ─────────────────────────────────────────────────────────────
@@ -834,14 +824,12 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
         main_col.controls.clear()
         # top bar: toggle button
         lbl = T['reg_title'] if view_mode[0] == 'dashboard' else T['dash_title']
-        toggle_btn = ft.GestureDetector(
-            content=ft.Container(
-                ft.Text(lbl, size=11, color=c('gold'),
-                        font_family='DM Sans', weight=ft.FontWeight.W_600),
-                padding=P.symmetric(horizontal=12, vertical=6),
-                border=B.all(1, c('gold')), border_radius=8,
-            ),
-            on_tap=toggle_view,
+        toggle_btn = ft.Container(
+            ft.Text(lbl, size=11, color=c('gold'),
+                    font_family='DM Sans', weight=ft.FontWeight.W_600),
+            padding=P.symmetric(horizontal=12, vertical=6),
+            border=B.all(1, c('gold')), border_radius=8,
+            on_click=toggle_view, ink=True,
         )
         main_col.controls.append(
             ft.Container(toggle_btn, padding=P.only(bottom=4))

@@ -1,0 +1,9 @@
+[tool.flet]
+app_name = "Oxycash"
+bundle_id = "io.github.promethyxx.oxycash"
+org = "Promethyxx"
+product = "Oxycash"
+description = "Monthly budget tracker"
+
+[tool.flet.android]
+exclude_packages = ["watchdog"]
