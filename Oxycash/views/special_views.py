@@ -186,8 +186,8 @@ def build_epargne_view(data: AppData, t, on_save, on_toast):
     def _build():
         ep = data.epargne
         sond_total   = sum(s.total for s in ep.get('sondages', []))
-        achats_total = sum(a.prix  for a in ep.get('achats',   []))
-        legacy_total = sum(p.val   for p in ep.get('pc_legacy',[]))
+        achats_total = sum(a.prix for wl in ep.get('wishlists', []) for a in wl.get('items', []))
+        legacy_total = sum(p.val  for p in ep.get('pc_legacy', []))
 
         sond_rows = []
         for i, s in enumerate(ep.get('sondages', [])):
@@ -227,31 +227,70 @@ def build_epargne_view(data: AppData, t, on_save, on_toast):
             from core.model import EpargneSondage
             ep['sondages'].append(EpargneSondage('Nouveau', 0, 0)); on_save(); rebuild()
 
-        achat_rows = []
-        for i, a in enumerate(ep.get('achats', [])):
-            def upd_an(i=i):
-                def _h(e): ep['achats'][i].name = e.control.value; on_save()
-                return _h
-            def upd_ap(i=i):
-                def _h(e):
-                    try: ep['achats'][i].prix = float(e.control.value.replace(',','.')); on_save(); rebuild()
-                    except ValueError: pass
-                return _h
-            def del_a(e, i=i):
-                ep['achats'].pop(i); on_save(); rebuild()
+        # ── Wishlists (renommable, multi-projets) ──
+        wishlist_blocks = []
+        for wi, wl in enumerate(ep.get('wishlists', [])):
+            items = wl.get('items', [])
+            wl_total = sum(a.prix for a in items)
 
-            achat_rows.append(ft.Container(
-                ft.Row([_tf(a.name, on_blur=upd_an(), expand=True, col=c('text'), c=c),
-                        _tf(fmt(a.prix), on_blur=upd_ap(), num=True, width=80, col=c('gold'), c=c),
-                        _del_btn(del_a, c)],
-                       spacing=4, vertical_alignment=ft.CrossAxisAlignment.CENTER),
-                padding=P.symmetric(horizontal=12, vertical=8),
-                bgcolor=c('card'), border=B.all(1, c('card_border')), border_radius=8,
+            def upd_wl_label(e, wi=wi):
+                ep['wishlists'][wi]['label'] = e.control.value; on_save()
+
+            item_rows = []
+            for ai, a in enumerate(items):
+                def upd_aname(e, wi=wi, ai=ai):
+                    ep['wishlists'][wi]['items'][ai].name = e.control.value; on_save()
+                def upd_aprix(e, wi=wi, ai=ai):
+                    try: ep['wishlists'][wi]['items'][ai].prix = float(e.control.value.replace(',','.')); on_save(); rebuild()
+                    except ValueError: pass
+                def upd_aurl(e, wi=wi, ai=ai):
+                    ep['wishlists'][wi]['items'][ai].url = e.control.value; on_save()
+                def del_a(e, wi=wi, ai=ai):
+                    ep['wishlists'][wi]['items'].pop(ai); on_save(); rebuild()
+
+                item_rows.append(ft.Container(
+                    ft.Column([
+                        ft.Row([
+                            _tf(a.name, on_blur=upd_aname, expand=True, col=c('text'), c=c),
+                            _tf(fmt(a.prix), on_blur=upd_aprix, num=True, width=80, col=c('gold'), c=c),
+                            _del_btn(del_a, c),
+                        ], spacing=4, vertical_alignment=ft.CrossAxisAlignment.CENTER),
+                        _tf(a.url or '', on_blur=upd_aurl, expand=True,
+                            col=c('text3'), hint='URL pour surveiller le prix', c=c),
+                    ], spacing=4),
+                    padding=P.symmetric(horizontal=12, vertical=8),
+                    bgcolor=c('card'), border=B.all(1, c('card_border')), border_radius=8,
+                ))
+
+            def add_item(e, wi=wi):
+                from core.model import EpargneAchat
+                ep['wishlists'][wi]['items'].append(EpargneAchat('Nouveau', 0, ''))
+                on_save(); rebuild()
+
+            def del_wl(e, wi=wi):
+                ep['wishlists'].pop(wi); on_save(); rebuild()
+
+            wishlist_blocks.append(ft.Container(
+                ft.Column([
+                    ft.Row([
+                        ft.Text('🛒', size=16),
+                        _tf(wl['label'], on_blur=upd_wl_label, expand=True,
+                            col=c('text'), c=c),
+                        _t(f"{fmt(wl_total)} CHF", size=13, weight=ft.FontWeight.W_700,
+                           col=c('gold')),
+                        _del_btn(del_wl, c),
+                    ], spacing=8, vertical_alignment=ft.CrossAxisAlignment.CENTER),
+                    ft.Divider(height=1, color=c('card_border')),
+                    *item_rows,
+                    _add_btn('Ajouter un article', add_item, c),
+                ], spacing=6),
+                padding=14, bgcolor=c('card'),
+                border=B.all(1, c('card_border')), border_radius=10,
             ))
 
-        def add_achat(e):
-            from core.model import EpargneAchat
-            ep['achats'].append(EpargneAchat('Nouveau', 0)); on_save(); rebuild()
+        def add_wishlist(e):
+            ep.setdefault('wishlists', []).append({'label': 'Projet', 'items': []})
+            on_save(); rebuild()
 
         legacy_rows = []
         for i, p in enumerate(ep.get('pc_legacy', [])):
@@ -285,8 +324,8 @@ def build_epargne_view(data: AppData, t, on_save, on_toast):
             _sec_hdr('Sondages en cours', '', f"{fmt(sond_total)} CHF", 'teal', c),
             *sond_rows, _add_btn('Ajouter un sondage', add_sond, c),
             ft.Container(height=8),
-            _sec_hdr('Wishlist PC', '', f"{fmt(achats_total)} CHF", 'gold', c),
-            *achat_rows, _add_btn('Ajouter un achat', add_achat, c),
+            *wishlist_blocks,
+            _add_btn('+ Nouveau projet', add_wishlist, c),
             ft.Container(height=8),
             _sec_hdr('PC Legacy (revente)', '', f"{fmt(legacy_total)} CHF", 'purple', c),
             *legacy_rows, _add_btn('Ajouter une piece', add_legacy, c),
@@ -526,9 +565,18 @@ def build_config_view(storage, t, on_save, on_toast, on_reload, on_theme_toggle,
                             'https://xxx/remote.php/dav/files/user/Oxy/')
     usr_lbl, usr_tf = field('Utilisateur', cfg.get('dav_user',''), 'ton@email.com')
     pw_lbl,  pw_tf  = field('Mot de passe', cfg.get('dav_pass',''), 'app password', password=True)
-    status_txt = ft.Text('', size=12, font_family='DM Sans')
+    status_txt   = ft.Text('', size=12, font_family='DM Sans')
+    import_status = ft.Text('', size=11, font_family='DM Sans')
 
-    def abtn(label, bg, on_click, danger=False):
+    # Import path field — shown after file picker or typed manually
+    import_path_tf = ft.TextField(
+        value='', hint_text='Chemin vers oxycash.json (ex: C:\\Users\\...\\oxycash.json)',
+        bgcolor=c('card'), border_color=c('card_border'),
+        focused_border_color=c('gold'), color=c('text'), text_size=12,
+        content_padding=P.symmetric(horizontal=10, vertical=8),
+    )
+
+    def abtn(label, bg, on_click, danger=False, expand=False):
         if danger:
             style = ft.ButtonStyle(bgcolor='transparent', color=c('danger'),
                                    side=ft.BorderSide(1, c('danger')),
@@ -537,8 +585,10 @@ def build_config_view(storage, t, on_save, on_toast, on_reload, on_theme_toggle,
             fg = '#1a1a1a' if bg in ('gold','teal','green') else c('text')
             style = ft.ButtonStyle(bgcolor=c(bg), color=fg,
                                    shape=ft.RoundedRectangleBorder(radius=8),
-                                   padding=P.symmetric(horizontal=16))
-        return ft.ElevatedButton(label, on_click=on_click, height=38, style=style)
+                                   padding=P.symmetric(horizontal=14))
+        btn = ft.ElevatedButton(label, on_click=on_click, height=36, style=style)
+        if expand: btn.expand = True
+        return btn
 
     def save_cfg(e):
         storage.save_config(url_tf.value.strip(), usr_tf.value.strip(), pw_tf.value)
@@ -548,7 +598,8 @@ def build_config_view(storage, t, on_save, on_toast, on_reload, on_theme_toggle,
     def test_cfg(e):
         storage.save_config(url_tf.value.strip(), usr_tf.value.strip(), pw_tf.value)
         ok, msg = storage.test_dav()
-        status_txt.value = msg; status_txt.color = c('green') if ok else c('danger')
+        status_txt.value = msg
+        status_txt.color = c('green') if ok else c('danger')
         status_txt.update()
 
     def clear_cfg(e):
@@ -557,60 +608,95 @@ def build_config_view(storage, t, on_save, on_toast, on_reload, on_theme_toggle,
         status_txt.value='Config effacee'; status_txt.color=c('text2')
         for w in [url_tf, usr_tf, pw_tf, status_txt]: w.update()
 
-    import_status = ft.Text('', size=11, font_family='DM Sans')
-
-    page_ref = [page]
-
     def do_export(e):
         import pathlib, datetime
         path = pathlib.Path.home() / f"oxycash-{datetime.date.today()}.json"
         path.write_text(storage.export_json(), encoding='utf-8')
-        on_toast(f'Exporte: {path.name}')
+        on_toast(f'Exporte: {path}')
 
-    def do_import_pick(e):
-        # page.run_task launches the async pick_files coroutine
-        if page_ref[0] is None:
-            on_toast('Import non disponible')
-            return
-        async def _pick_async():
-            try:
-                fp = ft.FilePicker()
-                page_ref[0].overlay.append(fp)
-                page_ref[0].update()
-                files = await fp.pick_files(
-                    dialog_title='Importer oxycash.json',
-                    allowed_extensions=['json'],
-                    file_type=ft.FilePickerFileType.CUSTOM,
-                    with_data=True,
+    def _open_native_picker():
+        """Try to open a native file dialog. Returns path string or None."""
+        import sys, subprocess
+        try:
+            if sys.platform == 'win32':
+                script = (
+                    'Add-Type -AssemblyName System.Windows.Forms; '
+                    '$f = New-Object System.Windows.Forms.OpenFileDialog; '
+                    '$f.Filter = "JSON files (*.json)|*.json|All files (*.*)|*.*"; '
+                    '$f.Title = "Importer oxycash.json"; '
+                    'if ($f.ShowDialog() -eq "OK") { Write-Output $f.FileName }'
                 )
-                page_ref[0].overlay.remove(fp)
-                page_ref[0].update()
-                if not files:
-                    return
-                f = files[0]
-                raw = (f.bytes.decode('utf-8') if f.bytes
-                       else open(f.path, encoding='utf-8').read())
-                ok = storage.import_json(raw)
-                if ok:
-                    import_status.value = f'Importe: {f.name}'
-                    import_status.color = c('green')
-                    try: import_status.update()
-                    except: pass
-                    on_reload()
-                    on_toast(f'Importe: {f.name}')
-                else:
-                    import_status.value = 'Format invalide'
-                    import_status.color = c('danger')
-                    try: import_status.update()
-                    except: pass
-                    on_toast('Format JSON invalide')
-            except Exception as ex:
-                import_status.value = str(ex)[:60]
+                r = subprocess.run(
+                    ['powershell', '-NoProfile', '-NonInteractive', '-Command', script],
+                    capture_output=True, text=True, timeout=60,
+                )
+                path = r.stdout.strip()
+                return path if path else None
+            else:
+                # Linux: try zenity, then kdialog
+                for cmd in [
+                    ['zenity', '--file-selection', '--title=Importer oxycash.json',
+                     '--file-filter=*.json'],
+                    ['kdialog', '--getopenfilename', '.', '*.json'],
+                ]:
+                    try:
+                        r = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+                        path = r.stdout.strip()
+                        if path:
+                            return path
+                    except FileNotFoundError:
+                        continue
+        except Exception:
+            pass
+        return None
+
+    def do_browse(e):
+        """Open native file picker in a thread, then fill import_path_tf."""
+        import threading
+        def _pick():
+            path = _open_native_picker()
+            if path:
+                import_path_tf.value = path
+                try: import_path_tf.update()
+                except: pass
+            else:
+                on_toast('Explorateur non disponible — entrer le chemin manuellement')
+        threading.Thread(target=_pick, daemon=True).start()
+
+    def do_import(e):
+        path = import_path_tf.value.strip()
+        if not path:
+            on_toast('Entre un chemin ou utilise Parcourir')
+            return
+        import pathlib
+        try:
+            raw = pathlib.Path(path).read_text(encoding='utf-8')
+            ok  = storage.import_json(raw)
+            if ok:
+                import_status.value = f'Importe depuis {pathlib.Path(path).name}'
+                import_status.color = c('green')
+                try: import_status.update()
+                except: pass
+                on_reload()
+                on_toast(f'Importe!')
+            else:
+                import_status.value = 'Format JSON invalide'
                 import_status.color = c('danger')
                 try: import_status.update()
                 except: pass
-                on_toast('Erreur import')
-        page_ref[0].run_task(_pick_async)
+                on_toast('Format invalide')
+        except FileNotFoundError:
+            import_status.value = 'Fichier non trouve'
+            import_status.color = c('danger')
+            try: import_status.update()
+            except: pass
+            on_toast('Fichier introuvable')
+        except Exception as ex:
+            import_status.value = str(ex)[:60]
+            import_status.color = c('danger')
+            try: import_status.update()
+            except: pass
+            on_toast('Erreur import')
 
     def do_reset(e):
         storage.reset(); on_reload(); on_toast('Reinitialise')
@@ -629,12 +715,20 @@ def build_config_view(storage, t, on_save, on_toast, on_reload, on_theme_toggle,
                 url_lbl, url_tf, ft.Container(height=2),
                 usr_lbl, usr_tf, ft.Container(height=2),
                 pw_lbl,  pw_tf,  ft.Container(height=6),
-                ft.Row([abtn('Sauver','gold',save_cfg), abtn('Tester','teal',test_cfg),
+                ft.Row([abtn('Sauver','gold',save_cfg),
+                        abtn('Tester','teal',test_cfg),
                         abtn('Effacer','card',clear_cfg)], spacing=8),
                 status_txt),
-        mk_card('Import / Export',
-                ft.Row([abtn('Exporter JSON','card',do_export),
-                        abtn('Importer JSON','card',do_import_pick)], spacing=8),
+        mk_card('Export',
+                abtn('Exporter JSON', 'card', do_export),
+                _t('Sauvegarde dans le dossier utilisateur', size=10, col=c('text3'))),
+        mk_card('Import',
+                _t('Parcourir ou coller le chemin complet du fichier JSON', size=10, col=c('text3')),
+                ft.Container(height=4),
+                import_path_tf,
+                ft.Container(height=6),
+                ft.Row([abtn('Parcourir', 'card', do_browse),
+                        abtn('Importer', 'teal', do_import)], spacing=8),
                 import_status),
         mk_card('Donnees', abtn('Reinitialiser','',do_reset,danger=True)),
         ft.Container(height=40),

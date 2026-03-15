@@ -4,3 +4,4 @@ Oxy_Wall/.env
 /Oxy_Wall/wallpapers
 Oxycash/.oxycash/
 Oxycash/build/
+Oxycash/core/__pycache__/

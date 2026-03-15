@@ -18,12 +18,24 @@ SECTION_META = {
 }
 
 
-def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Callable, all_months: dict = None, page=None) -> ft.Column:
+def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Callable, all_months: dict = None, page=None, frais: dict = None) -> ft.Column:
 
     def c(k): return t.c(k)
     expanded: dict[str, bool] = {}
     if all_months is None: all_months = {}
     page_ref = [page]  # mutable ref for dialog
+
+    storage_frais = [frais]  # mutable ref so _sync_frais sees updates
+
+    def _sync_frais(sec_key, idx):
+        from core.model import sync_frais_from_line
+        if storage_frais[0] is None:
+            return
+        line = month.section(sec_key)[idx]
+        class _D:
+            months = all_months
+            frais  = storage_frais[0]
+        sync_frais_from_line(_D(), month_key, sec_key, line)
 
     # ── widget helpers ──────────────────────────────────────────────────────
 
@@ -306,11 +318,17 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
             rebuild()
 
         def upd_banque(e, _s=sec_key, _i=idx):
-            try: month.section(_s)[_i].banque = float(e.control.value.replace(',','.')); on_save(); rebuild()
+            try:
+                month.section(_s)[_i].banque = float(e.control.value.replace(',','.'))
+                _sync_frais(_s, _i)
+                on_save(); rebuild()
             except ValueError: pass
 
         def upd_cash(e, _s=sec_key, _i=idx):
-            try: month.section(_s)[_i].cash = float(e.control.value.replace(',','.')); on_save(); rebuild()
+            try:
+                month.section(_s)[_i].cash = float(e.control.value.replace(',','.'))
+                _sync_frais(_s, _i)
+                on_save(); rebuild()
             except ValueError: pass
 
         def upd_name(e, _s=sec_key, _i=idx):

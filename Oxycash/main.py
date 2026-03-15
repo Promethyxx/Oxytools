@@ -128,7 +128,7 @@ def main(page: ft.Page):
         # rebuild content
         mi = MONTHS.index(tab) if tab in MONTHS else -1
         if mi >= 0:
-            view = build_month_view(tab, storage.data.months[tab], theme, on_save, show_toast, all_months=storage.data.months, page=page)
+            view = build_month_view(tab, storage.data.months[tab], theme, on_save, show_toast, all_months=storage.data.months, page=page, frais=storage.data.frais)
         elif tab == 'Dettes':
             view = build_dettes_view(storage.data, theme, on_save, show_toast)
         elif tab == 'Epargne':

@@ -134,9 +134,11 @@ class EpargneSondage:
 class EpargneAchat:
     name: str = 'Nouveau'
     prix: float = 0
-    def to_dict(self): return self.__dict__.copy()
+    url: str = ''
+    def to_dict(self): return {'name': self.name, 'prix': self.prix, 'url': self.url}
     @staticmethod
-    def from_dict(d): return EpargneAchat(name=d.get('name','Nouveau'), prix=float(d.get('prix',0)))
+    def from_dict(d): return EpargneAchat(
+        name=d.get('name','Nouveau'), prix=float(d.get('prix',0)), url=d.get('url',''))
 
 
 @dataclass
@@ -182,9 +184,11 @@ class AppData:
 
     def to_dict(self):
         ep = {
-            'sondages': [x.to_dict() for x in self.epargne.get('sondages', [])],
-            'achats':   [x.to_dict() for x in self.epargne.get('achats', [])],
-            'pc_legacy':[x.to_dict() for x in self.epargne.get('pc_legacy', [])],
+            'sondages':  [x.to_dict() for x in self.epargne.get('sondages', [])],
+            'wishlists': [{'label': wl['label'],
+                           'items': [a.to_dict() for a in wl.get('items', [])]}
+                          for wl in self.epargne.get('wishlists', [])],
+            'pc_legacy': [x.to_dict() for x in self.epargne.get('pc_legacy', [])],
         }
         fr = {
             'fixes':     [x.to_dict() for x in self.frais.get('fixes', [])],
@@ -203,9 +207,17 @@ class AppData:
         months = {k: Month.from_dict(v) for k, v in d.get('months', {}).items()}
         dettes = [Dette.from_dict(x) for x in d.get('dettes', [])]
         ep_raw = d.get('epargne', {})
+        # migrate old 'achats' list to new 'wishlists' format
+        if ep_raw.get('wishlists') is not None:
+            wishlists = [{'label': wl.get('label', 'Projet'),
+                          'items': [EpargneAchat.from_dict(a) for a in wl.get('items', [])]}
+                         for wl in ep_raw['wishlists']]
+        else:
+            old_items = [EpargneAchat.from_dict(x) for x in ep_raw.get('achats', [])]
+            wishlists = [{'label': 'Projet', 'items': old_items}] if old_items else []
         epargne = {
             'sondages':  [EpargneSondage.from_dict(x) for x in ep_raw.get('sondages', [])],
-            'achats':    [EpargneAchat.from_dict(x)   for x in ep_raw.get('achats', [])],
+            'wishlists': wishlists,
             'pc_legacy': [EpargnePcLegacy.from_dict(x) for x in ep_raw.get('pc_legacy', [])],
         }
         fr_raw = d.get('frais', {})
@@ -330,10 +342,14 @@ def default_data() -> AppData:
             EpargneSondage('Votre opinion',12.7,10), EpargneSondage('Yougov',2,50),
             EpargneSondage('Yuzuni',0,5),
         ],
-        'achats': [
-            EpargneAchat('Corsair 7000D',255), EpargneAchat('Asus Pro Art X870E Creator wifi',394.9),
-            EpargneAchat('AMD Ryzen 9 9950X 3d',589), EpargneAchat('Kingston Fury',826),
-            EpargneAchat('SSD Samsung 9100 Pro',452),
+        'wishlists': [
+            {'label': 'Projet PC', 'items': [
+                EpargneAchat('Corsair 7000D',255,'https://www.galaxus.ch/fr/s1/product/corsair-7000d-airflow-boitier-pc-18878141'),
+                EpargneAchat('Asus Pro Art X870E Creator wifi',394.9,''),
+                EpargneAchat('AMD Ryzen 9 9950X 3d',589,''),
+                EpargneAchat('Kingston Fury',826,''),
+                EpargneAchat('SSD Samsung 9100 Pro',452,''),
+            ]},
         ],
         'pc_legacy': [
             EpargnePcLegacy('Alim Corsair HX750i',80), EpargnePcLegacy('Asus Strix GTX 1060',80),
@@ -361,35 +377,54 @@ def default_data() -> AppData:
 
 def apply_recurring(data) -> None:
     """
-    For every variable line with recurring set, ensure it exists in the
-    correct target months (no payments copied, just name+amounts).
-    Runs in-place on AppData. Safe to call multiple times (idempotent).
+    Propagate recurring lines to target months.
+    ONLY creates missing lines — NEVER overwrites existing amounts or payments.
+    Each month owns its own data independently.
     """
     for src_key, src_month in data.months.items():
         src_mi = MONTHS.index(src_key)
-        for line in src_month.variables:
-            rec = line.recurring
-            if not rec:
-                continue
-            freq  = int(rec.get('freq', 3))
-            start = rec.get('start', src_key)
-            start_mi = MONTHS.index(start) if start in MONTHS else src_mi
-            for step in range(1, 13):
-                target_mi = (start_mi + step * freq) % 12
-                if target_mi == src_mi:
-                    break   # full cycle, stop
-                target_key   = MONTHS[target_mi]
-                target_month = data.months.get(target_key)
-                if target_month is None:
+        for sec_key in ('revenus', 'retraits', 'fixes', 'variables'):
+            for line in list(src_month.section(sec_key)):
+                rec = line.recurring
+                if not rec:
                     continue
-                existing = [l.name for l in target_month.variables]
-                if line.name not in existing:
-                    target_month.variables.append(Line(
-                        name=line.name,
-                        banque=line.banque,
-                        cash=line.cash,
-                        recurring={'freq': freq, 'start': start},
-                    ))
+                freq     = int(rec.get('freq', 3))
+                start    = rec.get('start', src_key)
+                start_mi = MONTHS.index(start) if start in MONTHS else src_mi
+                for step in range(1, 13):
+                    target_mi = (start_mi + step * freq) % 12
+                    if target_mi == src_mi:
+                        break
+                    target_key   = MONTHS[target_mi]
+                    target_month = data.months.get(target_key)
+                    if target_month is None:
+                        continue
+                    target_sec = target_month.section(sec_key)
+                    if line.name not in [l.name for l in target_sec]:
+                        target_sec.append(Line(
+                            name=line.name,
+                            banque=line.banque,
+                            cash=line.cash,
+                            recurring={'freq': freq, 'start': start},
+                        ))
+
+
+def sync_frais_from_line(data, month_key: str, sec_key: str, line) -> None:
+    """
+    Update ONE cell in Frais for a recurring line in a specific month.
+    Call after user edits banque/cash on a recurring line.
+    Never touches other months.
+    """
+    if not line.recurring or data.frais is None:
+        return
+    mi        = MONTHS.index(month_key)
+    frais_cat = 'fixes' if sec_key in ('fixes', 'retraits', 'revenus') else 'ponctuels'
+    frais_list = data.frais.setdefault(frais_cat, [])
+    fl = next((f for f in frais_list if f.name == line.name), None)
+    if fl is None:
+        fl = FraisLine(name=line.name, monthly=[0.0]*12)
+        frais_list.append(fl)
+    fl.monthly[mi] = line.banque + line.cash
 
 
 # ─── Budget month detection ────────────────────────────────────────────────────
