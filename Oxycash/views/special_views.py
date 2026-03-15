@@ -624,9 +624,10 @@ def build_config_view(storage, t, on_save, on_toast, on_reload, on_theme_toggle,
             on_toast('Aucun fichier sélectionné')
         _pupd()
 
-    # Create picker immediately if page is available
+    # Create picker immediately if page is available — Flet 0.82+ requires on_result set after init
     if page is not None:
-        _file_picker[0] = ft.FilePicker(on_result=_on_pick)
+        _file_picker[0] = ft.FilePicker()
+        _file_picker[0].on_result = _on_pick
         page.overlay.append(_file_picker[0])
 
     def do_browse(e):
