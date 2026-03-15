@@ -178,6 +178,24 @@ _EN = {
     'cfg_reset_done':   'Reset',
     'cfg_lang':         'Language',
 
+
+    # ── Charts ──
+    'tab_charts':         'Charts',
+    'chart_income_vs_exp':'INCOME VS EXPENSES',
+    'chart_cumul_balance':'CUMULATIVE BALANCE',
+    'chart_total_income': 'TOTAL INCOME',
+    'chart_total_exp':    'TOTAL EXPENSES',
+    'chart_net':          'NET',
+    'chart_final':        'Year-end balance',
+
+    # ── Config currency ──
+    'cfg_currency':       'Currency',
+    'cfg_profiles':     'Profiles',
+    'cfg_switch':       'Use',
+    'cfg_add_profile':  '+ Add',
+    'cfg_profile_hint': 'New profile name',
+
+
     # ── Toasts ──
     'toast_saved':      '✅ Saved',
     'toast_deleted':    '🗑️ Deleted',
@@ -360,6 +378,24 @@ _FR = {
     'cfg_reset':        'Réinitialiser',
     'cfg_reset_done':   'Réinitialisé',
     'cfg_lang':         'Langue',
+
+
+    # ── Charts ──
+    'tab_charts':         'Graphiques',
+    'chart_income_vs_exp':'REVENUS VS DÉPENSES',
+    'chart_cumul_balance':'SOLDE CUMULATIF',
+    'chart_total_income': 'TOTAL REVENUS',
+    'chart_total_exp':    'TOTAL DÉPENSES',
+    'chart_net':          'NET',
+    'chart_final':        "Solde fin d'année",
+
+    # ── Config currency ──
+    'cfg_currency':       'Devise',
+    'cfg_profiles':     'Profils',
+    'cfg_switch':       'Utiliser',
+    'cfg_add_profile':  '+ Ajouter',
+    'cfg_profile_hint': 'Nom du nouveau profil',
+
 
     # ── Toasts ──
     'toast_saved':      '✅ Sauvé',

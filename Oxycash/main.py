@@ -14,13 +14,19 @@ from core.i18n    import T, set_lang
 from views        import (
     build_month_view, build_dettes_view, build_epargne_view,
     build_frais_view, build_viabilite_view, build_config_view,
+    build_charts_view,
 )
+
+SPECIAL_TABS_KEYS = ['Debts','Savings','Expenses','Viability','Charts','Config']
 
 def get_tab_labels():
     return T.months_short + [
         T['tab_debts'], T['tab_savings'], T['tab_expenses'],
-        T['tab_viability'], T['tab_config'],
+        T['tab_viability'], T['tab_charts'], T['tab_config'],
     ]
+
+def get_all_tabs():
+    return MONTHS + SPECIAL_TABS_KEYS
 
 P = ft.Padding
 B = ft.Border
@@ -104,9 +110,9 @@ def main(page: ft.Page):
 
         # rebuild tabs
         tabs = []
-        for i, key in enumerate(ALL_TABS):
+        for i, key in enumerate(get_all_tabs()):
             is_act  = key == tab
-            is_spec = i >= 12
+            is_spec = i >= len(MONTHS)
             act_bg  = c('teal') if is_spec else c('gold')
             norm_fg = c('teal') if is_spec else c('text3')
             def make_tap(k):
@@ -133,6 +139,7 @@ def main(page: ft.Page):
 
         # rebuild content
         mi = MONTHS.index(tab) if tab in MONTHS else -1
+        n_tabs = len(get_all_tabs())
         if mi >= 0:
             view = build_month_view(tab, storage.data.months[tab], theme, on_save, show_toast, all_months=storage.data.months, page=page, frais=storage.data.frais)
         elif tab == 'Debts':
@@ -143,6 +150,8 @@ def main(page: ft.Page):
             view = build_frais_view(storage.data, theme, on_save, show_toast)
         elif tab == 'Viability':
             view = build_viabilite_view(storage.data, theme, on_save, show_toast)
+        elif tab == 'Charts':
+            view = build_charts_view(storage.data, theme, storage.currency)
         elif tab == 'Config':
             view = build_config_view(storage, theme, on_save, show_toast, render,
                                      lambda: (theme.toggle(), _apply_theme(), render()),
@@ -162,6 +171,20 @@ def main(page: ft.Page):
         top_bar.bgcolor = c('bg2')
         try: page.update()
         except: pass
+
+    # ── profile switcher ────────────────────────────────────────────────────
+    def _profile_btn():
+        prof = storage.active_profile
+        return ft.GestureDetector(
+            content=ft.Container(
+                ft.Text(prof['name'], size=10, font_family='DM Sans',
+                        weight=ft.FontWeight.W_600, color=c('teal'),
+                        no_wrap=True),
+                padding=P.symmetric(horizontal=8, vertical=4),
+                border=B.all(1, c('teal')), border_radius=6,
+            ),
+            on_tap=lambda e: state.update({'tab': 'Config'}) or render(),
+        )
 
     # ── font scale ──────────────────────────────────────────────────────────
     font_scale = [0]   # offset in px, persisted in config
@@ -217,6 +240,7 @@ def main(page: ft.Page):
                     ft.Text('Oxycash', size=18, weight=ft.FontWeight.W_700,
                             font_family='Playfair Display', color=c('text')),
                     badge,
+                    _profile_btn(),
                 ], spacing=6, vertical_alignment=ft.CrossAxisAlignment.CENTER),
                 ft.Row([
                     _scale_btn('A-', -2),

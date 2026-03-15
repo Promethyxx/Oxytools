@@ -684,15 +684,150 @@ def build_config_view(storage, t, on_save, on_toast, on_reload, on_theme_toggle,
             padding=14, bgcolor=c('card'), border=B.all(1, c('card_border')), border_radius=12,
         )
 
+    # ── profile management ───────────────────────────────────────────────────
+    def profile_card():
+        profiles = storage.profiles
+        active   = storage.active_slug
+
+        rows = []
+        for p in profiles:
+            is_act = p['slug'] == active
+
+            def switch(e, slug=p['slug']):
+                storage.switch_profile(slug)
+                on_reload()
+
+            def del_p(e, slug=p['slug'], name=p['name']):
+                if len(storage.profiles) <= 1:
+                    on_toast('Cannot delete last profile')
+                    return
+                storage.delete_profile(slug)
+                on_reload()
+
+            name_ref = ft.Ref[ft.TextField]()
+
+            def rename(e, slug=p['slug']):
+                tf = name_ref.current
+                if tf and tf.value.strip():
+                    storage.rename_profile(slug, tf.value.strip())
+                    on_reload()
+
+            rows.append(ft.Container(
+                ft.Row([
+                    ft.Container(
+                        width=8, height=8,
+                        bgcolor=c('teal') if is_act else 'transparent',
+                        border_radius=4,
+                        border=B.all(1, c('teal')),
+                    ),
+                    ft.TextField(
+                        ref=name_ref,
+                        value=p['name'], expand=True, height=32, text_size=12,
+                        bgcolor='transparent', border_color='transparent',
+                        focused_border_color=c('gold'), color=c('text'),
+                        content_padding=P.symmetric(horizontal=4, vertical=2),
+                        on_blur=rename,
+                    ),
+                    ft.GestureDetector(
+                        content=ft.Container(
+                            _t('✓' if is_act else T['cfg_switch'], size=10,
+                               col=c('teal') if is_act else c('text2')),
+                            padding=P.symmetric(horizontal=6, vertical=4),
+                            border=B.all(1, c('teal') if is_act else c('card_border')),
+                            border_radius=6,
+                        ),
+                        on_tap=switch,
+                    ),
+                    ft.IconButton(
+                        ft.Icons.DELETE_OUTLINE, icon_size=14,
+                        icon_color=c('danger'),
+                        on_click=del_p,
+                        style=ft.ButtonStyle(padding=P.all(2)),
+                    ),
+                ], spacing=6, vertical_alignment=ft.CrossAxisAlignment.CENTER),
+                padding=P.symmetric(horizontal=4, vertical=4),
+                bgcolor=c('card') if is_act else 'transparent',
+                border_radius=8,
+            ))
+
+        new_name_tf = ft.TextField(
+            value='', hint_text=T['cfg_profile_hint'],
+            bgcolor=c('card'), border_color=c('card_border'),
+            focused_border_color=c('gold'), color=c('text'), text_size=12,
+            content_padding=P.symmetric(horizontal=10, vertical=6),
+            height=36,
+        )
+
+        def add_profile(e):
+            name = new_name_tf.value.strip()
+            if not name:
+                on_toast(T['toast_label_req']); return
+            slug = storage.add_profile(name)
+            storage.switch_profile(slug)
+            on_reload()
+
+        return mk_card(T['cfg_profiles'],
+                       *rows,
+                       ft.Container(height=4),
+                       ft.Row([
+                           new_name_tf,
+                           ft.ElevatedButton(T['cfg_add_profile'], on_click=add_profile,
+                                             height=36,
+                                             style=ft.ButtonStyle(
+                                                 bgcolor=c('teal'), color='#1a1a1a',
+                                                 shape=ft.RoundedRectangleBorder(radius=8),
+                                                 padding=P.symmetric(horizontal=12))),
+                       ], spacing=8))
+
+    # ── WebDAV per active profile ─────────────────────────────────────────────
+    prof    = storage.active_profile
+    url_lbl, url_tf = field(T['cfg_url'],      prof.get('dav_url',''),  'https://…/remote.php/dav/files/user/Oxy/')
+    usr_lbl, usr_tf = field(T['cfg_user'],     prof.get('dav_user',''), 'user@email.com')
+    pw_lbl,  pw_tf  = field(T['cfg_password'], prof.get('dav_pass',''), '••••••••', password=True)
+
+    def save_cfg_profile(e):
+        storage.save_profile_dav(storage.active_slug,
+                                  url_tf.value.strip(),
+                                  usr_tf.value.strip(),
+                                  pw_tf.value)
+        status_txt.value = T['cfg_saved']; status_txt.color = c('green')
+        status_txt.update(); on_toast(T['cfg_saved'])
+
+    def test_cfg_profile(e):
+        storage.save_profile_dav(storage.active_slug,
+                                  url_tf.value.strip(),
+                                  usr_tf.value.strip(),
+                                  pw_tf.value)
+        ok, msg = storage.test_dav()
+        status_txt.value = msg; status_txt.color = c('green') if ok else c('danger')
+        status_txt.update()
+
+    # ── Currency ──────────────────────────────────────────────────────────────
+    currency_tf = ft.TextField(
+        value=storage.currency, width=80, height=36, text_size=13,
+        bgcolor=c('card'), border_color=c('card_border'),
+        focused_border_color=c('gold'), color=c('text'),
+        content_padding=P.symmetric(horizontal=10, vertical=6),
+    )
+    def save_currency(e):
+        storage.set_currency(currency_tf.value.strip() or 'CHF')
+        on_toast(T['cfg_saved'])
+
+    currency_card = mk_card(T['cfg_currency'],
+        ft.Row([currency_tf,
+                abtn(T['cfg_save'], 'gold', save_currency)], spacing=8))
+
     return ft.Column([
         _t(T['cfg_title'], size=20, weight=ft.FontWeight.W_700,
            family='Playfair Display', col=c('text')),
+        profile_card(),
+        currency_card,
         mk_card(T['cfg_webdav'],
                 url_lbl, url_tf, ft.Container(height=2),
                 usr_lbl, usr_tf, ft.Container(height=2),
                 pw_lbl,  pw_tf,  ft.Container(height=6),
-                ft.Row([abtn(T['cfg_save'],'gold',save_cfg),
-                        abtn(T['cfg_test'],'teal',test_cfg),
+                ft.Row([abtn(T['cfg_save'],'gold',save_cfg_profile),
+                        abtn(T['cfg_test'],'teal',test_cfg_profile),
                         abtn(T['cfg_clear'],'card',clear_cfg)], spacing=8),
                 status_txt),
         mk_card(T['cfg_export'],

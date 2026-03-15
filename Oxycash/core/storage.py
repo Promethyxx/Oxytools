@@ -1,53 +1,79 @@
 """
-Oxycash – Storage layer
-  • WebDAV (Nextcloud / kDrive) — primary
-  • Local JSON file (~/.oxycash/oxycash.json) — fallback
+Oxycash – Storage layer — multi-profile
+  Each profile has its own JSON file: oxycash_<slug>.json
+  Config: ~/.oxycash/config.json
+    profiles: [{name, slug, dav_url, dav_user, dav_pass}, ...]
+    active:   slug of active profile
+    lang:     'en'|'fr'
+    font_scale: int
+    currency: str (default 'CHF')
 """
 from __future__ import annotations
-import json, os, pathlib, base64
-from typing import Optional, Tuple
+import json, pathlib, base64, re
+from typing import Optional, Tuple, List
 import urllib.request, urllib.error
 
 from .model import AppData, default_data
 
-LOCAL_DIR  = pathlib.Path.home() / '.oxycash'
-LOCAL_FILE = LOCAL_DIR / 'oxycash.json'
-CONF_FILE  = LOCAL_DIR / 'config.json'
-JSON_NAME  = 'oxycash.json'
+LOCAL_DIR = pathlib.Path.home() / '.oxycash'
+CONF_FILE = LOCAL_DIR / 'config.json'
+UA        = 'Oxycash/1.0 (Python urllib)'
 
 
-# ─── Config ───────────────────────────────────────────────────────────────────
+# ─── Config helpers ───────────────────────────────────────────────────────────
+
+def _default_cfg() -> dict:
+    return {
+        'profiles': [{'name': 'Default', 'slug': 'default',
+                      'dav_url': '', 'dav_user': '', 'dav_pass': ''}],
+        'active':      'default',
+        'lang':        'en',
+        'font_scale':  0,
+        'currency':    'CHF',
+    }
+
 
 def load_config() -> dict:
     if CONF_FILE.exists():
         try:
-            return json.loads(CONF_FILE.read_text(encoding='utf-8'))
+            d = json.loads(CONF_FILE.read_text(encoding='utf-8'))
+            # migrate old flat config
+            if 'profiles' not in d:
+                d = {**_default_cfg(),
+                     'lang':       d.get('lang', 'en'),
+                     'font_scale': d.get('font_scale', 0),
+                     'currency':   d.get('currency', 'CHF'),
+                     'profiles': [{'name': 'Default', 'slug': 'default',
+                                   'dav_url':  d.get('dav_url', ''),
+                                   'dav_user': d.get('dav_user', ''),
+                                   'dav_pass': d.get('dav_pass', '')}]}
+            return d
         except Exception:
             pass
-    return {'dav_url': '', 'dav_user': '', 'dav_pass': '', 'lang': 'en'}
+    return _default_cfg()
 
 
 def save_config(cfg: dict):
     LOCAL_DIR.mkdir(parents=True, exist_ok=True)
-    CONF_FILE.write_text(json.dumps(cfg, indent=2), encoding='utf-8')
+    CONF_FILE.write_text(json.dumps(cfg, indent=2, ensure_ascii=False), encoding='utf-8')
+
+
+def _slug(name: str) -> str:
+    return re.sub(r'[^a-z0-9]+', '_', name.lower()).strip('_') or 'profile'
+
+
+def _local_file(slug: str) -> pathlib.Path:
+    return LOCAL_DIR / f'oxycash_{slug}.json'
+
+
+def _dav_json_name(slug: str) -> str:
+    return f'oxycash_{slug}.json'
 
 
 # ─── WebDAV helpers ───────────────────────────────────────────────────────────
 
 def _auth_header(user: str, pw: str) -> str:
     return 'Basic ' + base64.b64encode(f"{user}:{pw}".encode()).decode()
-
-
-def _dav_url(cfg: dict) -> Optional[str]:
-    url  = cfg.get('dav_url', '').strip()
-    user = cfg.get('dav_user', '').strip()
-    pw   = cfg.get('dav_pass', '').strip()
-    if not (url and user and pw):
-        return None
-    return (url if url.endswith('/') else url + '/') + JSON_NAME
-
-
-UA = 'Oxycash/1.0 (Python urllib)'
 
 
 def _dav_req(url, method, user, pw, body=None):
@@ -60,112 +86,201 @@ def _dav_req(url, method, user, pw, body=None):
     return req
 
 
-def dav_test(cfg: dict) -> Tuple[bool, str]:
-    """Returns (ok, message)"""
-    url  = cfg.get('dav_url', '').strip()
-    user = cfg.get('dav_user', '').strip()
-    pw   = cfg.get('dav_pass', '').strip()
+def _dav_full_url(profile: dict) -> Optional[str]:
+    url  = profile.get('dav_url', '').strip()
+    user = profile.get('dav_user', '').strip()
+    pw   = profile.get('dav_pass', '').strip()
     if not (url and user and pw):
-        return False, "Remplis les 3 champs"
-    full = (url if url.endswith('/') else url + '/') + JSON_NAME
-    req = _dav_req(full, 'HEAD', user, pw)
+        return None
+    base = url if url.endswith('/') else url + '/'
+    return base + _dav_json_name(profile.get('slug', 'default'))
+
+
+def dav_test(profile: dict) -> Tuple[bool, str]:
+    url  = profile.get('dav_url', '').strip()
+    user = profile.get('dav_user', '').strip()
+    pw   = profile.get('dav_pass', '').strip()
+    if not (url and user and pw):
+        return False, "Fill all 3 fields"
+    full = _dav_full_url(profile)
+    req  = _dav_req(full, 'HEAD', user, pw)
     try:
         with urllib.request.urlopen(req, timeout=8) as r:
-            return True, f"OK ({r.status}) — {full}"
+            return True, f"OK ({r.status})"
     except urllib.error.HTTPError as e:
-        if e.code == 404:
-            return True, f"OK — dossier accessible, fichier sera cree"
-        if e.code == 401:
-            return False, "401 Non autorise — verifie user/mot de passe"
-        if e.code == 403:
-            return False, f"403 Interdit — verifie que le dossier existe sur Nextcloud: {full}"
-        return False, f"Erreur HTTP {e.code} — {full}"
+        if e.code == 404: return True,  "OK — folder accessible, file will be created"
+        if e.code == 401: return False, "401 Unauthorized — check user/password"
+        if e.code == 403: return False, f"403 Forbidden — check folder exists: {full}"
+        return False, f"HTTP {e.code}"
     except Exception as ex:
         return False, str(ex)
 
 
-def dav_load(cfg: dict) -> Optional[AppData]:
-    full = _dav_url(cfg)
+def _dav_load(profile: dict) -> Optional[AppData]:
+    full = _dav_full_url(profile)
     if not full:
         return None
-    user = cfg['dav_user'].strip()
-    pw   = cfg['dav_pass'].strip()
-    req  = _dav_req(full, 'GET', user, pw)
+    user = profile['dav_user'].strip()
+    pw   = profile['dav_pass'].strip()
     try:
-        with urllib.request.urlopen(req, timeout=10) as r:
-            raw = r.read().decode('utf-8')
-            d = json.loads(raw)
+        with urllib.request.urlopen(_dav_req(full, 'GET', user, pw), timeout=10) as r:
+            d = json.loads(r.read().decode('utf-8'))
             if 'months' in d:
                 return AppData.from_dict(d)
     except urllib.error.HTTPError as e:
-        if e.code != 404:
-            raise
+        if e.code != 404: raise
     except Exception:
         pass
     return None
 
 
-def dav_save(cfg: dict, data: AppData) -> bool:
-    full = _dav_url(cfg)
+def _dav_save(profile: dict, data: AppData) -> bool:
+    full = _dav_full_url(profile)
     if not full:
         return False
-    user = cfg['dav_user'].strip()
-    pw   = cfg['dav_pass'].strip()
+    user = profile['dav_user'].strip()
+    pw   = profile['dav_pass'].strip()
     body = data.to_json().encode('utf-8')
-    req  = _dav_req(full, 'PUT', user, pw, body)
     try:
-        with urllib.request.urlopen(req, timeout=10) as r:
+        with urllib.request.urlopen(_dav_req(full, 'PUT', user, pw, body), timeout=10) as r:
             return r.status in (200, 201, 204)
     except Exception:
         return False
 
 
-# ─── Local JSON ───────────────────────────────────────────────────────────────
-
-def local_load() -> Optional[AppData]:
-    if LOCAL_FILE.exists():
-        try:
-            d = json.loads(LOCAL_FILE.read_text(encoding='utf-8'))
-            if 'months' in d:
-                return AppData.from_dict(d)
-        except Exception:
-            pass
-    return None
-
-
-def local_save(data: AppData):
-    LOCAL_DIR.mkdir(parents=True, exist_ok=True)
-    LOCAL_FILE.write_text(data.to_json(), encoding='utf-8')
-
-
-# ─── High-level storage manager ───────────────────────────────────────────────
+# ─── Storage manager ──────────────────────────────────────────────────────────
 
 class Storage:
-    """
-    Manages persistence with WebDAV primary + local fallback.
-    All methods are synchronous (call from a thread if needed).
-    """
     def __init__(self):
-        self.cfg    = load_config()
-        self.dav_ok = False
-        self.data   = AppData()
+        self.cfg      = load_config()
+        self.dav_ok   = False
+        self.data     = AppData()
 
-    def reload_config(self):
-        self.cfg = load_config()
+    # ── profile helpers ───────────────────────────────────────────────────────
 
-    def save_config(self, url: str, user: str, pw: str):
-        lang = self.cfg.get('lang', 'en')
-        self.cfg = {'dav_url': url, 'dav_user': user, 'dav_pass': pw, 'lang': lang}
+    @property
+    def profiles(self) -> List[dict]:
+        return self.cfg.setdefault('profiles', _default_cfg()['profiles'])
+
+    @property
+    def active_slug(self) -> str:
+        return self.cfg.get('active', 'default')
+
+    @property
+    def active_profile(self) -> dict:
+        slug = self.active_slug
+        for p in self.profiles:
+            if p['slug'] == slug:
+                return p
+        return self.profiles[0]
+
+    @property
+    def currency(self) -> str:
+        return self.cfg.get('currency', 'CHF')
+
+    def switch_profile(self, slug: str):
+        self.cfg['active'] = slug
+        save_config(self.cfg)
+        self.load()
+
+    def add_profile(self, name: str) -> str:
+        base = _slug(name)
+        slug = base
+        existing = {p['slug'] for p in self.profiles}
+        n = 2
+        while slug in existing:
+            slug = f"{base}_{n}"; n += 1
+        self.profiles.append({'name': name, 'slug': slug,
+                               'dav_url': '', 'dav_user': '', 'dav_pass': ''})
+        save_config(self.cfg)
+        return slug
+
+    def rename_profile(self, slug: str, new_name: str):
+        for p in self.profiles:
+            if p['slug'] == slug:
+                p['name'] = new_name
         save_config(self.cfg)
 
-    def clear_config(self):
-        lang = self.cfg.get('lang', 'en')
-        self.cfg = {'dav_url': '', 'dav_user': '', 'dav_pass': '', 'lang': lang}
+    def delete_profile(self, slug: str):
+        if len(self.profiles) <= 1:
+            return
+        self.cfg['profiles'] = [p for p in self.profiles if p['slug'] != slug]
+        f = _local_file(slug)
+        if f.exists():
+            f.unlink()
+        if self.active_slug == slug:
+            self.cfg['active'] = self.profiles[0]['slug']
         save_config(self.cfg)
+
+    def save_profile_dav(self, slug: str, url: str, user: str, pw: str):
+        for p in self.profiles:
+            if p['slug'] == slug:
+                p['dav_url']  = url
+                p['dav_user'] = user
+                p['dav_pass'] = pw
+        save_config(self.cfg)
+
+    # ── load/save ─────────────────────────────────────────────────────────────
+
+    def load(self) -> str:
+        from .model import apply_recurring
+        prof = self.active_profile
+        slug = prof['slug']
+        # try WebDAV
+        try:
+            app = _dav_load(prof)
+            if app:
+                self.data   = app
+                self.dav_ok = True
+                apply_recurring(self.data)
+                _local_file(slug).parent.mkdir(parents=True, exist_ok=True)
+                _local_file(slug).write_text(app.to_json(), encoding='utf-8')
+                return 'dav'
+        except Exception:
+            pass
         self.dav_ok = False
+        # try local
+        lf = _local_file(slug)
+        if lf.exists():
+            try:
+                d = json.loads(lf.read_text(encoding='utf-8'))
+                if 'months' in d:
+                    self.data = AppData.from_dict(d)
+                    apply_recurring(self.data)
+                    return 'local'
+            except Exception:
+                pass
+        # default
+        self.data = default_data()
+        apply_recurring(self.data)
+        _local_file(slug).parent.mkdir(parents=True, exist_ok=True)
+        _local_file(slug).write_text(self.data.to_json(), encoding='utf-8')
+        return 'default'
+
+    def save(self) -> str:
+        prof = self.active_profile
+        slug = prof['slug']
+        _local_file(slug).parent.mkdir(parents=True, exist_ok=True)
+        _local_file(slug).write_text(self.data.to_json(), encoding='utf-8')
+        if _dav_full_url(prof):
+            ok = _dav_save(prof, self.data)
+            self.dav_ok = ok
+            if ok:
+                return 'dav'
+        self.dav_ok = False
+        return 'local'
+
+    def test_dav(self) -> Tuple[bool, str]:
+        return dav_test(self.active_profile)
+
+    def status(self) -> str:
+        if self.dav_ok: return 'dav'
+        if _dav_full_url(self.active_profile): return 'dav_err'
+        return 'local'
+
+    # ── lang / font / currency ────────────────────────────────────────────────
 
     def set_lang(self, lang: str):
-        from .model import MONTHS  # avoid circular
         from .i18n import set_lang
         self.cfg['lang'] = lang
         save_config(self.cfg)
@@ -175,56 +290,12 @@ class Storage:
         from .i18n import set_lang
         set_lang(self.cfg.get('lang', 'en'))
 
-    def load(self) -> str:
-        """Load data; return 'dav' | 'local' | 'default'"""
-        from .model import apply_recurring
-        # try WebDAV
-        try:
-            app = dav_load(self.cfg)
-            if app:
-                self.data   = app
-                self.dav_ok = True
-                apply_recurring(self.data)
-                local_save(app)
-                return 'dav'
-        except Exception:
-            pass
-        self.dav_ok = False
-        # try local
-        app = local_load()
-        if app:
-            self.data = app
-            apply_recurring(self.data)
-            return 'local'
-        # default
-        self.data = default_data()
-        apply_recurring(self.data)
-        local_save(self.data)
-        return 'default'
+    def set_currency(self, cur: str):
+        self.cfg['currency'] = cur.strip() or 'CHF'
+        save_config(self.cfg)
 
-    def save(self) -> str:
-        """Save data; return 'dav' | 'local'"""
-        local_save(self.data)
-        if _dav_url(self.cfg):
-            ok = dav_save(self.cfg, self.data)
-            self.dav_ok = ok
-            if ok:
-                return 'dav'
-        self.dav_ok = False
-        return 'local'
+    # ── import / export ───────────────────────────────────────────────────────
 
-    def test_dav(self) -> Tuple[bool, str]:
-        return dav_test(self.cfg)
-
-    def status(self) -> str:
-        """'dav' | 'dav_err' | 'local'"""
-        if self.dav_ok:
-            return 'dav'
-        if _dav_url(self.cfg):
-            return 'dav_err'
-        return 'local'
-
-    # ── Import / Export ──
     def export_json(self) -> str:
         return self.data.to_json()
 
