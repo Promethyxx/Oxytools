@@ -241,123 +241,43 @@ class AppData:
 def _def_month(mi: int) -> Month:
     return Month(
         name=MNAMES[mi],
-        revenus=[
-            mk_line('Assurance'), mk_line('Autre'),
-            mk_line('Banque', banque=0.07), mk_line('Cash'),
-            mk_line('CSR', banque=2090), mk_line('Remboursement'), mk_line('Sondage'),
-        ],
-        retraits=[mk_line('Retraits', banque=380)],
-        fixes=[
-            mk_line('BCV', banque=3.5), mk_line('Courses', banque=460),
-            mk_line('Loisirs', cash=380), mk_line('Loyer', banque=900),
-            mk_line('Salt home', banque=39.95), mk_line('Salt mobile', banque=20.95),
-        ],
+        revenus=[],
+        retraits=[],
+        fixes=[],
         variables=[],
     )
 
 
 def default_data() -> AppData:
+    """Données vierges pour un nouvel utilisateur."""
     d = AppData()
     for i, m in enumerate(MONTHS):
         d.months[m] = _def_month(i)
 
-    # ── JAN overrides ──
-    jan = d.months['JAN']
-    jan.revenus[2].banque = 1.2;  jan.revenus[2].payments = [Payment('2026-01-01', 1.2)]
-    jan.revenus[3].cash   = 5;    jan.revenus[3].payments = [Payment('2026-01-02', 5)]
-    jan.revenus[4].banque = 2090; jan.revenus[4].payments = [Payment('2026-01-03', 2090)]
-    jan.revenus[5].banque = 40;   jan.revenus[5].payments = [Payment('2026-01-15', 40)]
-    jan.retraits = [mk_line('Retraits', banque=360, payments=[{'date':'2026-01-05','amount':360}])]
-    jan.fixes[0].payments = [Payment('2026-01-01', 3.5)]
-    jan.fixes[1].payments = [Payment('2026-01-07',112.30), Payment('2026-01-14',98.45),
-                              Payment('2026-01-21',156.20), Payment('2026-01-28',119.50)]
-    jan.fixes[2].cash=360; jan.fixes[2].banque=0; jan.fixes[2].payments=[Payment('2026-01-05',360)]
-    jan.fixes[3].payments = [Payment('2026-01-01', 900)]
-    jan.fixes[4].payments = [Payment('2026-01-15', 39.95)]
-    jan.fixes[5].payments = [Payment('2026-01-15', 20.95)]
-    jan.variables = [
-        mk_line('Epargne'),
-        mk_line('Galaxus',   banque=211,   payments=[{'date':'2026-01-08','amount':211}]),
-        mk_line('Equity',    banque=63.96, payments=[{'date':'2026-01-10','amount':63.96}]),
-        mk_line('Jacques Kebab', cash=5,   payments=[{'date':'2026-01-12','amount':5}]),
-        mk_line('Maman'),
-        mk_line('Tam',       cash=50,      payments=[{'date':'2026-01-18','amount':20},
-                                                     {'date':'2026-01-25','amount':30}]),
-        mk_line('Claude',    banque=18.82, payments=[{'date':'2026-01-20','amount':18.82}]),
-    ]
+    d.dettes    = []
+    d.frais     = {'fixes': [], 'ponctuels': []}
+    d.epargne   = {'sondages': [], 'wishlists': [], 'pc_legacy': []}
+    d.viabilite = []
+    return d
 
-    # ── FEB overrides ──
-    feb = d.months['FEB']
-    feb.revenus[4].payments = [Payment('2026-02-03', 2090)]
-    feb.revenus[2].banque   = 0.07; feb.revenus[2].payments = [Payment('2026-02-01', 0.07)]
-    feb.retraits = [mk_line('Retraits', banque=400, payments=[{'date':'2026-02-02','amount':20}])]
-    feb.fixes[1].payments = [Payment('2026-02-06',55.80), Payment('2026-02-13',57.80)]
-    feb.fixes[4].payments = [Payment('2026-02-15', 39.95)]
-    feb.fixes[5].banque=39.75; feb.fixes[5].payments=[Payment('2026-02-15',39.75)]
-    feb.fixes[2].cash=380; feb.fixes[2].banque=0
-    feb.variables = [
-        mk_line('Epargne', banque=200),
-        mk_line('Maman', cash=20, payments=[{'date':'2026-02-10','amount':20}]),
-        mk_line('Serafe', banque=83.75),
-    ]
 
-    # ── Dettes ──
-    d.dettes = [
-        Dette('Dr Plumez','Dr Plumez','7887912',403.60,204.75,'ADB','13.07.2017'),
-        Dette('EOS','Dr Jean-Marie Monney','8007430',413.10,120.60,'ADB','03.01.2017'),
-        Dette('Intrum AG','CFF','9150645',2804.25,2000,'Opposition totale','03.05.2019'),
-        Dette('OFCOM','Serafe','7437384',270.65,270.65,'ADB','31.11.2015'),
-        Dette('OFCOM','Serafe','7726673',315.35,315.35,'ADB','20.06.2016'),
-        Dette('EOS','Swisscom','—',641,297,'Poursuite','?'),
-    ]
+def demo_data() -> AppData:
+    """Données de démonstration — NE PAS embarquer dans une release publique."""
+    d = AppData()
+    for i, m in enumerate(MONTHS):
+        d.months[m] = _def_month(i)
 
-    # ── Frais ──
+    d.dettes = []
     d.frais = {
         'fixes': [
-            FraisLine('BCV',      [3.5]*12),
-            FraisLine('Courses',  [460]*12),
-            FraisLine('Loisirs',  [380]*12),
-            FraisLine('Loyer',    [900]*12),
-            FraisLine('Salt H',   [39.9]*12),
-            FraisLine('Salt M',   [20.95]*12),
+            FraisLine('Loyer',   [900]*12),
+            FraisLine('Courses', [460]*12),
+            FraisLine('Loisirs', [380]*12),
         ],
-        'ponctuels': [
-            FraisLine('ECA',       [20.7]+[0]*11),
-            FraisLine('Serafe',    [0,83.75,0,0,83.75,0,0,83.75,0,0,83.75,0]),
-            FraisLine('RC',        [0]*11+[89.15]),
-            FraisLine('Romande',   [0,0,225,0,0,225,0,0,225,0,0,225]),
-            FraisLine('Swisscaution',[0]*11+[139]),
-        ],
+        'ponctuels': [],
     }
-
-    # ── Épargne ──
-    d.epargne = {
-        'sondages': [
-            EpargneSondage('AttaPoll',2.67,3), EpargneSondage('Club Décideur',0,5),
-            EpargneSondage('Espace Opinion',33.2,25), EpargneSondage('Freecash',8.29,20),
-            EpargneSondage('LP',0,0), EpargneSondage('Mobrog',0,5),
-            EpargneSondage('Mypuls',22.3,30), EpargneSondage("Pawns.app",0,5),
-            EpargneSondage('Polittrends',24.66,15), EpargneSondage('Surveoo',0,20),
-            EpargneSondage('SurveyPolice',0,0), EpargneSondage('TGM Panel',0,15),
-            EpargneSondage('Votre opinion',12.7,10), EpargneSondage('Yougov',2,50),
-            EpargneSondage('Yuzuni',0,5),
-        ],
-        'wishlists': [
-            {'label': 'Projet PC', 'items': [
-                EpargneAchat('Corsair 7000D',255,'https://www.galaxus.ch/fr/s1/product/corsair-7000d-airflow-boitier-pc-18878141'),
-                EpargneAchat('Asus Pro Art X870E Creator wifi',394.9,''),
-                EpargneAchat('AMD Ryzen 9 9950X 3d',589,''),
-                EpargneAchat('Kingston Fury',826,''),
-                EpargneAchat('SSD Samsung 9100 Pro',452,''),
-            ]},
-        ],
-        'pc_legacy': [
-            EpargnePcLegacy('Alim Corsair HX750i',80), EpargnePcLegacy('Asus Strix GTX 1060',80),
-            EpargnePcLegacy('AsRock X99 Extrem 6',120), EpargnePcLegacy('Corsair Graphite 780 T',45),
-            EpargnePcLegacy('Intel Core I7 5820K',169), EpargnePcLegacy('Ram HyperX Fury',44.6),
-            EpargnePcLegacy('Samsung Evo 840',35), EpargnePcLegacy('Samsung Evo 850',60),
-        ],
-    }
+    d.epargne   = {'sondages': [], 'wishlists': [{'label': 'Projet', 'items': []}], 'pc_legacy': []}
+    d.viabilite = []
 
     # ── Viabilité ──
     viab = []
