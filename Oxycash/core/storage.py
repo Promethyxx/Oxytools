@@ -24,7 +24,7 @@ def load_config() -> dict:
             return json.loads(CONF_FILE.read_text(encoding='utf-8'))
         except Exception:
             pass
-    return {'dav_url': '', 'dav_user': '', 'dav_pass': ''}
+    return {'dav_url': '', 'dav_user': '', 'dav_pass': '', 'lang': 'en'}
 
 
 def save_config(cfg: dict):
@@ -154,13 +154,26 @@ class Storage:
         self.cfg = load_config()
 
     def save_config(self, url: str, user: str, pw: str):
-        self.cfg = {'dav_url': url, 'dav_user': user, 'dav_pass': pw}
+        lang = self.cfg.get('lang', 'en')
+        self.cfg = {'dav_url': url, 'dav_user': user, 'dav_pass': pw, 'lang': lang}
         save_config(self.cfg)
 
     def clear_config(self):
-        self.cfg = {'dav_url': '', 'dav_user': '', 'dav_pass': ''}
+        lang = self.cfg.get('lang', 'en')
+        self.cfg = {'dav_url': '', 'dav_user': '', 'dav_pass': '', 'lang': lang}
         save_config(self.cfg)
         self.dav_ok = False
+
+    def set_lang(self, lang: str):
+        from .model import MONTHS  # avoid circular
+        from .i18n import set_lang
+        self.cfg['lang'] = lang
+        save_config(self.cfg)
+        set_lang(lang)
+
+    def load_lang(self):
+        from .i18n import set_lang
+        set_lang(self.cfg.get('lang', 'en'))
 
     def load(self) -> str:
         """Load data; return 'dav' | 'local' | 'default'"""

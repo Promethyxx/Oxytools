@@ -1,7 +1,9 @@
 """Oxycash – Special views (Flet 0.82+) — fully editable"""
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 import flet as ft
 from core.model import AppData, fmt, MONTHS
+from core.i18n import T
 
 P  = ft.Padding
 M  = ft.Margin
@@ -10,9 +12,12 @@ B  = ft.Border
 BS = ft.BorderSide
 
 
+_font_scale = [0]  # set by build_*_view via theme.scale
+
 def _t(s, size=12, weight=ft.FontWeight.NORMAL, col='', family='DM Sans',
        align=ft.TextAlign.LEFT, expand=False, overflow=None, no_wrap=False):
-    kw = dict(size=size, weight=weight, font_family=family, text_align=align)
+    kw = dict(size=max(6, size + _font_scale[0]), weight=weight,
+              font_family=family, text_align=align)
     if col:      kw['color']    = col
     if expand:   kw['expand']   = True
     if overflow: kw['overflow'] = overflow
@@ -72,6 +77,7 @@ def _del_btn(on_click, c):
 
 def build_dettes_view(data: AppData, t, on_save, on_toast):
     def c(k): return t.c(k)
+    _font_scale[0] = t.scale
     col = ft.Column([], spacing=8, scroll=ft.ScrollMode.AUTO, expand=True)
 
     def rebuild():
@@ -87,13 +93,13 @@ def build_dettes_view(data: AppData, t, on_save, on_toast):
 
         summary = ft.Container(
             ft.Row([
-                ft.Column([_t('TOTAL DU', size=9, weight=ft.FontWeight.W_600, col=c('text3')),
+                ft.Column([_t(T['deb_total_due'], size=9, weight=ft.FontWeight.W_600, col=c('text3')),
                            _t(f"{fmt(total_du)} CHF", size=16, weight=ft.FontWeight.W_700, col=c('danger'))],
                           expand=True),
-                ft.Column([_t('NEGOCIE', size=9, weight=ft.FontWeight.W_600, col=c('text3')),
+                ft.Column([_t(T['deb_negotiated'], size=9, weight=ft.FontWeight.W_600, col=c('text3')),
                            _t(f"{fmt(total_ok)} CHF", size=16, weight=ft.FontWeight.W_700, col=c('green'))],
                           expand=True),
-                ft.Column([_t('SOLDEES', size=9, weight=ft.FontWeight.W_600, col=c('text3')),
+                ft.Column([_t(T['deb_settled'], size=9, weight=ft.FontWeight.W_600, col=c('text3')),
                            _t(f"{paid}/{len(data.dettes)}", size=16, weight=ft.FontWeight.W_700, col=c('teal'))],
                           expand=True),
             ]),
@@ -114,7 +120,7 @@ def build_dettes_view(data: AppData, t, on_save, on_toast):
                     except ValueError: pass
                 return _h
             def del_dette(e, i=i):
-                data.dettes.pop(i); on_save(); rebuild(); on_toast('Supprime')
+                data.dettes.pop(i); on_save(); rebuild(); on_toast(T['toast_deleted'])
 
             cards.append(ft.Container(
                 ft.Column([
@@ -123,26 +129,26 @@ def build_dettes_view(data: AppData, t, on_save, on_toast):
                         _del_btn(del_dette, c),
                     ], spacing=4),
                     ft.Row([
-                        ft.Column([_t('Representant', size=9, col=c('text3')),
+                        ft.Column([_t(T['deb_representative'], size=9, col=c('text3')),
                                    _tf(d.rep, on_blur=upd_str('rep'), col=c('text2'), c=c)],
                                   expand=True, spacing=2),
-                        ft.Column([_t('N Poursuite', size=9, col=c('text3')),
+                        ft.Column([_t(T['deb_pursuit'], size=9, col=c('text3')),
                                    _tf(d.poursuite, on_blur=upd_str('poursuite'), col=c('text2'), c=c)],
                                   expand=True, spacing=2),
                     ], spacing=8),
                     ft.Row([
-                        ft.Column([_t('Solde du (CHF)', size=9, col=c('text3')),
+                        ft.Column([_t(T['deb_due_chf'], size=9, col=c('text3')),
                                    _tf(fmt(d.solde), on_blur=upd_num('solde'), num=True, col=c('danger'), c=c)],
                                   expand=True, spacing=2),
-                        ft.Column([_t('Negocie (CHF)', size=9, col=c('text3')),
+                        ft.Column([_t(T['deb_neg_chf'], size=9, col=c('text3')),
                                    _tf(fmt(d.soldeOk), on_blur=upd_num('soldeOk'), num=True, col=c('green'), c=c)],
                                   expand=True, spacing=2),
                     ], spacing=8),
                     ft.Row([
-                        ft.Column([_t('Etat', size=9, col=c('text3')),
+                        ft.Column([_t(T['deb_status'], size=9, col=c('text3')),
                                    _tf(d.etat, on_blur=upd_str('etat'), col=c('text2'), c=c)],
                                   expand=True, spacing=2),
-                        ft.Column([_t('Date', size=9, col=c('text3')),
+                        ft.Column([_t(T['deb_date'], size=9, col=c('text3')),
                                    _tf(d.date, on_blur=upd_str('date'), col=c('text3'), c=c)],
                                   expand=True, spacing=2),
                     ], spacing=8),
@@ -160,10 +166,10 @@ def build_dettes_view(data: AppData, t, on_save, on_toast):
             on_save(); rebuild()
 
         return [
-            _t('Dettes', size=20, weight=ft.FontWeight.W_700, family='Playfair Display', col=c('text')),
-            _t('Suivi des poursuites et creances', size=12, col=c('text2')),
+            _t(T['deb_title'], size=20, weight=ft.FontWeight.W_700, family='Playfair Display', col=c('text')),
+            _t(T['deb_subtitle'], size=12, col=c('text2')),
             summary, *cards,
-            _add_btn('Ajouter une dette', add_dette, c),
+            _add_btn(T['deb_add'], add_dette, c),
             ft.Container(height=40),
         ]
 
@@ -175,6 +181,7 @@ def build_dettes_view(data: AppData, t, on_save, on_toast):
 
 def build_epargne_view(data: AppData, t, on_save, on_toast):
     def c(k): return t.c(k)
+    _font_scale[0] = t.scale
     col = ft.Column([], spacing=6, scroll=ft.ScrollMode.AUTO, expand=True)
 
     def rebuild():
@@ -185,47 +192,8 @@ def build_epargne_view(data: AppData, t, on_save, on_toast):
 
     def _build():
         ep = data.epargne
-        sond_total   = sum(s.total for s in ep.get('sondages', []))
         achats_total = sum(a.prix for wl in ep.get('wishlists', []) for a in wl.get('items', []))
         legacy_total = sum(p.val  for p in ep.get('pc_legacy', []))
-
-        sond_rows = []
-        for i, s in enumerate(ep.get('sondages', [])):
-            pct = min(1.0, s.total / s.goal) if s.goal > 0 else 0
-            def upd_sn(i=i):
-                def _h(e): ep['sondages'][i].name = e.control.value; on_save()
-                return _h
-            def upd_sf(field, i=i):
-                def _h(e):
-                    try: setattr(ep['sondages'][i], field, float(e.control.value.replace(',','.'))); on_save(); rebuild()
-                    except ValueError: pass
-                return _h
-            def del_s(e, i=i):
-                ep['sondages'].pop(i); on_save(); rebuild()
-
-            sond_rows.append(ft.Container(
-                ft.Column([
-                    ft.Row([_tf(s.name, on_blur=upd_sn(), expand=True, col=c('text'), c=c),
-                            _del_btn(del_s, c)], spacing=4),
-                    ft.Row([
-                        ft.Column([_t('Total CHF', size=9, col=c('text3')),
-                                   _tf(fmt(s.total), on_blur=upd_sf('total'), num=True, col=c('teal'), c=c)],
-                                  expand=True, spacing=2),
-                        ft.Column([_t('Objectif CHF', size=9, col=c('text3')),
-                                   _tf(fmt(s.goal), on_blur=upd_sf('goal'), num=True, col=c('text2'), c=c)],
-                                  expand=True, spacing=2),
-                    ], spacing=8),
-                    ft.Container(ft.Container(width=pct, bgcolor=c('teal'), border_radius=3),
-                                 height=4, bgcolor=c('card_border'), border_radius=3)
-                    if s.goal > 0 else ft.Container(height=4),
-                ], spacing=4),
-                padding=P.symmetric(horizontal=12, vertical=10),
-                bgcolor=c('card'), border=B.all(1, c('card_border')), border_radius=8,
-            ))
-
-        def add_sond(e):
-            from core.model import EpargneSondage
-            ep['sondages'].append(EpargneSondage('Nouveau', 0, 0)); on_save(); rebuild()
 
         # ── Wishlists (renommable, multi-projets) ──
         wishlist_blocks = []
@@ -256,7 +224,7 @@ def build_epargne_view(data: AppData, t, on_save, on_toast):
                             _del_btn(del_a, c),
                         ], spacing=4, vertical_alignment=ft.CrossAxisAlignment.CENTER),
                         _tf(a.url or '', on_blur=upd_aurl, expand=True,
-                            col=c('text3'), hint='URL pour surveiller le prix', c=c),
+                            col=c('text3'), hint=T['sav_url_hint'], c=c),
                     ], spacing=4),
                     padding=P.symmetric(horizontal=12, vertical=8),
                     bgcolor=c('card'), border=B.all(1, c('card_border')), border_radius=8,
@@ -282,7 +250,7 @@ def build_epargne_view(data: AppData, t, on_save, on_toast):
                     ], spacing=8, vertical_alignment=ft.CrossAxisAlignment.CENTER),
                     ft.Divider(height=1, color=c('card_border')),
                     *item_rows,
-                    _add_btn('Ajouter un article', add_item, c),
+                    _add_btn(T['sav_add_item'], add_item, c),
                 ], spacing=6),
                 padding=14, bgcolor=c('card'),
                 border=B.all(1, c('card_border')), border_radius=10,
@@ -292,50 +260,13 @@ def build_epargne_view(data: AppData, t, on_save, on_toast):
             ep.setdefault('wishlists', []).append({'label': 'Projet', 'items': []})
             on_save(); rebuild()
 
-        legacy_rows = []
-        for i, p in enumerate(ep.get('pc_legacy', [])):
-            def upd_pn(i=i):
-                def _h(e): ep['pc_legacy'][i].name = e.control.value; on_save()
-                return _h
-            def upd_pv(i=i):
-                def _h(e):
-                    try: ep['pc_legacy'][i].val = float(e.control.value.replace(',','.')); on_save(); rebuild()
-                    except ValueError: pass
-                return _h
-            def del_p(e, i=i):
-                ep['pc_legacy'].pop(i); on_save(); rebuild()
 
-            legacy_rows.append(ft.Container(
-                ft.Row([_tf(p.name, on_blur=upd_pn(), expand=True, col=c('text'), c=c),
-                        _tf(fmt(p.val), on_blur=upd_pv(), num=True, width=80, col=c('purple'), c=c),
-                        _del_btn(del_p, c)],
-                       spacing=4, vertical_alignment=ft.CrossAxisAlignment.CENTER),
-                padding=P.symmetric(horizontal=12, vertical=8),
-                bgcolor=c('card'), border=B.all(1, c('card_border')), border_radius=8,
-            ))
 
-        def add_legacy(e):
-            from core.model import EpargnePcLegacy
-            ep['pc_legacy'].append(EpargnePcLegacy('Nouveau', 0)); on_save(); rebuild()
 
-        sc = 'green' if legacy_total >= achats_total else 'danger'
         return [
-            _t('Epargne', size=20, weight=ft.FontWeight.W_700, family='Playfair Display', col=c('text')),
-            _sec_hdr('Sondages en cours', '', f"{fmt(sond_total)} CHF", 'teal', c),
-            *sond_rows, _add_btn('Ajouter un sondage', add_sond, c),
-            ft.Container(height=8),
+            _t(T['sav_title'], size=20, weight=ft.FontWeight.W_700, family='Playfair Display', col=c('text')),
             *wishlist_blocks,
-            _add_btn('+ Nouveau projet', add_wishlist, c),
-            ft.Container(height=8),
-            _sec_hdr('PC Legacy (revente)', '', f"{fmt(legacy_total)} CHF", 'purple', c),
-            *legacy_rows, _add_btn('Ajouter une piece', add_legacy, c),
-            ft.Container(
-                ft.Row([_t('Solde net', size=13, weight=ft.FontWeight.W_700, col=c('text'), expand=True),
-                        _t(f"{fmt(legacy_total - achats_total)} CHF", size=16,
-                           weight=ft.FontWeight.W_700, col=c(sc))]),
-                padding=14, bgcolor=c('card'), border=B.all(1, c('card_border')),
-                border_radius=10, margin=M.only(top=8),
-            ),
+            _add_btn(T['sav_add_project'], add_wishlist, c),
             ft.Container(height=40),
         ]
 
@@ -347,6 +278,7 @@ def build_epargne_view(data: AppData, t, on_save, on_toast):
 
 def build_frais_view(data: AppData, t, on_save, on_toast):
     def c(k): return t.c(k)
+    _font_scale[0] = t.scale
     col = ft.Column([], spacing=12, scroll=ft.ScrollMode.AUTO, expand=True)
 
     def rebuild():
@@ -366,9 +298,9 @@ def build_frais_view(data: AppData, t, on_save, on_toast):
                 return ft.Container(ct, width=width) if width else ft.Container(ct, expand=True)
 
             header = ft.Row(
-                [hdr('Poste', 'text3', width=72)] +
+                [hdr(T['exp_post'], 'text3', width=72)] +
                 [hdr(MONTHS[mi][:3], 'text3') for mi in range(12)] +
-                [hdr('Total', col_key, width=52), ft.Container(width=28)],
+                [hdr(T['exp_total'], col_key, width=52), ft.Container(width=28)],
                 spacing=2,
             )
             rows = [header, ft.Divider(height=1, color=c('card_border'))]
@@ -420,7 +352,7 @@ def build_frais_view(data: AppData, t, on_save, on_toast):
 
             rows.append(ft.Divider(height=1, color=c('card_border')))
             rows.append(ft.Row(
-                [ft.Container(_t('Total', size=10, weight=ft.FontWeight.W_700, col=c('text')), width=72)] +
+                [ft.Container(_t(T['col_total'], size=10, weight=ft.FontWeight.W_700, col=c('text')), width=72)] +
                 [ft.Container(_t(fmt(totals[mi]) if totals[mi] else '-', size=9,
                                   weight=ft.FontWeight.W_700, col=c(col_key),
                                   align=ft.TextAlign.CENTER), expand=True)
@@ -447,10 +379,10 @@ def build_frais_view(data: AppData, t, on_save, on_toast):
             ], spacing=6)
 
         return [
-            _t('Frais annuels', size=20, weight=ft.FontWeight.W_700,
+            _t(T['exp_title'], size=20, weight=ft.FontWeight.W_700,
                family='Playfair Display', col=c('text')),
-            table('fixes',     'Charges fixes',    'blue'),
-            table('ponctuels', 'Frais ponctuels',  'amber'),
+            table('fixes',     T['exp_fixed'],    'blue'),
+            table('ponctuels', T['exp_occasional'],  'amber'),
             ft.Container(height=40),
         ]
 
@@ -462,6 +394,7 @@ def build_frais_view(data: AppData, t, on_save, on_toast):
 
 def build_viabilite_view(data: AppData, t, on_save, on_toast):
     def c(k): return t.c(k)
+    _font_scale[0] = t.scale
     col = ft.Column([], spacing=10, scroll=ft.ScrollMode.AUTO, expand=True)
 
     def rebuild():
@@ -471,8 +404,8 @@ def build_viabilite_view(data: AppData, t, on_save, on_toast):
         except: pass
 
     def _build():
-        COLS = [('Salaire','gold',60),('Loyer','text3',None),('Assur.','text3',None),
-                ('Frais','text3',None),('Impot','text3',None),('Subside','teal',None),('Solde','green',58)]
+        COLS = [(T['via_salary'],'gold',60),(T['via_rent'],'text3',None),(T['via_insurance'],'text3',None),
+                (T['via_expenses'],'text3',None),(T['via_tax'],'text3',None),(T['via_subsidy'],'teal',None),(T['via_balance'],'green',58)]
 
         def hdr(s, ck, width=None):
             ct = _t(s, size=9, weight=ft.FontWeight.W_600, col=c(ck), align=ft.TextAlign.RIGHT)
@@ -531,12 +464,12 @@ def build_viabilite_view(data: AppData, t, on_save, on_toast):
             on_save(); rebuild()
 
         return [
-            _t('Viabilite', size=20, weight=ft.FontWeight.W_700,
+            _t(T['via_title'], size=20, weight=ft.FontWeight.W_700,
                family='Playfair Display', col=c('text')),
-            _t('Simulation mensuelle par palier de salaire', size=12, col=c('text2')),
+            _t(T['via_subtitle'], size=12, col=c('text2')),
             ft.Container(ft.Column(rows, spacing=2), padding=12,
                          bgcolor=c('card'), border=B.all(1, c('card_border')), border_radius=10),
-            _add_btn('Ajouter un palier', add_palier, c),
+            _add_btn(T['via_add'], add_palier, c),
             ft.Container(height=40),
         ]
 
@@ -546,8 +479,51 @@ def build_viabilite_view(data: AppData, t, on_save, on_toast):
 
 # ═══ CONFIG ═════════════════════════════════════════════════════════
 
+def _lang_switch_card(storage, on_reload, c, T_ref):
+    from core.i18n import toggle_lang, get_lang
+    lang_lbl = ft.Text(
+        'EN | FR', size=13, font_family='DM Sans',
+        weight=ft.FontWeight.W_600, color=c('text'),
+    )
+    en_indicator = ft.Container(
+        ft.Text('EN', size=11, font_family='DM Sans', weight=ft.FontWeight.W_700,
+                color='#1a1a1a' if get_lang()=='en' else c('text2')),
+        padding=P.symmetric(horizontal=10, vertical=5),
+        bgcolor=c('gold') if get_lang()=='en' else 'transparent',
+        border=B.all(1, c('gold') if get_lang()=='en' else c('card_border')),
+        border_radius=ft.BorderRadius(6,0,0,6),
+    )
+    fr_indicator = ft.Container(
+        ft.Text('FR', size=11, font_family='DM Sans', weight=ft.FontWeight.W_700,
+                color='#1a1a1a' if get_lang()=='fr' else c('text2')),
+        padding=P.symmetric(horizontal=10, vertical=5),
+        bgcolor=c('gold') if get_lang()=='fr' else 'transparent',
+        border=B.all(1, c('gold') if get_lang()=='fr' else c('card_border')),
+        border_radius=ft.BorderRadius(0,6,6,0),
+    )
+
+    def switch(e):
+        toggle_lang()
+        storage.set_lang(get_lang())
+        on_reload()
+
+    return ft.Container(
+        ft.Column([
+            _t(T_ref['cfg_lang'], size=11, weight=ft.FontWeight.W_600, col=c('text3')),
+            ft.Container(height=6),
+            ft.GestureDetector(
+                content=ft.Row([en_indicator, fr_indicator], spacing=0),
+                on_tap=switch,
+            ),
+        ], spacing=2),
+        padding=14, bgcolor=c('card'),
+        border=B.all(1, c('card_border')), border_radius=12,
+    )
+
+
 def build_config_view(storage, t, on_save, on_toast, on_reload, on_theme_toggle, page=None):
     def c(k): return t.c(k)
+    _font_scale[0] = t.scale
     cfg = storage.cfg
 
     def field(label, value, hint='', password=False):
@@ -561,10 +537,10 @@ def build_config_view(storage, t, on_save, on_toast, on_reload, on_theme_toggle,
         )
         return lbl, tf
 
-    url_lbl, url_tf = field('URL WebDAV', cfg.get('dav_url',''),
+    url_lbl, url_tf = field(T['cfg_url'], cfg.get('dav_url',''),
                             'https://xxx/remote.php/dav/files/user/Oxy/')
-    usr_lbl, usr_tf = field('Utilisateur', cfg.get('dav_user',''), 'ton@email.com')
-    pw_lbl,  pw_tf  = field('Mot de passe', cfg.get('dav_pass',''), 'app password', password=True)
+    usr_lbl, usr_tf = field(T['cfg_user'], cfg.get('dav_user',''), 'ton@email.com')
+    pw_lbl,  pw_tf  = field(T['cfg_password'], cfg.get('dav_pass',''), 'app password', password=True)
     status_txt   = ft.Text('', size=12, font_family='DM Sans')
     import_status = ft.Text('', size=11, font_family='DM Sans')
 
@@ -592,8 +568,8 @@ def build_config_view(storage, t, on_save, on_toast, on_reload, on_theme_toggle,
 
     def save_cfg(e):
         storage.save_config(url_tf.value.strip(), usr_tf.value.strip(), pw_tf.value)
-        status_txt.value = 'Config sauvee'; status_txt.color = c('green')
-        status_txt.update(); on_toast('Config sauvee')
+        status_txt.value = T['cfg_saved']; status_txt.color = c('green')
+        status_txt.update(); on_toast(T['cfg_saved'])
 
     def test_cfg(e):
         storage.save_config(url_tf.value.strip(), usr_tf.value.strip(), pw_tf.value)
@@ -605,14 +581,14 @@ def build_config_view(storage, t, on_save, on_toast, on_reload, on_theme_toggle,
     def clear_cfg(e):
         storage.clear_config()
         url_tf.value=''; usr_tf.value=''; pw_tf.value=''
-        status_txt.value='Config effacee'; status_txt.color=c('text2')
+        status_txt.value=T['cfg_cleared']; status_txt.color=c('text2')
         for w in [url_tf, usr_tf, pw_tf, status_txt]: w.update()
 
     def do_export(e):
         import pathlib, datetime
         path = pathlib.Path.home() / f"oxycash-{datetime.date.today()}.json"
         path.write_text(storage.export_json(), encoding='utf-8')
-        on_toast(f'Exporte: {path}')
+        on_toast(T.fmt('cfg_exported', name=path.name))
 
     def _open_native_picker():
         """Try to open a native file dialog. Returns path string or None."""
@@ -660,37 +636,37 @@ def build_config_view(storage, t, on_save, on_toast, on_reload, on_theme_toggle,
                 try: import_path_tf.update()
                 except: pass
             else:
-                on_toast('Explorateur non disponible — entrer le chemin manuellement')
+                on_toast(T['cfg_import_na'])
         threading.Thread(target=_pick, daemon=True).start()
 
     def do_import(e):
         path = import_path_tf.value.strip()
         if not path:
-            on_toast('Entre un chemin ou utilise Parcourir')
+            on_toast(T['cfg_import_nopath'])
             return
         import pathlib
         try:
             raw = pathlib.Path(path).read_text(encoding='utf-8')
             ok  = storage.import_json(raw)
             if ok:
-                import_status.value = f'Importe depuis {pathlib.Path(path).name}'
+                import_status.value = T.fmt('cfg_import_ok', name=pathlib.Path(path).name)
                 import_status.color = c('green')
                 try: import_status.update()
                 except: pass
                 on_reload()
                 on_toast(f'Importe!')
             else:
-                import_status.value = 'Format JSON invalide'
+                import_status.value = T['cfg_import_invalid']
                 import_status.color = c('danger')
                 try: import_status.update()
                 except: pass
-                on_toast('Format invalide')
+                on_toast(T['cfg_import_invalid'])
         except FileNotFoundError:
-            import_status.value = 'Fichier non trouve'
+            import_status.value = T['cfg_import_notfound']
             import_status.color = c('danger')
             try: import_status.update()
             except: pass
-            on_toast('Fichier introuvable')
+            on_toast(T['cfg_import_notfound'])
         except Exception as ex:
             import_status.value = str(ex)[:60]
             import_status.color = c('danger')
@@ -699,7 +675,7 @@ def build_config_view(storage, t, on_save, on_toast, on_reload, on_theme_toggle,
             on_toast('Erreur import')
 
     def do_reset(e):
-        storage.reset(); on_reload(); on_toast('Reinitialise')
+        storage.reset(); on_reload(); on_toast(T['cfg_reset_done'])
 
     def mk_card(title, *children):
         return ft.Container(
@@ -709,27 +685,27 @@ def build_config_view(storage, t, on_save, on_toast, on_reload, on_theme_toggle,
         )
 
     return ft.Column([
-        _t('Configuration', size=20, weight=ft.FontWeight.W_700,
+        _t(T['cfg_title'], size=20, weight=ft.FontWeight.W_700,
            family='Playfair Display', col=c('text')),
-        mk_card('WebDAV (Nextcloud, kDrive)',
+        mk_card(T['cfg_webdav'],
                 url_lbl, url_tf, ft.Container(height=2),
                 usr_lbl, usr_tf, ft.Container(height=2),
                 pw_lbl,  pw_tf,  ft.Container(height=6),
-                ft.Row([abtn('Sauver','gold',save_cfg),
-                        abtn('Tester','teal',test_cfg),
-                        abtn('Effacer','card',clear_cfg)], spacing=8),
+                ft.Row([abtn(T['cfg_save'],'gold',save_cfg),
+                        abtn(T['cfg_test'],'teal',test_cfg),
+                        abtn(T['cfg_clear'],'card',clear_cfg)], spacing=8),
                 status_txt),
-        mk_card('Export',
-                abtn('Exporter JSON', 'card', do_export),
-                _t('Sauvegarde dans le dossier utilisateur', size=10, col=c('text3'))),
-        mk_card('Import',
-                _t('Parcourir ou coller le chemin complet du fichier JSON', size=10, col=c('text3')),
+        mk_card(T['cfg_export'],
+                abtn(T['cfg_export_lbl'], 'card', do_export),
+                _t(T['cfg_export_sub'], size=10, col=c('text3'))),
+        mk_card(T['cfg_import'],
+                _t(T['cfg_import_sub'], size=10, col=c('text3')),
                 ft.Container(height=4),
                 import_path_tf,
                 ft.Container(height=6),
-                ft.Row([abtn('Parcourir', 'card', do_browse),
-                        abtn('Importer', 'teal', do_import)], spacing=8),
+                ft.Row([abtn(T['cfg_browse'], 'card', do_browse),
+                        abtn(T['cfg_import_btn'], 'teal', do_import)], spacing=8),
                 import_status),
-        mk_card('Donnees', abtn('Reinitialiser','',do_reset,danger=True)),
+        mk_card(T['cfg_data'], abtn(T['cfg_reset'],'',do_reset,danger=True)),
         ft.Container(height=40),
     ], spacing=12, scroll=ft.ScrollMode.AUTO, expand=True)

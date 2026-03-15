@@ -2,7 +2,8 @@
 from __future__ import annotations
 import flet as ft
 from typing import Callable
-from core.model import Month, Line, Payment, fmt, fmt_sign, today
+from core.model import Month, Line, Payment, fmt, fmt_sign, today, MONTHS
+from core.i18n import T
 
 P = ft.Padding
 M = ft.Margin
@@ -10,11 +11,15 @@ BR = ft.BorderRadius
 B = ft.Border
 BS = ft.BorderSide
 
+# SECTION_META: (label_key, color_key)
 SECTION_META = {
-    'revenus':   ('💰', 'Revenus',   'teal'),
-    'retraits':  ('🏧', 'Retraits',  'amber'),
-    'fixes':     ('📌', 'Fixes',     'blue'),
-    'variables': ('🔄', 'Variables', 'gold'),
+    'revenus':   ('sec_income',      'teal'),
+    'retraits':  ('sec_withdrawals', 'amber'),
+    'fixes':     ('sec_fixed',       'blue'),
+    'variables': ('sec_variable',    'gold'),
+}
+SECTION_ICONS = {
+    'revenus': '💰', 'retraits': '🏧', 'fixes': '📌', 'variables': '🔄',
 }
 
 
@@ -41,7 +46,7 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
 
     def txt(s, size=12, weight=ft.FontWeight.NORMAL, col='text', family='DM Sans',
             align=ft.TextAlign.LEFT, expand=False, overflow=None, no_wrap=False):
-        kw = dict(size=size, weight=weight, font_family=family,
+        kw = dict(size=max(6, size + t.scale), weight=weight, font_family=family,
                   color=c(col), text_align=align)
         if expand:   kw['expand']   = True
         if overflow: kw['overflow'] = overflow
@@ -155,31 +160,31 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
 
         grid = ft.Column([
             ft.Row([
-                card('💰 REVENUS', [
+                card(T['card_income'], [
                     ('Banque', rev_banque, 'text'),
                     ('Cash',   rev_cash,   'text'),
                 ], rev_total, 'green'),
-                card('🏧 RETRAITS', [
-                    ('À retirer', ret_a_retirer, 'text'),
-                    ('Retiré',    ret_retire,    'text'),
+                card(T['card_withdrawals'], [
+                    (T['card_to_withdraw'], ret_a_retirer, 'text'),
+                    (T['card_withdrawn'],    ret_retire,    'text'),
                 ], ret_solde, cc(-ret_solde)),
             ], spacing=8),
             ft.Row([
-                card('✅ PAYÉ', [
+                card(T['card_paid'], [
                     ('Banque', paye_banque, 'text'),
                     ('Cash',   paye_cash,   'text'),
                 ], paye_total, 'teal'),
-                card('⏳ À PAYER', [
+                card(T['card_to_pay'], [
                     ('Banque', a_payer_b, 'text'),
                     ('Cash',   a_payer_c, 'text'),
                 ], a_payer_t, 'amber'),
             ], spacing=8),
             ft.Row([
-                card('📊 PRÉVISION', [
+                card(T['card_forecast'], [
                     ('Banque', prev_banque, cc(prev_banque)),
                     ('Cash',   prev_cash,   cc(prev_cash)),
                 ], prev_total, cc(prev_total), big=True),
-                card('🏦 SOLDE', [
+                card(T['card_balance'], [
                     ('Banque', solde_banque, cc(solde_banque)),
                     ('Cash',   solde_cash,   cc(solde_cash)),
                 ], solde_total, cc(solde_total), big=True),
@@ -193,9 +198,9 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
         var_paye   = sum(l.etat() for l in month.variables)
 
         cats = [
-            ('Retraits',  ret_a_retirer, ret_retire,  'teal'),
-            ('Fixes',     fix_budget,    fix_paye,    'gold'),
-            ('Variables', var_budget,    var_paye,    'red'),
+            (T['chart_withdrawals'],  ret_a_retirer, ret_retire,  'teal'),
+            (T['chart_fixed'],     fix_budget,    fix_paye,    'gold'),
+            (T['chart_variable'], var_budget,    var_paye,    'red'),
         ]
         max_v = max((b for _, b, _, _ in cats), default=1) or 1
         BAR_H = 75
@@ -221,14 +226,14 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
 
         chart = ft.Container(
             ft.Column([
-                txt('BUDGET VS PAYÉ', size=9, weight=ft.FontWeight.W_600, col='text3'),
+                txt(T['card_budget_vs'], size=9, weight=ft.FontWeight.W_600, col='text3'),
                 ft.Container(height=4),
                 ft.Row(bar_cols, alignment=ft.MainAxisAlignment.SPACE_AROUND,
                        vertical_alignment=ft.CrossAxisAlignment.END),
                 ft.Container(height=4),
                 ft.Row([
-                    txt('▓ Budget', size=9, col='text3'),
-                    txt('█ Payé',   size=9, col='text3'),
+                    txt(T['card_budget'], size=9, col='text3'),
+                    txt(T['card_paid_lbl'],   size=9, col='text3'),
                 ], alignment=ft.MainAxisAlignment.CENTER, spacing=16),
             ], spacing=0),
             padding=14, bgcolor=c('card'),
@@ -246,7 +251,7 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
             def del_pay(e, _pi=pi, _sec=sec_key, _li=li):
                 month.section(_sec)[_li].payments.pop(_pi)
                 on_save(); rebuild()
-                on_toast('✕ Supprimé')
+                on_toast(T['pay_deleted'])
             rows.append(ft.Row([
                 txt(p.date[5:].replace('-', '/'), size=11, col='text3'),
                 ft.Container(expand=True),
@@ -258,19 +263,19 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
             ], vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=4))
 
         if not rows:
-            rows.append(txt('Aucun paiement', size=11, col='text3'))
+            rows.append(txt(T['no_payments'], size=11, col='text3'))
 
         date_f = ft.TextField(value=today(), width=110, height=30, text_size=11,
                               bgcolor='transparent', border_color=c('card_border'),
                               focused_border_color=c('gold'),
                               content_padding=P.symmetric(horizontal=6, vertical=2),
-                              hint_text='YYYY-MM-DD')
+                              hint_text=T['pay_date_hint'])
         amt_f  = ft.TextField(value='', width=80, height=30, text_size=12,
                               text_align=ft.TextAlign.RIGHT,
                               bgcolor='transparent', border_color=c('card_border'),
                               focused_border_color=c('gold'),
                               content_padding=P.symmetric(horizontal=6, vertical=2),
-                              hint_text='Montant', keyboard_type=ft.KeyboardType.NUMBER)
+                              hint_text=T['pay_amt_hint'], keyboard_type=ft.KeyboardType.NUMBER)
 
         def add_pay(e, _sec=sec_key, _li=li):
             try:
@@ -278,9 +283,9 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
                 date   = date_f.value.strip() or today()
                 month.section(_sec)[_li].payments.append(Payment(date, amount))
                 on_save(); rebuild()
-                on_toast(f'✓ +{fmt(amount)} CHF')
+                on_toast(f"+{fmt(amount)} CHF")
             except ValueError:
-                on_toast('⚠️ Montant invalide')
+                on_toast(T['pay_invalid'])
 
         add_row = ft.Row([
             date_f, amt_f,
@@ -335,7 +340,7 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
             month.section(_s)[_i].name = e.control.value; on_save()
 
         def del_var(e, _s=sec_key, _i=idx):
-            month.section(_s).pop(_i); on_save(); rebuild(); on_toast('🗑️ Supprimé')
+            month.section(_s).pop(_i); on_save(); rebuild(); on_toast(T['toast_deleted'])
 
         # name widget
         if is_var:
@@ -354,18 +359,18 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
         def open_recurring_dialog(e, _s=sec_key, _i=idx):
             from core.model import apply_recurring
             if page_ref[0] is None:
-                on_toast('⚠️ Dialog non disponible')
+                on_toast(T['rec_na'])
                 return
 
             src = month.section(_s)[_i]
             freq_state = [(src.recurring or {}).get('freq', 3)]
 
             FREQ_OPTIONS = [
-                ('Chaque mois',     1),
-                ('Tous les 2 mois', 2),
-                ('Tous les 3 mois', 3),
-                ('Tous les 6 mois', 6),
-                ('Annuel',          12),
+                (T['rec_every_1'],  1),
+                (T['rec_every_2'],  2),
+                (T['rec_every_3'],  3),
+                (T['rec_every_6'],  6),
+                (T['rec_every_12'], 12),
             ]
 
             # RadioGroup is simplest for single-select in Flet
@@ -385,13 +390,13 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
                 modal=True,
                 bgcolor=c('bg2'),
                 title=ft.Text(
-                    f'🔁  {src.name}',
+                    f"{T['rec_title']}  {src.name}",
                     font_family='Playfair Display', size=15,
                     weight=ft.FontWeight.W_600, color=c('text'),
                 ),
                 content=ft.Container(
                     ft.Column([
-                        ft.Text('Fréquence de répétition', size=11,
+                        ft.Text(T['rec_frequency'], size=11,
                                 color=c('text2'), font_family='DM Sans'),
                         ft.Container(height=6),
                         rg,
@@ -400,17 +405,17 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
                 ),
                 actions=[
                     ft.TextButton(
-                        'Annuler',
+                        T['rec_cancel'],
                         on_click=lambda e2: page_ref[0].pop_dialog(),
                         style=ft.ButtonStyle(color=c('text2')),
                     ),
                     ft.TextButton(
-                        'Désactiver',
+                        T['rec_disable'],
                         on_click=lambda e2: _remove_rec(_s, _i),
                         style=ft.ButtonStyle(color=c('danger')),
                     ),
                     ft.ElevatedButton(
-                        'Appliquer',
+                        T['rec_apply'],
                         on_click=lambda e2: _apply_rec(_s, _i, freq_state[0]),
                         style=ft.ButtonStyle(
                             bgcolor=c('teal'), color='#1a1a1a',
@@ -432,14 +437,14 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
             apply_recurring(_D())
             on_save()
             page_ref[0].pop_dialog()
-            on_toast(f'🔁 Récurrent tous les {freq} mois')
+            on_toast(T.fmt('rec_active', n=freq))
             rebuild()
 
         def _remove_rec(_s, _i):
             month.section(_s)[_i].recurring = None
             on_save()
             page_ref[0].pop_dialog()
-            on_toast('🔁 Récurrence désactivée')
+            on_toast(T['rec_disabled'])
             rebuild()
 
         # Récurrence disponible sur toutes les sections
@@ -492,7 +497,7 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
     # ── section ──────────────────────────────────────────────────────────────
 
     def section(sec_key) -> ft.Column:
-        icon, label, col_key = SECTION_META[sec_key]
+        lbl_key, col_key = SECTION_META[sec_key]; icon = SECTION_ICONS[sec_key]; label = T[lbl_key]
         col_ref = ft.Column([], spacing=4)
 
         def rebuild():
@@ -505,8 +510,8 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
             tot_b    = sum(l.banque + l.cash for l in lines)
             tot_etat = sum(l.etat() for l in lines)
             tot_sol  = sum(l.solde() for l in lines)
-            is_open  = expanded.get(f'sec-{month_key}-{sk}', sk in ('revenus', 'variables'))
-            icon2, lbl2, ck2 = SECTION_META[sk]
+            is_open  = expanded.get(f'sec-{month_key}-{sk}', False)
+            lbl2_key, ck2 = SECTION_META[sk]; icon2 = SECTION_ICONS[sk]; lbl2 = T[lbl2_key]
 
             def toggle_sec(e):
                 expanded[f'sec-{month_key}-{sk}'] = not is_open
@@ -532,37 +537,44 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
                 # legend
                 parts.append(ft.Row([
                     ft.Container(expand=True),
-                    ft.Container(txt('Banque', size=9, col='blue', weight=ft.FontWeight.W_600, align=ft.TextAlign.CENTER), width=60),
-                    ft.Container(txt('Cash',   size=9, col='amber', weight=ft.FontWeight.W_600, align=ft.TextAlign.CENTER), width=60),
-                    ft.Container(txt('État',   size=9, col='teal', weight=ft.FontWeight.W_600, align=ft.TextAlign.CENTER), width=60),
-                    ft.Container(txt('Solde',  size=9, col='gold', weight=ft.FontWeight.W_600, align=ft.TextAlign.CENTER), width=54),
+                    ft.Container(txt(T['col_bank'], size=9, col='blue', weight=ft.FontWeight.W_600, align=ft.TextAlign.CENTER), width=60),
+                    ft.Container(txt(T['col_cash'],   size=9, col='amber', weight=ft.FontWeight.W_600, align=ft.TextAlign.CENTER), width=60),
+                    ft.Container(txt(T['col_state'],   size=9, col='teal', weight=ft.FontWeight.W_600, align=ft.TextAlign.CENTER), width=60),
+                    ft.Container(txt(T['col_balance'],  size=9, col='gold', weight=ft.FontWeight.W_600, align=ft.TextAlign.CENTER), width=54),
                 ], spacing=4))
 
                 for i, ln in enumerate(month.section(sk)):
                     parts.append(line_row(sk, i, ln, rebuild))
 
-                # add variable row
-                if sk == 'variables':
-                    def add_var(e):
+                # add row for all sections
+                _ADD_LABELS = {
+                    'revenus':   'add_income',
+                    'retraits':  'add_withdrawal',
+                    'fixes':     'add_fixed',
+                    'variables': 'add_expense',
+                }
+                def make_add(sk2=sk):
+                    def _add(e):
                         from core.model import mk_line as _mk
-                        month.variables.append(_mk('Nouveau'))
-                        on_save(); rebuild(); on_toast('✓ Ajouté')
-                    parts.append(ft.GestureDetector(
-                        content=ft.Container(
-                            ft.Row([ft.Icon(ft.Icons.ADD, size=14, color=c('text3')),
-                                    txt('Ajouter une dépense', size=12, col='text3')], spacing=6),
-                            padding=P.symmetric(horizontal=12, vertical=8),
-                            border=B.all(1, c('card_border')), border_radius=10,
-                            margin=M.only(top=4),
-                        ),
-                        on_tap=add_var,
-                    ))
+                        month.section(sk2).append(_mk('New' if True else ''))
+                        on_save(); rebuild(); on_toast(T['toast_added'])
+                    return _add
+                parts.append(ft.GestureDetector(
+                    content=ft.Container(
+                        ft.Row([ft.Icon(ft.Icons.ADD, size=14, color=c('text3')),
+                                txt(T[_ADD_LABELS[sk]], size=12, col='text3')], spacing=6),
+                        padding=P.symmetric(horizontal=12, vertical=8),
+                        border=B.all(1, c('card_border')), border_radius=10,
+                        margin=M.only(top=4),
+                    ),
+                    on_tap=make_add(),
+                ))
 
                 # section total
                 sc2 = 'green' if tot_sol >= 0 else 'danger'
                 parts.append(ft.Container(
                     ft.Row([
-                        txt('Total', size=11, weight=ft.FontWeight.W_700, col='text2', expand=True),
+                        txt(T['col_total'], size=11, weight=ft.FontWeight.W_700, col='text2', expand=True),
                         ft.Container(txt(fmt(tot_b),    size=11, weight=ft.FontWeight.W_700, col=ck2,    align=ft.TextAlign.RIGHT), width=60),
                         ft.Container(width=60),
                         ft.Container(txt(fmt(tot_etat), size=11, weight=ft.FontWeight.W_700, col='teal', align=ft.TextAlign.RIGHT), width=60),
@@ -586,10 +598,10 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
         'variables': 'gold',
     }
     SECTION_LABELS = {
-        'revenus':   'Revenus',
-        'retraits':  'Retraits',
-        'fixes':     'Fixe',
-        'variables': 'Variable',
+        'revenus':   'sec_income',
+        'retraits':  'sec_withdrawals',
+        'fixes':     'sec_fixed',
+        'variables': 'sec_variable',
     }
 
     def build_registre(sort_asc: list, root_col: ft.Column):
@@ -615,7 +627,7 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
             month.section(entry['sec'])[entry['li']].payments.pop(entry['pi'])
             on_save()
             refresh_registre(sort_asc, root_col)
-            on_toast('Supprime')
+            on_toast(T['toast_deleted'])
 
         rows = []
         prev_date = None
@@ -636,7 +648,7 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
             rows.append(ft.Container(
                 ft.Row([
                     ft.Container(
-                        ft.Text(SECTION_LABELS[entry['sec']], size=9,
+                        ft.Text(T[SECTION_LABELS[entry['sec']]], size=9,
                                 color=c(col_key), font_family='DM Sans',
                                 weight=ft.FontWeight.W_600),
                         width=56,
@@ -675,7 +687,7 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
             bgcolor='transparent', border_color=c('card_border'),
             focused_border_color=c('gold'),
             content_padding=P.symmetric(horizontal=8, vertical=4),
-            hint_text='YYYY-MM-DD', color=c('text'),
+            hint_text=T['pay_date_hint'], color=c('text'),
         )
         amt_f = ft.TextField(
             value='', width=90, height=34, text_size=12,
@@ -683,7 +695,7 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
             bgcolor='transparent', border_color=c('card_border'),
             focused_border_color=c('gold'),
             content_padding=P.symmetric(horizontal=8, vertical=4),
-            hint_text='Montant', keyboard_type=ft.KeyboardType.NUMBER,
+            hint_text=T['pay_amt_hint'], keyboard_type=ft.KeyboardType.NUMBER,
             color=c('text'),
         )
         name_f = ft.TextField(
@@ -695,10 +707,10 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
         )
 
         SEC_OPTIONS = [
-            ('Variable', 'variables'),
-            ('Fixe',     'fixes'),
-            ('Retrait',  'retraits'),
-            ('Revenu',   'revenus'),
+            (T['reg_variable'], 'variables'),
+            (T['reg_fixed'],     'fixes'),
+            (T['reg_withdrawal'],  'retraits'),
+            (T['reg_income'],   'revenus'),
         ]
         sec_state = ['variables']
 
@@ -738,7 +750,7 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
                 name   = name_f.value.strip()
                 sec    = sec_state[0]
                 if not name:
-                    on_toast('Libelle requis')
+                    on_toast(T['toast_label_req'])
                     return
                 # find or create line with that name in the section
                 lines  = month.section(sec)
@@ -756,11 +768,11 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
                 refresh_registre(sort_asc, root_col)
                 on_toast(f'+{fmt(amount)} CHF → {name}')
             except ValueError:
-                on_toast('Montant invalide')
+                on_toast(T['toast_invalid'])
 
         add_form = ft.Container(
             ft.Column([
-                ft.Text('Nouvelle transaction', size=10, color=c('text3'),
+                ft.Text(T['reg_new_tx'], size=10, color=c('text3'),
                         font_family='DM Sans', weight=ft.FontWeight.W_600),
                 ft.Container(height=4),
                 sec_btns_col,
@@ -793,7 +805,7 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
         except: pass
 
     def _registre_header(sort_asc, root_col):
-        sort_label = '↑ Date croissante' if sort_asc[0] else '↓ Date decroissante'
+        sort_label = T['reg_date_asc'] if sort_asc[0] else T['reg_date_desc']
         def toggle_sort(e):
             sort_asc[0] = not sort_asc[0]
             refresh_registre(sort_asc, root_col)
@@ -821,7 +833,7 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
     def refresh_main():
         main_col.controls.clear()
         # top bar: toggle button
-        lbl = '📋 Registre' if view_mode[0] == 'dashboard' else '📊 Dashboard'
+        lbl = T['reg_title'] if view_mode[0] == 'dashboard' else T['dash_title']
         toggle_btn = ft.GestureDetector(
             content=ft.Container(
                 ft.Text(lbl, size=11, color=c('gold'),

@@ -6,11 +6,15 @@ from dataclasses import dataclass, field
 from typing import List, Optional
 import json, copy, datetime
 
-MONTHS    = ['JAN','FEB','MAR','APR','MAI','JUN','JUL','AUG','SEP','OCT','NOV','DEC']
-MNAMES    = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août',
-             'Septembre','Octobre','Novembre','Décembre']
-SPECIAL_TABS = ['Dettes','Epargne','Frais','Viabilite','Config']
-ALL_TABS  = MONTHS + SPECIAL_TABS
+# Month keys — kept as original for backward compatibility with saved JSON files
+MONTHS       = ['JAN','FEB','MAR','APR','MAI','JUN','JUL','AUG','SEP','OCT','NOV','DEC']
+# Tab keys
+SPECIAL_TABS = ['Debts','Savings','Expenses','Viability','Config']
+ALL_TABS     = MONTHS + SPECIAL_TABS
+
+# English month names for display (i18n overrides via T.months_long)
+MNAMES = ['January','February','March','April','May','June',
+          'July','August','September','October','November','December']
 
 
 # ─── Primitives ───────────────────────────────────────────────────────────────
@@ -240,7 +244,7 @@ class AppData:
 
 def _def_month(mi: int) -> Month:
     return Month(
-        name=MNAMES[mi],
+        name=MNAMES[mi],  # display name updated at runtime via i18n
         revenus=[],
         retraits=[],
         fixes=[],

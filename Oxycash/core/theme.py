@@ -46,8 +46,9 @@ LIGHT = {
 
 class Theme:
     def __init__(self, dark: bool = True):
-        self._dark = dark
-        self._c    = DARK if dark else LIGHT
+        self._dark  = dark
+        self._c     = DARK if dark else LIGHT
+        self.scale  = 0    # font size offset in px
 
     @property
     def is_dark(self): return self._dark
