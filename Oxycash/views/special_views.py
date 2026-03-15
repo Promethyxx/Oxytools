@@ -598,56 +598,89 @@ def build_config_view(storage, t, on_save, on_toast, on_reload, on_theme_toggle,
         path.write_text(storage.export_json(), encoding='utf-8')
         on_toast(T.fmt('cfg_exported', name=path.name)); _pupd()
 
-    # ── File picker (created at build time for Android reliability) ─────────
+    # ── File picker (lazy init — only created when Browse is clicked) ────────
     _file_picker = [None]
     _picked_content = [None]
+    _picker_failed = [False]
+    _perm_handler = [None]
 
-    def _on_pick(ev: ft.FilePickerResultEvent):
-        if ev.files and len(ev.files) > 0:
-            picked = ev.files[0]
-            fpath = picked.path
-            if fpath:
-                import_path_tf.value = fpath
-                try:
-                    import pathlib
-                    raw = pathlib.Path(fpath).read_text(encoding='utf-8')
-                    _picked_content[0] = raw
-                    on_toast('Fichier chargé ✓')
-                except Exception:
+    def _on_pick(ev):
+        try:
+            if ev.files and len(ev.files) > 0:
+                picked = ev.files[0]
+                fpath = picked.path
+                if fpath:
+                    import_path_tf.value = fpath
+                    try:
+                        import pathlib
+                        raw = pathlib.Path(fpath).read_text(encoding='utf-8')
+                        _picked_content[0] = raw
+                        on_toast('Fichier chargé ✓')
+                    except Exception:
+                        _picked_content[0] = None
+                        on_toast('Fichier sélectionné — cliquer Importer')
+                else:
+                    import_path_tf.value = picked.name or ''
                     _picked_content[0] = None
-                    on_toast('Fichier sélectionné — cliquer Importer')
+                    on_toast('Fichier sélectionné')
             else:
-                import_path_tf.value = picked.name or ''
-                _picked_content[0] = None
-                on_toast('Fichier sélectionné')
-        else:
-            on_toast('Aucun fichier sélectionné')
+                on_toast('Aucun fichier sélectionné')
+        except Exception:
+            on_toast('Erreur lors de la sélection')
         _pupd()
 
-    # Create picker immediately if page is available — Flet 0.82+ requires on_result set after init
-    if page is not None:
-        _file_picker[0] = ft.FilePicker()
-        _file_picker[0].on_result = _on_pick
-        page.overlay.append(_file_picker[0])
+    def _request_storage_permission():
+        """Request storage permission on Android via PermissionHandler."""
+        if _perm_handler[0] is None and page is not None:
+            try:
+                ph = ft.PermissionHandler()
+                page.overlay.append(ph)
+                page.update()
+                _perm_handler[0] = ph
+            except Exception:
+                return  # PermissionHandler not available, proceed anyway
+        if _perm_handler[0] is not None:
+            try:
+                _perm_handler[0].request_permission(ft.PermissionType.STORAGE)
+            except Exception:
+                pass  # Not on Android or permission already granted
 
     def do_browse(e):
-        """Open Flet FilePicker — async for Android reliability."""
-        if page is None or _file_picker[0] is None:
-            on_toast(T['cfg_import_na']); _pupd()
+        """Open file picker — request permissions first on Android."""
+        if page is None:
+            on_toast(T['cfg_import_na']); _pupd(); return
+        if _picker_failed[0]:
+            on_toast('FilePicker non disponible — coller le chemin manuellement'); _pupd()
             return
         _picked_content[0] = None
+
+        # Request storage permission (Android)
+        _request_storage_permission()
+
+        # Lazy create picker on first click
+        if _file_picker[0] is None:
+            try:
+                fp = ft.FilePicker()
+                fp.on_result = _on_pick
+                _file_picker[0] = fp
+                page.overlay.append(fp)
+                page.update()
+            except Exception as ex:
+                _picker_failed[0] = True
+                on_toast(f'FilePicker non supporté: {str(ex)[:30]}'); _pupd()
+                return
+
+        # Open picker async to give overlay + permission dialog time
         async def _do_pick():
             import asyncio
-            # Ensure overlay is mounted
-            page.update()
-            await asyncio.sleep(0.2)
+            await asyncio.sleep(0.5)
             try:
                 _file_picker[0].pick_files(
-                    dialog_title='Importer oxycash.json',
                     allowed_extensions=['json'],
                     allow_multiple=False,
                 )
             except Exception as ex:
+                _picker_failed[0] = True
                 on_toast(f'Erreur: {str(ex)[:40]}'); _pupd()
         page.run_task(_do_pick)
 
