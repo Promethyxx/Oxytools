@@ -48,17 +48,16 @@ def main(page: ft.Page):
 
     def c(k): return theme.c(k)
 
-    # ── toast (native SnackBar — works reliably on Android) ─────────────────
+    # ── toast (SnackBar via overlay — validated on Android) ─────────────────
+    _snack = ft.SnackBar(ft.Text('', size=13, color='#1a1a1a', font_family='DM Sans',
+                                  weight=ft.FontWeight.W_500),
+                          bgcolor='#7BC47F', duration=2500)
+    page.overlay.append(_snack)
+
     def show_toast(msg: str):
-        try:
-            page.open(ft.SnackBar(
-                ft.Text(msg, size=13, color='#1a1a1a', font_family='DM Sans',
-                        weight=ft.FontWeight.W_500),
-                bgcolor='#7BC47F',
-                duration=2500,
-            ))
-        except Exception:
-            pass
+        _snack.content.value = msg
+        _snack.open = True
+        page.update()
 
     # ── badge ───────────────────────────────────────────────────────────────
     badge_txt = ft.Text('💾 Local', size=10, font_family='DM Sans',
@@ -78,12 +77,16 @@ def main(page: ft.Page):
         else:
             badge_txt.value  = '💾 Local';      badge_txt.color = '#F2D388'
             badge.bgcolor    = 'rgba(242,211,136,0.15)'
+        page.update()
 
     # ── content area ────────────────────────────────────────────────────────
     content_col = ft.Column(expand=True, scroll=ft.ScrollMode.AUTO)
 
     def on_save():
-        page.run_thread(storage.save)
+        def _do():
+            storage.save()
+            update_badge()
+        page.run_thread(_do)
 
     def render():
         theme.scale = font_scale[0]
@@ -113,9 +116,8 @@ def main(page: ft.Page):
 
         tab_row.controls.clear()
         tab_row.controls.extend(tabs)
-        tab_row.update()
         profile_text.value = storage.active_profile['name']
-        profile_text.update()
+        tab_row.update()
 
         # rebuild content
         mi = MONTHS.index(tab) if tab in MONTHS else -1
@@ -143,10 +145,12 @@ def main(page: ft.Page):
             ft.Container(view, padding=P.symmetric(horizontal=14, vertical=12), expand=True)
         )
         content_col.update()
+        page.update()
 
     def _apply_theme():
         page.bgcolor = c('bg')
         top_bar.bgcolor = c('bg2')
+        page.update()
 
     # ── profile switcher ────────────────────────────────────────────────────
     def _profile_btn():
@@ -266,6 +270,46 @@ def main(page: ft.Page):
     )
     top_bar_container = top_bar
 
+    # ── build initial content BEFORE page.add (validated pattern) ───────────
+    # On Android, controls must have content when added to the page.
+    # render() fills tab_row and content_col.
+    theme.scale = font_scale[0]
+    tab = state['tab']
+    # Build tabs
+    _init_tabs = []
+    for i, key in enumerate(get_all_tabs()):
+        is_act  = key == tab
+        is_spec = i >= len(MONTHS)
+        act_bg  = c('teal') if is_spec else c('gold')
+        norm_fg = c('teal') if is_spec else c('text3')
+        def _make_init_tap(k):
+            def _tap(e):
+                state['tab'] = k
+                render()
+            return _tap
+        _init_tabs.append(ft.Container(
+            ft.Text(get_tab_labels()[i], size=11, weight=ft.FontWeight.W_600,
+                    font_family='DM Sans', no_wrap=True,
+                    color='#1a1a1a' if is_act else norm_fg),
+            padding=P.symmetric(horizontal=14, vertical=6),
+            bgcolor=act_bg if is_act else 'transparent',
+            border_radius=8,
+            on_click=_make_init_tap(key), ink=True,
+        ))
+    tab_row.controls.extend(_init_tabs)
+
+    # Build initial placeholder (real content after load)
+    content_col.controls.append(
+        ft.Container(
+            ft.Column([
+                ft.Text('Oxycash', size=20, weight=ft.FontWeight.W_700,
+                        font_family='Playfair Display', color=c('text')),
+                ft.Text('Chargement…', size=13, color=c('text3')),
+            ], spacing=8),
+            padding=P.symmetric(horizontal=14, vertical=12), expand=True,
+        )
+    )
+
     # ── root ────────────────────────────────────────────────────────────────
     page.add(ft.SafeArea(
         ft.Column([
@@ -275,13 +319,14 @@ def main(page: ft.Page):
         expand=True,
     ))
 
-    # ── initial load ────────────────────────────────────────────────────────
+    # ── load data then refresh (run_task AFTER page.add) ──────────────────
     async def _start():
         import asyncio
         await asyncio.get_event_loop().run_in_executor(None, storage.load)
         storage.load_lang()
         font_scale[0] = storage.cfg.get('font_scale', 0)
         update_badge()
+        # Now render with real data — controls are already on page
         render()
 
     page.run_task(_start)

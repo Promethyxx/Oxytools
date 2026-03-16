@@ -562,7 +562,7 @@ def build_config_view(storage, t, on_save, on_toast, on_reload, on_theme_toggle,
 
     def do_export(e):
         if page is None:
-            on_toast('Export non disponible'); return
+            on_toast('Export non disponible'); page.update(); return
 
         async def _do_export():
             import datetime
@@ -588,7 +588,7 @@ def build_config_view(storage, t, on_save, on_toast, on_reload, on_theme_toggle,
                     on_toast(T.fmt('cfg_exported', name=path.name))
                 except Exception as ex2:
                     on_toast(f'Erreur export: {str(ex2)[:40]}')
-            
+            page.update()
 
         page.run_task(_do_export)
 
@@ -598,7 +598,7 @@ def build_config_view(storage, t, on_save, on_toast, on_reload, on_theme_toggle,
     def do_browse(e):
         """Pick a JSON file using Flet 0.82 FilePicker Service API."""
         if page is None:
-            on_toast(T['cfg_import_na']); return
+            on_toast(T['cfg_import_na']); page.update(); return
 
         async def _do_pick():
             import asyncio
@@ -631,7 +631,7 @@ def build_config_view(storage, t, on_save, on_toast, on_reload, on_theme_toggle,
                     on_toast('Aucun fichier sélectionné')
             except Exception as ex:
                 on_toast(f'Erreur: {str(ex)[:50]}')
-            
+            page.update()
 
         page.run_task(_do_pick)
 
@@ -641,16 +641,16 @@ def build_config_view(storage, t, on_save, on_toast, on_reload, on_theme_toggle,
         if raw is None:
             path = import_path_tf.value.strip()
             if not path:
-                on_toast(T['cfg_import_nopath'])
+                on_toast(T['cfg_import_nopath']); page.update()
                 return
             import pathlib
             try:
                 raw = pathlib.Path(path).read_text(encoding='utf-8')
             except FileNotFoundError:
-                on_toast(T['cfg_import_notfound'])
+                on_toast(T['cfg_import_notfound']); page.update()
                 return
             except Exception as ex:
-                on_toast(f'Erreur: {str(ex)[:40]}')
+                on_toast(f'Erreur: {str(ex)[:40]}'); page.update()
                 return
         try:
             ok = storage.import_json(raw)
@@ -668,10 +668,10 @@ def build_config_view(storage, t, on_save, on_toast, on_reload, on_theme_toggle,
             import_status.value = str(ex)[:60]
             import_status.color = c('danger')
             on_toast('Erreur import')
-        
+        page.update()
 
     def do_reset(e):
-        storage.reset(); on_reload(); on_toast(T['cfg_reset_done'])
+        storage.reset(); on_reload(); on_toast(T['cfg_reset_done']); page.update()
 
     def mk_card(title, *children):
         return ft.Container(
@@ -698,7 +698,7 @@ def build_config_view(storage, t, on_save, on_toast, on_reload, on_theme_toggle,
                     on_toast('Cannot delete last profile')
                     return
                 storage.delete_profile(slug)
-                on_reload()
+                on_reload(); page.update()
 
             name_ref = ft.Ref[ft.TextField]()
 
@@ -760,7 +760,7 @@ def build_config_view(storage, t, on_save, on_toast, on_reload, on_theme_toggle,
             storage.switch_profile(slug)
             new_name_tf.value = ''
             on_toast(f'Profil « {name} » créé ✓')
-            on_reload()
+            on_reload(); page.update()
 
         return mk_card(T['cfg_profiles'],
                        *rows,
@@ -787,7 +787,7 @@ def build_config_view(storage, t, on_save, on_toast, on_reload, on_theme_toggle,
                                   usr_tf.value.strip(),
                                   pw_tf.value)
         status_txt.value = T['cfg_saved']; status_txt.color = c('green')
-        on_toast(T['cfg_saved']); _badge()
+        on_toast(T['cfg_saved']); _badge(); page.update()
 
     def test_cfg_profile(e):
         storage.save_profile_dav(storage.active_slug,
@@ -797,13 +797,13 @@ def build_config_view(storage, t, on_save, on_toast, on_reload, on_theme_toggle,
         ok, msg = storage.test_dav()
         status_txt.value = msg
         status_txt.color = c('green') if ok else c('danger')
-        on_toast(f'✓ {msg}' if ok else f'✗ {msg}'); _badge()
+        on_toast(f'\u2713 {msg}' if ok else f'\u2717 {msg}'); _badge(); page.update()
 
     def clear_cfg(e):
         storage.clear_config()
         url_tf.value = ''; usr_tf.value = ''; pw_tf.value = ''
         status_txt.value = T['cfg_cleared']; status_txt.color = c('text2')
-        on_toast(T['cfg_cleared']); _badge()
+        on_toast(T['cfg_cleared']); _badge(); page.update()
 
     # ── Currency ──────────────────────────────────────────────────────────────
     currency_tf = ft.TextField(
