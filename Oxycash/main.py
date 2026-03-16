@@ -48,30 +48,17 @@ def main(page: ft.Page):
 
     def c(k): return theme.c(k)
 
-    # ── toast ──────────────────────────────────────────────────────────────
-    toast_txt = ft.Text('', size=13, color='#1a1a1a', font_family='DM Sans',
-                         weight=ft.FontWeight.W_500)
-    toast_box = ft.Container(
-        toast_txt,
-        padding=P.symmetric(horizontal=20, vertical=10),
-        bgcolor='#7BC47F', border_radius=10,
-        visible=False,
-        margin=P.symmetric(horizontal=20),
-    )
-
+    # ── toast (native SnackBar — works reliably on Android) ─────────────────
     def show_toast(msg: str):
-        toast_txt.value  = msg
-        toast_box.visible = True
-        try: page.update()
-        except: pass
-        async def _hide_later():
-            import asyncio
-            await asyncio.sleep(2.5)
-            toast_box.visible = False
-            try: page.update()
-            except: pass
-        try: page.run_task(_hide_later)
-        except: pass
+        try:
+            page.open(ft.SnackBar(
+                ft.Text(msg, size=13, color='#1a1a1a', font_family='DM Sans',
+                        weight=ft.FontWeight.W_500),
+                bgcolor='#7BC47F',
+                duration=2500,
+            ))
+        except Exception:
+            pass
 
     # ── badge ───────────────────────────────────────────────────────────────
     badge_txt = ft.Text('💾 Local', size=10, font_family='DM Sans',
@@ -91,20 +78,12 @@ def main(page: ft.Page):
         else:
             badge_txt.value  = '💾 Local';      badge_txt.color = '#F2D388'
             badge.bgcolor    = 'rgba(242,211,136,0.15)'
-        try: badge.update()
-        except: pass
 
     # ── content area ────────────────────────────────────────────────────────
     content_col = ft.Column(expand=True, scroll=ft.ScrollMode.AUTO)
 
     def on_save():
-        async def _do_async():
-            import asyncio
-            await asyncio.get_event_loop().run_in_executor(None, storage.save)
-            update_badge()
-            try: page.update()
-            except: pass
-        page.run_task(_do_async)
+        page.run_thread(storage.save)
 
     def render():
         theme.scale = font_scale[0]
@@ -112,7 +91,6 @@ def main(page: ft.Page):
 
         # rebuild tabs
         tabs = []
-        _tabs_built = True
         for i, key in enumerate(get_all_tabs()):
             is_act  = key == tab
             is_spec = i >= len(MONTHS)
@@ -135,31 +113,28 @@ def main(page: ft.Page):
 
         tab_row.controls.clear()
         tab_row.controls.extend(tabs)
-        try:
-            tab_row.update()
-            profile_text.value = storage.active_profile['name']
-            profile_text.update()
-        except: pass
+        tab_row.update()
+        profile_text.value = storage.active_profile['name']
+        profile_text.update()
 
         # rebuild content
         mi = MONTHS.index(tab) if tab in MONTHS else -1
-        n_tabs = len(get_all_tabs())
         if mi >= 0:
             view = build_month_view(tab, storage.data.months[tab], theme, on_save, show_toast, all_months=storage.data.months, page=page, frais=storage.data.frais)
         elif tab == 'Debts':
-            view = build_dettes_view(storage.data, theme, on_save, show_toast, render)
+            view = build_dettes_view(storage.data, theme, on_save, show_toast)
         elif tab == 'Savings':
-            view = build_epargne_view(storage.data, theme, on_save, show_toast, render)
+            view = build_epargne_view(storage.data, theme, on_save, show_toast)
         elif tab == 'Expenses':
-            view = build_frais_view(storage.data, theme, on_save, show_toast, render)
+            view = build_frais_view(storage.data, theme, on_save, show_toast)
         elif tab == 'Viability':
-            view = build_viabilite_view(storage.data, theme, on_save, show_toast, render)
+            view = build_viabilite_view(storage.data, theme, on_save, show_toast)
         elif tab == 'Charts':
             view = build_charts_view(storage.data, theme, storage.currency)
         elif tab == 'Config':
             view = build_config_view(storage, theme, on_save, show_toast, render,
                                      lambda: (theme.toggle(), _apply_theme(), render()),
-                                     page=page)
+                                     page=page, on_badge=update_badge)
         else:
             view = ft.Text('?')
 
@@ -168,13 +143,10 @@ def main(page: ft.Page):
             ft.Container(view, padding=P.symmetric(horizontal=14, vertical=12), expand=True)
         )
         content_col.update()
-        page.update()
 
     def _apply_theme():
         page.bgcolor = c('bg')
         top_bar.bgcolor = c('bg2')
-        try: top_bar.update(); page.update()
-        except: pass
 
     # ── profile switcher ────────────────────────────────────────────────────
     def _profile_btn():
@@ -208,8 +180,6 @@ def main(page: ft.Page):
         theme_icon.value = '☀️' if not theme.is_dark else '🌙'
         _apply_theme()
         render()
-        try: theme_icon.update()
-        except: pass
 
     # ── top bar — all widgets are persistent (never recreated) ─────────────
     tab_row    = ft.Row([], spacing=2, scroll=ft.ScrollMode.AUTO)
@@ -225,31 +195,21 @@ def main(page: ft.Page):
             storage.cfg['font_scale'] = font_scale[0]
             from core.storage import save_config
             save_config(storage.cfg)
-            async def _defer():
-                import asyncio
-                render()
-                await asyncio.sleep(0.1)
-                show_toast(f'Police {"+" if delta > 0 else ""}{delta}')
-            page.run_task(_defer)
+            render()
+            show_toast(f'Police {"+" if delta > 0 else ""}{delta}')
         return _h
 
     def _do_lang(e):
         from core.i18n import toggle_lang, get_lang
         toggle_lang()
         storage.set_lang(get_lang())
-        async def _defer():
-            import asyncio
-            render()
-            lang_text.value = _lang_display()
-            await asyncio.sleep(0.05)
-            page.update()
-            show_toast('🌐 EN' if get_lang() == 'en' else '🌐 FR')
-        page.run_task(_defer)
+        lang_text.value = _lang_display()
+        render()
+        show_toast('🌐 EN' if get_lang() == 'en' else '🌐 FR')
 
     def _do_profile(e):
         state['tab'] = 'Config'
         render()
-        page.update()
 
     top_bar = ft.Container(
         ft.Column([
@@ -311,36 +271,21 @@ def main(page: ft.Page):
         ft.Column([
             top_bar_container,
             ft.Container(content_col, expand=True),
-            ft.Container(toast_box, alignment=ft.Alignment(0, 0)),
         ], expand=True, spacing=0),
         expand=True,
     ))
 
     # ── initial load ────────────────────────────────────────────────────────
-    async def do_load_async():
+    async def _start():
         import asyncio
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, storage.load)
+        await asyncio.get_event_loop().run_in_executor(None, storage.load)
         storage.load_lang()
+        font_scale[0] = storage.cfg.get('font_scale', 0)
         update_badge()
         render()
-        try: page.update()
-        except: pass
 
-    # Ensure page is fully mounted before rendering — retry if needed
-    async def start():
-        import asyncio
-        await asyncio.sleep(0.15)
-        await do_load_async()
-        # Force a second update pass to ensure all widgets are visible
-        await asyncio.sleep(0.1)
-        try:
-            render()
-            page.update()
-        except: pass
-
-    page.run_task(start)
+    page.run_task(_start)
 
 
 if __name__ == '__main__':
-    ft.app(target=main)
+    ft.run(main)

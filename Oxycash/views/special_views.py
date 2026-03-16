@@ -81,9 +81,7 @@ def build_dettes_view(data: AppData, t, on_save, on_toast, on_reload=None):
     def rebuild():
         col.controls.clear()
         col.controls.extend(_build())
-        try: col.update()
-        except: pass
-        if on_reload: on_reload()
+        col.update()
 
     def _build():
         total_du = sum(d.solde   for d in data.dettes)
@@ -186,9 +184,7 @@ def build_epargne_view(data: AppData, t, on_save, on_toast, on_reload=None):
     def rebuild():
         col.controls.clear()
         col.controls.extend(_build())
-        try: col.update()
-        except: pass
-        if on_reload: on_reload()
+        col.update()
 
     def _build():
         ep = data.epargne
@@ -284,9 +280,7 @@ def build_frais_view(data: AppData, t, on_save, on_toast, on_reload=None):
     def rebuild():
         col.controls.clear()
         col.controls.extend(_build())
-        try: col.update()
-        except: pass
-        if on_reload: on_reload()
+        col.update()
 
     def _build():
         def table(cat, label, col_key):
@@ -402,9 +396,7 @@ def build_viabilite_view(data: AppData, t, on_save, on_toast, on_reload=None):
     def rebuild():
         col.controls.clear()
         col.controls.extend(_build())
-        try: col.update()
-        except: pass
-        if on_reload: on_reload()
+        col.update()
 
     def _build():
         COLS = [(T['via_salary'],'gold',60),(T['via_rent'],'text3',None),(T['via_insurance'],'text3',None),
@@ -524,15 +516,13 @@ def _lang_switch_card(storage, on_reload, c, T_ref):
     )
 
 
-def build_config_view(storage, t, on_save, on_toast, on_reload, on_theme_toggle, page=None):
+def build_config_view(storage, t, on_save, on_toast, on_reload, on_theme_toggle, page=None, on_badge=None):
     def c(k): return t.c(k)
     _font_scale[0] = t.scale
     cfg = storage.cfg
 
-    def _pupd():
-        try:
-            if page: page.update()
-        except: pass
+    def _badge():
+        if on_badge: on_badge()
 
     def field(label, value, hint='', password=False):
         lbl = _t(label, size=11, col=c('text2'))
@@ -545,10 +535,6 @@ def build_config_view(storage, t, on_save, on_toast, on_reload, on_theme_toggle,
         )
         return lbl, tf
 
-    url_lbl, url_tf = field(T['cfg_url'], cfg.get('dav_url',''),
-                            'https://xxx/remote.php/dav/files/user/Oxy/')
-    usr_lbl, usr_tf = field(T['cfg_user'], cfg.get('dav_user',''), 'ton@email.com')
-    pw_lbl,  pw_tf  = field(T['cfg_password'], cfg.get('dav_pass',''), 'app password', password=True)
     status_txt   = ft.Text('', size=12, font_family='DM Sans')
     import_status = ft.Text('', size=11, font_family='DM Sans')
 
@@ -574,132 +560,97 @@ def build_config_view(storage, t, on_save, on_toast, on_reload, on_theme_toggle,
         if expand: btn.expand = True
         return btn
 
-    def save_cfg(e):
-        storage.save_config(url_tf.value.strip(), usr_tf.value.strip(), pw_tf.value)
-        status_txt.value = T['cfg_saved']; status_txt.color = c('green')
-        on_toast(T['cfg_saved']); _pupd()
-
-    def test_cfg(e):
-        storage.save_config(url_tf.value.strip(), usr_tf.value.strip(), pw_tf.value)
-        ok, msg = storage.test_dav()
-        status_txt.value = msg
-        status_txt.color = c('green') if ok else c('danger')
-        on_toast(f'✓ {msg}' if ok else f'✗ {msg}'); _pupd()
-
-    def clear_cfg(e):
-        storage.clear_config()
-        url_tf.value=''; usr_tf.value=''; pw_tf.value=''
-        status_txt.value=T['cfg_cleared']; status_txt.color=c('text2')
-        on_toast(T['cfg_cleared']); _pupd()
-
     def do_export(e):
-        import pathlib, datetime
-        path = pathlib.Path.home() / f"oxycash-{datetime.date.today()}.json"
-        path.write_text(storage.export_json(), encoding='utf-8')
-        on_toast(T.fmt('cfg_exported', name=path.name)); _pupd()
+        if page is None:
+            on_toast('Export non disponible'); return
 
-    # ── File picker (lazy init — only created when Browse is clicked) ────────
-    _file_picker = [None]
+        async def _do_export():
+            import datetime
+            fname = f"oxycash-{datetime.date.today()}.json"
+            json_data = storage.export_json()
+            try:
+                # Flet 0.82: save_file returns path (desktop) or saves directly (mobile)
+                result = await ft.FilePicker().save_file(
+                    file_name=fname,
+                    allowed_extensions=['json'],
+                    src_bytes=json_data.encode('utf-8'),
+                )
+                if result:
+                    on_toast(f'Exporté: {fname} ✓')
+                else:
+                    on_toast(f'Exporté: {fname} ✓')
+            except Exception:
+                # Fallback: write to home directory (desktop)
+                try:
+                    import pathlib
+                    path = pathlib.Path.home() / fname
+                    path.write_text(json_data, encoding='utf-8')
+                    on_toast(T.fmt('cfg_exported', name=path.name))
+                except Exception as ex2:
+                    on_toast(f'Erreur export: {str(ex2)[:40]}')
+            
+
+        page.run_task(_do_export)
+
+    # ── File picker (Flet 0.82+ Service API) ────────────────────────────────
     _picked_content = [None]
-    _picker_failed = [False]
-    _perm_handler = [None]
 
-    def _on_pick(ev):
-        try:
-            if ev.files and len(ev.files) > 0:
-                picked = ev.files[0]
-                fpath = picked.path
-                if fpath:
-                    import_path_tf.value = fpath
-                    try:
-                        import pathlib
-                        raw = pathlib.Path(fpath).read_text(encoding='utf-8')
-                        _picked_content[0] = raw
+    def do_browse(e):
+        """Pick a JSON file using Flet 0.82 FilePicker Service API."""
+        if page is None:
+            on_toast(T['cfg_import_na']); return
+
+        async def _do_pick():
+            import asyncio
+            try:
+                files = await ft.FilePicker().pick_files(
+                    allowed_extensions=['json'],
+                    allow_multiple=False,
+                    with_data=True,
+                )
+                if files and len(files) > 0:
+                    picked = files[0]
+                    import_path_tf.value = picked.name or 'oxycash.json'
+                    # with_data=True gives us file content directly
+                    if picked.data:
+                        _picked_content[0] = picked.data.decode('utf-8') if isinstance(picked.data, bytes) else picked.data
                         on_toast('Fichier chargé ✓')
-                    except Exception:
+                    elif picked.path:
+                        # Fallback: read from path (desktop)
+                        import pathlib
+                        try:
+                            _picked_content[0] = pathlib.Path(picked.path).read_text(encoding='utf-8')
+                            on_toast('Fichier chargé ✓')
+                        except Exception:
+                            _picked_content[0] = None
+                            on_toast('Fichier sélectionné — cliquer Importer')
+                    else:
                         _picked_content[0] = None
                         on_toast('Fichier sélectionné — cliquer Importer')
                 else:
-                    import_path_tf.value = picked.name or ''
-                    _picked_content[0] = None
-                    on_toast('Fichier sélectionné')
-            else:
-                on_toast('Aucun fichier sélectionné')
-        except Exception:
-            on_toast('Erreur lors de la sélection')
-        _pupd()
-
-    def _request_storage_permission():
-        """Request storage permission on Android via PermissionHandler."""
-        if _perm_handler[0] is None and page is not None:
-            try:
-                ph = ft.PermissionHandler()
-                page.overlay.append(ph)
-                page.update()
-                _perm_handler[0] = ph
-            except Exception:
-                return  # PermissionHandler not available, proceed anyway
-        if _perm_handler[0] is not None:
-            try:
-                _perm_handler[0].request_permission(ft.PermissionType.STORAGE)
-            except Exception:
-                pass  # Not on Android or permission already granted
-
-    def do_browse(e):
-        """Open file picker — request permissions first on Android."""
-        if page is None:
-            on_toast(T['cfg_import_na']); _pupd(); return
-        if _picker_failed[0]:
-            on_toast('FilePicker non disponible — coller le chemin manuellement'); _pupd()
-            return
-        _picked_content[0] = None
-
-        # Request storage permission (Android)
-        _request_storage_permission()
-
-        # Lazy create picker on first click
-        if _file_picker[0] is None:
-            try:
-                fp = ft.FilePicker()
-                fp.on_result = _on_pick
-                _file_picker[0] = fp
-                page.overlay.append(fp)
-                page.update()
+                    on_toast('Aucun fichier sélectionné')
             except Exception as ex:
-                _picker_failed[0] = True
-                on_toast(f'FilePicker non supporté: {str(ex)[:30]}'); _pupd()
-                return
+                on_toast(f'Erreur: {str(ex)[:50]}')
+            
 
-        # Open picker async to give overlay + permission dialog time
-        async def _do_pick():
-            import asyncio
-            await asyncio.sleep(0.5)
-            try:
-                _file_picker[0].pick_files(
-                    allowed_extensions=['json'],
-                    allow_multiple=False,
-                )
-            except Exception as ex:
-                _picker_failed[0] = True
-                on_toast(f'Erreur: {str(ex)[:40]}'); _pupd()
         page.run_task(_do_pick)
 
     def do_import(e):
-        # First try content already loaded by picker (Android workaround)
+        # First try content already loaded by picker
         raw = _picked_content[0]
         if raw is None:
             path = import_path_tf.value.strip()
             if not path:
-                on_toast(T['cfg_import_nopath']); _pupd()
+                on_toast(T['cfg_import_nopath'])
                 return
             import pathlib
             try:
                 raw = pathlib.Path(path).read_text(encoding='utf-8')
             except FileNotFoundError:
-                on_toast(T['cfg_import_notfound']); _pupd()
+                on_toast(T['cfg_import_notfound'])
                 return
             except Exception as ex:
-                on_toast(f'Erreur: {str(ex)[:40]}'); _pupd()
+                on_toast(f'Erreur: {str(ex)[:40]}')
                 return
         try:
             ok = storage.import_json(raw)
@@ -717,10 +668,10 @@ def build_config_view(storage, t, on_save, on_toast, on_reload, on_theme_toggle,
             import_status.value = str(ex)[:60]
             import_status.color = c('danger')
             on_toast('Erreur import')
-        _pupd()
+        
 
     def do_reset(e):
-        storage.reset(); on_reload(); on_toast(T['cfg_reset_done']); _pupd()
+        storage.reset(); on_reload(); on_toast(T['cfg_reset_done'])
 
     def mk_card(title, *children):
         return ft.Container(
@@ -747,7 +698,7 @@ def build_config_view(storage, t, on_save, on_toast, on_reload, on_theme_toggle,
                     on_toast('Cannot delete last profile')
                     return
                 storage.delete_profile(slug)
-                on_reload(); _pupd()
+                on_reload()
 
             name_ref = ft.Ref[ft.TextField]()
 
@@ -808,10 +759,8 @@ def build_config_view(storage, t, on_save, on_toast, on_reload, on_theme_toggle,
             slug = storage.add_profile(name)
             storage.switch_profile(slug)
             new_name_tf.value = ''
-            try: new_name_tf.update()
-            except: pass
             on_toast(f'Profil « {name} » créé ✓')
-            on_reload(); _pupd()
+            on_reload()
 
         return mk_card(T['cfg_profiles'],
                        *rows,
@@ -838,20 +787,23 @@ def build_config_view(storage, t, on_save, on_toast, on_reload, on_theme_toggle,
                                   usr_tf.value.strip(),
                                   pw_tf.value)
         status_txt.value = T['cfg_saved']; status_txt.color = c('green')
-        on_toast(T['cfg_saved']); _pupd()
+        on_toast(T['cfg_saved']); _badge()
 
     def test_cfg_profile(e):
-        url = url_tf.value.strip()
-        usr = usr_tf.value.strip()
-        pw  = pw_tf.value
-        if not url or not usr or not pw:
-            on_toast('⚠️ Remplir les 3 champs'); _pupd()
-            return
-        on_toast('⏳ Test en cours…'); _pupd()
-        storage.save_profile_dav(storage.active_slug, url, usr, pw)
+        storage.save_profile_dav(storage.active_slug,
+                                  url_tf.value.strip(),
+                                  usr_tf.value.strip(),
+                                  pw_tf.value)
         ok, msg = storage.test_dav()
-        status_txt.value = msg; status_txt.color = c('green') if ok else c('danger')
-        on_toast(f'✓ {msg}' if ok else f'✗ {msg}'); _pupd()
+        status_txt.value = msg
+        status_txt.color = c('green') if ok else c('danger')
+        on_toast(f'✓ {msg}' if ok else f'✗ {msg}'); _badge()
+
+    def clear_cfg(e):
+        storage.clear_config()
+        url_tf.value = ''; usr_tf.value = ''; pw_tf.value = ''
+        status_txt.value = T['cfg_cleared']; status_txt.color = c('text2')
+        on_toast(T['cfg_cleared']); _badge()
 
     # ── Currency ──────────────────────────────────────────────────────────────
     currency_tf = ft.TextField(
@@ -862,7 +814,7 @@ def build_config_view(storage, t, on_save, on_toast, on_reload, on_theme_toggle,
     )
     def save_currency(e):
         storage.set_currency(currency_tf.value.strip() or 'CHF')
-        on_toast(T['cfg_saved']); _pupd()
+        on_toast(T['cfg_saved'])
 
     currency_card = mk_card(T['cfg_currency'],
         ft.Row([currency_tf,

@@ -6,7 +6,6 @@ requires-python = ">=3.10"
 authors = [{ name = "Promethyxx" }]
 dependencies = [
     "flet",
-    "flet-permission-handler",
 ]
 
 [tool.flet]

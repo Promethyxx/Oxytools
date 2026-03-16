@@ -92,6 +92,8 @@ def _dav_full_url(profile: dict) -> Optional[str]:
     pw   = profile.get('dav_pass', '').strip()
     if not (url and user and pw):
         return None
+    if not url.startswith('http://') and not url.startswith('https://'):
+        url = 'https://' + url
     base = url if url.endswith('/') else url + '/'
     return base + _dav_json_name(profile.get('slug', 'default'))
 
@@ -101,19 +103,22 @@ def dav_test(profile: dict) -> Tuple[bool, str]:
     user = profile.get('dav_user', '').strip()
     pw   = profile.get('dav_pass', '').strip()
     if not (url and user and pw):
-        return False, "Fill all 3 fields"
+        return False, "Connexion échouée"
     full = _dav_full_url(profile)
-    req  = _dav_req(full, 'HEAD', user, pw)
+    if not full:
+        return False, "Connexion échouée"
+    if not full.startswith('http://') and not full.startswith('https://'):
+        full = 'https://' + full
     try:
+        req = _dav_req(full, 'HEAD', user, pw)
         with urllib.request.urlopen(req, timeout=8) as r:
-            return True, f"OK ({r.status})"
+            return True, "Connecté ✓"
     except urllib.error.HTTPError as e:
-        if e.code == 404: return True,  "OK — folder accessible, file will be created"
-        if e.code == 401: return False, "401 Unauthorized — check user/password"
-        if e.code == 403: return False, f"403 Forbidden — check folder exists: {full}"
-        return False, f"HTTP {e.code}"
-    except Exception as ex:
-        return False, str(ex)
+        if e.code == 404:
+            return True, "Connecté ✓"
+        return False, "Connexion échouée"
+    except Exception:
+        return False, "Connexion échouée"
 
 
 def _dav_load(profile: dict) -> Optional[AppData]:
@@ -218,6 +223,14 @@ class Storage:
                 p['dav_url']  = url
                 p['dav_user'] = user
                 p['dav_pass'] = pw
+        save_config(self.cfg)
+
+    def clear_config(self):
+        prof = self.active_profile
+        prof['dav_url']  = ''
+        prof['dav_user'] = ''
+        prof['dav_pass'] = ''
+        self.dav_ok = False
         save_config(self.cfg)
 
     # ── load/save ─────────────────────────────────────────────────────────────
