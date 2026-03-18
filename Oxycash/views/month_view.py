@@ -351,6 +351,17 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
                 on_save(); rebuild()
             except ValueError: pass
 
+        def upd_etat(e, _s=sec_key, _i=idx):
+            try:
+                from core.model import Payment, today
+                val = float(e.control.value.replace(',','.'))
+                ln = month.section(_s)[_i]
+                ln.payments.clear()
+                if val != 0:
+                    ln.payments.append(Payment(date=today(), amount=val))
+                on_save(); rebuild()
+            except ValueError: pass
+
         def upd_name(e, _s=sec_key, _i=idx):
             month.section(_s)[_i].name = e.control.value
             month.section(_s).sort(key=lambda l: l.name.lower())
@@ -589,7 +600,7 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
                     num_field(fmt(line.banque), upd_banque, col='blue', width=56),
                     txt('C', size=8, col='amber', weight=ft.FontWeight.W_600),
                     num_field(fmt(line.cash),   upd_cash,   col='amber', width=56),
-                    ro_field(fmt(etat),   col='teal', width=52),
+                    num_field(fmt(etat), upd_etat, col='teal', width=52),
                     ro_field(fmt(solde),  col=sc, width=48),
                 ], spacing=2, vertical_alignment=ft.CrossAxisAlignment.CENTER),
             ], spacing=2)
@@ -598,7 +609,7 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
                 name_w,
                 num_field(fmt(line.banque), upd_banque, col='blue'),
                 num_field(fmt(line.cash),   upd_cash,   col='amber'),
-                ro_field(fmt(etat),   col='teal'),
+                num_field(fmt(etat), upd_etat, col='teal'),
                 ro_field(fmt(solde),  col=sc, width=54),
                 *trailing,
             ], spacing=4, vertical_alignment=ft.CrossAxisAlignment.CENTER)
