@@ -333,6 +333,7 @@ def apply_recurring(data) -> None:
                             cash=line.cash,
                             recurring={'freq': freq, 'start': start},
                         ))
+                        target_sec.sort(key=lambda l: l.name.lower())
 
 
 def sync_frais_from_line(data, month_key: str, sec_key: str, line) -> None:

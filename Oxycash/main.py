@@ -262,10 +262,10 @@ def main(page: ft.Page):
                 ], spacing=6),
             ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                vertical_alignment=ft.CrossAxisAlignment.CENTER),
-            ft.Container(tab_row, padding=P.only(bottom=10, top=4)),
+            ft.Container(tab_row, padding=P.only(bottom=10, top=10)),
         ], spacing=0),
         bgcolor=c('bg2'),
-        padding=P.only(left=12, right=12, top=10, bottom=0),
+        padding=P.only(left=12, right=12, top=10, bottom=6),
         border=B.only(bottom=BS(1, c('card_border'))),
     )
     top_bar_container = top_bar

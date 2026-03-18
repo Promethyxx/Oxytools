@@ -29,6 +29,7 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
     expanded: dict[str, bool] = {}
     if all_months is None: all_months = {}
     page_ref = [page]  # mutable ref for dialog
+    _focus_key = [None]  # key of line to autofocus after add
 
     storage_frais = [frais]  # mutable ref so _sync_frais sees updates
 
@@ -175,7 +176,7 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
         grid = ft.Column([
             ft.Row([
                 card(T['card_income'], [
-                    ('Banque', rev_banque, 'text'),
+                    (T['col_bank'], rev_banque, 'text'),
                     ('Cash',   rev_cash,   'text'),
                 ], rev_total, 'green'),
                 card(T['card_withdrawals'], [
@@ -185,21 +186,21 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
             ], spacing=8),
             ft.Row([
                 card(T['card_paid'], [
-                    ('Banque', paye_banque, 'text'),
+                    (T['col_bank'], paye_banque, 'text'),
                     ('Cash',   paye_cash,   'text'),
                 ], paye_total, 'teal'),
                 card(T['card_to_pay'], [
-                    ('Banque', a_payer_b, 'text'),
+                    (T['col_bank'], a_payer_b, 'text'),
                     ('Cash',   a_payer_c, 'text'),
                 ], a_payer_t, 'amber'),
             ], spacing=8),
             ft.Row([
                 card(T['card_forecast'], [
-                    ('Banque', prev_banque, cc(prev_banque)),
+                    (T['col_bank'], prev_banque, cc(prev_banque)),
                     ('Cash',   prev_cash,   cc(prev_cash)),
                 ], prev_total, cc(prev_total), big=True),
                 card(T['card_balance'], [
-                    ('Banque', solde_banque, cc(solde_banque)),
+                    (T['col_bank'], solde_banque, cc(solde_banque)),
                     ('Cash',   solde_cash,   cc(solde_cash)),
                 ], solde_total, cc(solde_total), big=True),
             ], spacing=8),
@@ -351,17 +352,23 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
             except ValueError: pass
 
         def upd_name(e, _s=sec_key, _i=idx):
-            month.section(_s)[_i].name = e.control.value; on_save()
+            month.section(_s)[_i].name = e.control.value
+            month.section(_s).sort(key=lambda l: l.name.lower())
+            on_save(); rebuild()
 
         def del_var(e, _s=sec_key, _i=idx):
             month.section(_s).pop(_i); on_save(); rebuild(); on_toast(T['toast_deleted'])
 
         # name widget — editable for ALL sections
+        _should_focus = (_focus_key[0] == key)
+        if _should_focus:
+            _focus_key[0] = None  # consume
         name_w = ft.TextField(
             value=line.name, expand=True, height=34, text_size=12,
             bgcolor='transparent', border_color='transparent',
             content_padding=P.symmetric(horizontal=4, vertical=2),
             on_blur=upd_name, color=c('text'),
+            autofocus=_should_focus,
         )
 
         def open_recurring_dialog(e, _s=sec_key, _i=idx):
@@ -372,6 +379,7 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
 
             src = month.section(_s)[_i]
             freq_state = [(src.recurring or {}).get('freq', 3)]
+            include_past = [False]
 
             FREQ_OPTIONS = [
                 (T['rec_every_1'],  1),
@@ -381,7 +389,6 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
                 (T['rec_every_12'], 12),
             ]
 
-            # RadioGroup is simplest for single-select in Flet
             rg = ft.RadioGroup(
                 value=str(freq_state[0]),
                 content=ft.Column([
@@ -392,6 +399,14 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
                     for lbl, v in FREQ_OPTIONS
                 ], spacing=2),
                 on_change=lambda e2: freq_state.__setitem__(0, int(e2.control.value)),
+            )
+
+            past_cb = ft.Checkbox(
+                label=T.get('rec_include_past', 'Also apply to past months'),
+                value=False,
+                label_style=ft.TextStyle(color=c('text2'), size=12, font_family='DM Sans'),
+                check_color=c('teal'), active_color=c('teal'),
+                on_change=lambda e2: include_past.__setitem__(0, e2.control.value),
             )
 
             dlg = ft.AlertDialog(
@@ -408,7 +423,9 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
                                 color=c('text2'), font_family='DM Sans'),
                         ft.Container(height=6),
                         rg,
-                    ], spacing=0),
+                        ft.Divider(height=1, color=c('card_border')),
+                        past_cb,
+                    ], spacing=4),
                     width=260, padding=P.only(top=4),
                 ),
                 actions=[
@@ -424,7 +441,7 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
                     ),
                     ft.ElevatedButton(
                         T['rec_apply'],
-                        on_click=lambda e2: _apply_rec(_s, _i, freq_state[0]),
+                        on_click=lambda e2: _apply_rec(_s, _i, freq_state[0], include_past[0]),
                         style=ft.ButtonStyle(
                             bgcolor=c('teal'), color='#1a1a1a',
                             shape=ft.RoundedRectangleBorder(radius=8),
@@ -435,24 +452,38 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
             )
             page_ref[0].show_dialog(dlg)
 
-        def _apply_rec(_s, _i, freq):
-            from core.model import apply_recurring, MONTHS, mk_line
+        def _apply_rec(_s, _i, freq, include_past=False):
+            from core.model import apply_recurring, MONTHS, mk_line, FraisLine
             src2 = month.section(_s)[_i]
             src2.recurring = {'freq': freq, 'start': month_key}
 
-            # Manually propagate current values to target months
-            start_idx = MONTHS.index(month_key) if month_key in MONTHS else 0
-            for step in range(1, 12):
-                target_idx = start_idx + step
-                if target_idx >= 12:
-                    break
-                if step % freq != 0:
+            src_mi = MONTHS.index(month_key) if month_key in MONTHS else 0
+
+            # Determine frais category for syncing
+            if _s == 'fixes':
+                frais_cat = 'fixes'
+            elif _s == 'retraits':
+                frais_cat = 'retraits'
+            elif _s == 'variables':
+                frais_cat = 'ponctuels'
+            else:
+                frais_cat = None  # revenus not in frais
+
+            # Determine range: future only, or all months
+            if include_past:
+                target_indices = [mi for mi in range(12) if mi != src_mi]
+            else:
+                target_indices = [mi for mi in range(src_mi + 1, 12)]
+
+            # Filter by frequency
+            for mi in target_indices:
+                distance = (mi - src_mi) % 12
+                if distance % freq != 0:
                     continue
-                target_key = MONTHS[target_idx]
+                target_key = MONTHS[mi]
                 if target_key not in all_months:
                     continue
                 target_section = all_months[target_key].section(_s)
-                # Find matching line by name or create it
                 existing = next((l for l in target_section if l.name == src2.name), None)
                 if existing is None:
                     new_line = mk_line(src2.name, banque=src2.banque, cash=src2.cash)
@@ -462,21 +493,66 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
                     existing.banque = src2.banque
                     existing.cash = src2.cash
                     existing.recurring = {'freq': freq, 'start': month_key}
+                target_section.sort(key=lambda l: l.name.lower())
 
-            # Also call model's apply_recurring for any extra logic
-            class _D:
-                months = all_months
-            try:
-                apply_recurring(_D())
-            except Exception:
-                pass
+                # Sync to frais table
+                if frais_cat and storage_frais[0] is not None:
+                    frais_list = storage_frais[0].setdefault(frais_cat, [])
+                    fl = next((f for f in frais_list if f.name == src2.name), None)
+                    if fl is None:
+                        fl = FraisLine(name=src2.name, monthly=[0.0]*12)
+                        frais_list.append(fl)
+                    fl.monthly[mi] = src2.banque + src2.cash
+
+            # Sync current month frais too
+            if frais_cat and storage_frais[0] is not None:
+                frais_list = storage_frais[0].setdefault(frais_cat, [])
+                fl = next((f for f in frais_list if f.name == src2.name), None)
+                if fl is None:
+                    fl = FraisLine(name=src2.name, monthly=[0.0]*12)
+                    frais_list.append(fl)
+                fl.monthly[src_mi] = src2.banque + src2.cash
+
+            month.section(_s).sort(key=lambda l: l.name.lower())
             on_save()
             page_ref[0].pop_dialog()
             on_toast(T.fmt('rec_active', n=freq))
             rebuild()
 
         def _remove_rec(_s, _i):
-            month.section(_s)[_i].recurring = None
+            from core.model import MONTHS
+            src_line = month.section(_s)[_i]
+            line_name = src_line.name
+            src_mi = MONTHS.index(month_key)
+            # Remove recurring flag on current month
+            src_line.recurring = None
+
+            # Determine frais category
+            if _s == 'fixes':
+                frais_cat = 'fixes'
+            elif _s == 'retraits':
+                frais_cat = 'retraits'
+            elif _s == 'variables':
+                frais_cat = 'ponctuels'
+            else:
+                frais_cat = None
+
+            # Delete same-named lines from all months AFTER the current one
+            for mi in range(src_mi + 1, 12):
+                target_key = MONTHS[mi]
+                if target_key not in all_months:
+                    continue
+                target_sec = all_months[target_key].section(_s)
+                to_remove = [l for l in target_sec if l.name == line_name]
+                for l in to_remove:
+                    target_sec.remove(l)
+                # Zero out frais for this month
+                if frais_cat and storage_frais[0] is not None:
+                    frais_list = storage_frais[0].get(frais_cat, [])
+                    fl = next((f for f in frais_list if f.name == line_name), None)
+                    if fl:
+                        fl.monthly[mi] = 0.0
+
             on_save()
             page_ref[0].pop_dialog()
             on_toast(T['rec_disabled'])
@@ -587,11 +663,12 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
                 # legend — only shown on wide layout (narrow has inline B/C labels)
                 if not _narrow:
                     parts.append(ft.Row([
-                        ft.Container(expand=True),
+                        ft.Container(expand=True),  # matches name_w expand
                         ft.Container(txt(T['col_bank'], size=9, col='blue', weight=ft.FontWeight.W_600, align=ft.TextAlign.CENTER), width=60),
                         ft.Container(txt(T['col_cash'],   size=9, col='amber', weight=ft.FontWeight.W_600, align=ft.TextAlign.CENTER), width=60),
                         ft.Container(txt(T['col_state'],   size=9, col='teal', weight=ft.FontWeight.W_600, align=ft.TextAlign.CENTER), width=60),
                         ft.Container(txt(T['col_balance'],  size=9, col='gold', weight=ft.FontWeight.W_600, align=ft.TextAlign.CENTER), width=54),
+                        ft.Container(width=64),  # space for recurring + delete buttons
                     ], spacing=4))
 
                 for i, ln in enumerate(month.section(sk)):
@@ -607,7 +684,11 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
                 def make_add(sk2=sk):
                     def _add(e):
                         from core.model import mk_line as _mk
-                        month.section(sk2).append(_mk(T['new_entry']))
+                        section = month.section(sk2)
+                        section.append(_mk(T['new_entry']))
+                        new_idx = len(section) - 1
+                        expanded[f'sec-{month_key}-{sk2}'] = True  # ensure section open
+                        _focus_key[0] = f"{month_key}-{sk2}-{new_idx}"
                         on_save(); rebuild(); on_toast(T['toast_added'])
                     return _add
                 parts.append(ft.Container(
@@ -907,9 +988,9 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
                 summary(),
                 ft.Divider(height=1, color='transparent'),
                 section('revenus'),
-                section('retraits'),
                 section('fixes'),
                 section('variables'),
+                section('retraits'),
                 ft.Container(height=40),
             ]
         else:

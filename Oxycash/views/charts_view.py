@@ -1,14 +1,14 @@
-"""Oxycash – Annual charts view (Flet 0.82+)"""
+"""Oxycash – Annual overview (Flet 0.82+)
+Same 6 summary cards as monthly view but with annual totals + monthly breakdown table."""
 from __future__ import annotations
 import flet as ft
-from core.model import AppData, MONTHS, fmt
+from core.model import AppData, MONTHS, fmt, fmt_sign
 from core.i18n import T
 
 P  = ft.Padding
 M  = ft.Margin
 B  = ft.Border
 BS = ft.BorderSide
-BR = ft.BorderRadius
 
 
 def build_charts_view(data: AppData, t, currency: str) -> ft.Column:
@@ -21,178 +21,166 @@ def build_charts_view(data: AppData, t, currency: str) -> ft.Column:
                        font_family=family, color=c(col),
                        text_align=align, expand=expand if expand else None)
 
-    # ── Compute monthly data ─────────────────────────────────────────────────
-    month_labels = T.months_short
-    revenues  = []
-    expenses  = []
-    balances  = []
-    cumul     = 0.0
+    # ── Compute annual totals — same logic as monthly summary() ───────────
+    tot_rev = 0.0
+    tot_paye = 0.0
+    tot_a_payer = 0.0
+    tot_ret = 0.0
+    tot_prev = 0.0
+    tot_solde = 0.0
+
+    month_rows = []
 
     for mk in MONTHS:
         m = data.months.get(mk)
         if m is None:
-            revenues.append(0); expenses.append(0); balances.append(cumul)
+            month_rows.append({'rev': 0, 'dep': 0, 'prev': 0})
             continue
-        # Use budgeted amounts (banque+cash), not just payments received
-        rev_budget = sum(l.banque + l.cash for l in m.revenus)
-        rev_paid   = sum(l.etat() for l in m.revenus)
-        exp_budget = sum(l.banque + l.cash for l in m.fixes + m.variables) + sum(l.banque + l.cash for l in m.retraits)
-        exp_paid   = sum(l.etat() for l in m.fixes + m.variables) + sum(l.etat() for l in m.retraits)
-        # Show whichever is greater: budget or actual payments
-        rev = max(rev_budget, rev_paid)
-        exp = max(exp_budget, exp_paid)
-        revenues.append(rev)
-        expenses.append(exp)
-        cumul += rev - exp
-        balances.append(cumul)
 
-    max_bar   = max(max(revenues), max(expenses), 1)
-    BAR_H     = 120
-    BAR_W     = 18
-    COL_W     = 44
+        rev_banque = sum(l.banque for l in m.revenus)
+        rev_cash   = sum(l.cash   for l in m.revenus)
+        rev_total  = rev_banque + rev_cash
 
-    # ── Bar chart: revenues vs expenses ──────────────────────────────────────
-    def bar_chart() -> ft.Container:
-        cols = []
-        for i, mk in enumerate(MONTHS):
-            rev_h = max(2, revenues[i] / max_bar * BAR_H)
-            exp_h = max(2, expenses[i] / max_bar * BAR_H)
-            cols.append(ft.Column([
-                ft.Row([
-                    ft.Container(width=BAR_W, height=rev_h,
-                                 bgcolor=c('teal'), opacity=0.85,
-                                 border_radius=BR.only(top_left=3, top_right=3)),
-                    ft.Container(width=BAR_W, height=exp_h,
-                                 bgcolor=c('danger'), opacity=0.75,
-                                 border_radius=BR.only(top_left=3, top_right=3)),
-                ], spacing=2, alignment=ft.MainAxisAlignment.CENTER,
-                   vertical_alignment=ft.CrossAxisAlignment.END),
-                txt(month_labels[i], size=9, col='text3',
-                    align=ft.TextAlign.CENTER),
-            ], spacing=4, horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-               width=COL_W))
+        ret_a_retirer = sum(l.banque for l in m.retraits)
+        ret_retire    = sum(l.etat() for l in m.retraits)
 
-        legend = ft.Row([
-            ft.Row([ft.Container(width=10, height=10, bgcolor=c('teal'),
-                                 border_radius=2),
-                    txt(T['card_income'], size=10, col='text2')], spacing=4),
-            ft.Row([ft.Container(width=10, height=10, bgcolor=c('danger'),
-                                 border_radius=2),
-                    txt(T['chart_fixed'] + ' + ' + T['chart_variable'],
-                        size=10, col='text2')], spacing=4),
-        ], spacing=16, alignment=ft.MainAxisAlignment.CENTER)
+        all_dep    = m.fixes + m.variables
+        dep_banque = sum(l.banque for l in all_dep)
+        dep_cash   = sum(l.cash   for l in all_dep)
 
+        rev_recu_b = sum(l.etat() for l in m.revenus if l.banque > 0.01)
+        paye_banque = sum(l.etat() for l in all_dep if l.banque > 0.01) + ret_retire
+        paye_cash   = sum(l.etat() for l in all_dep if l.cash > 0.01)
+        paye_total  = paye_banque + paye_cash
+
+        a_payer_b = dep_banque - sum(l.etat() for l in all_dep if l.banque > 0.01)
+        a_payer_c = dep_cash - sum(l.etat() for l in all_dep if l.cash > 0.01)
+
+        prev_banque = rev_banque - dep_banque - ret_a_retirer
+        prev_cash   = ret_a_retirer - dep_cash
+        prev_total  = prev_banque + prev_cash
+
+        solde_banque = rev_recu_b - paye_banque
+        solde_cash   = ret_retire - paye_cash
+        solde_total  = solde_banque + solde_cash
+
+        tot_rev     += rev_total
+        tot_ret     += ret_a_retirer
+        tot_paye    += paye_total
+        tot_a_payer += a_payer_b + a_payer_c
+        tot_prev    += prev_total
+        tot_solde   += solde_total
+
+        month_rows.append({
+            'rev': rev_total,
+            'dep': dep_banque + dep_cash + ret_a_retirer,
+            'prev': prev_total,
+        })
+
+    def cc(n): return 'green' if n > 0.01 else ('danger' if n < -0.01 else 'text')
+
+    # ── 6 summary cards ───────────────────────────────────────────────────
+    def card(label, value, col_key) -> ft.Container:
         return ft.Container(
             ft.Column([
-                txt(T['chart_income_vs_exp'], size=11,
-                    weight=ft.FontWeight.W_600, col='text3'),
-                ft.Container(height=6),
-                ft.Row(cols, alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-                       vertical_alignment=ft.CrossAxisAlignment.END),
-                ft.Container(height=8),
-                legend,
-            ], spacing=0),
+                txt(label, size=9, weight=ft.FontWeight.W_600, col='text3'),
+                txt(f"{fmt_sign(value)} {currency}", size=16,
+                    weight=ft.FontWeight.W_700, col=col_key,
+                    family='Playfair Display'),
+            ], spacing=4),
             padding=14, bgcolor=c('card'),
-            border=B.all(1, c('card_border')), border_radius=12,
+            border=B.all(1, c('card_border')), border_radius=10,
+            expand=True,
         )
 
-    # ── Balance curve (sparkline-style SVG) ──────────────────────────────────
-    def balance_chart() -> ft.Container:
-        W, H   = 320, 100
-        min_b  = min(balances)
-        max_b  = max(balances) if max(balances) != min_b else min_b + 1
-        rng    = max_b - min_b or 1
+    cards_row1 = ft.Row([
+        card(T['card_income'], tot_rev, cc(tot_rev)),
+        card(T['card_paid'], tot_paye, 'teal'),
+    ], spacing=8)
 
-        def px(i, val):
-            x = int(i / 11 * (W - 20)) + 10
-            y = int(H - 10 - (val - min_b) / rng * (H - 20))
-            return x, y
+    cards_row2 = ft.Row([
+        card(T['card_to_pay'], tot_a_payer, cc(-tot_a_payer)),
+        card(T['card_withdrawals'], tot_ret, 'amber'),
+    ], spacing=8)
 
-        pts = [px(i, v) for i, v in enumerate(balances)]
+    cards_row3 = ft.Row([
+        card(T['card_forecast'], tot_prev, cc(tot_prev)),
+        card(T['card_balance'], tot_solde, cc(tot_solde)),
+    ], spacing=8)
 
-        # zero line
-        zero_y = int(H - 10 - (0 - min_b) / rng * (H - 20))
-        zero_y = max(5, min(H - 5, zero_y))
+    # ── Monthly breakdown table ───────────────────────────────────────────
+    month_labels = T.months_short
 
-        # build polyline
-        polyline = ' '.join(f"{x},{y}" for x, y in pts)
+    def hdr(s, width=None):
+        ct = txt(s, size=9, weight=ft.FontWeight.W_600, col='text3',
+                 align=ft.TextAlign.CENTER)
+        return ft.Container(ct, width=width) if width else ft.Container(ct, expand=True)
 
-        # colored dots
-        dots = ''
-        for i, (x, y) in enumerate(pts):
-            col_dot = '#7BC47F' if balances[i] >= 0 else '#E05555'
-            dots += f'<circle cx="{x}" cy="{y}" r="3" fill="{col_dot}"/>'
+    header = ft.Row([
+        hdr('', width=36),
+        hdr(T['card_income']),
+        hdr(T.get('chart_exp', 'Dep.')),
+        hdr(T['card_forecast']),
+    ], spacing=4)
 
-        # month labels
-        labels = ''
-        for i, lbl in enumerate(month_labels):
-            x, _ = pts[i]
-            labels += f'<text x="{x}" y="{H+2}" text-anchor="middle" font-size="7" fill="{c("text3")}">{lbl}</text>'
+    tbl_rows = [header, ft.Divider(height=1, color=c('card_border'))]
+    cumul = 0.0
+    for i, md in enumerate(month_rows):
+        cumul += md['prev']
+        pc = cc(md['prev'])
+        tbl_rows.append(ft.Row([
+            ft.Container(txt(month_labels[i], size=10, col='text3',
+                             align=ft.TextAlign.CENTER), width=36),
+            ft.Container(txt(fmt(md['rev']), size=10, col='teal',
+                             align=ft.TextAlign.RIGHT), expand=True),
+            ft.Container(txt(fmt(md['dep']), size=10, col='danger',
+                             align=ft.TextAlign.RIGHT), expand=True),
+            ft.Container(txt(fmt_sign(md['prev']), size=10, col=pc,
+                             weight=ft.FontWeight.W_700,
+                             align=ft.TextAlign.RIGHT), expand=True),
+        ], spacing=4))
 
-        svg = f'''<svg viewBox="0 0 {W} {H+12}" xmlns="http://www.w3.org/2000/svg">
-  <line x1="0" y1="{zero_y}" x2="{W}" y2="{zero_y}"
-        stroke="{c("card_border")}" stroke-width="1" stroke-dasharray="3,3"/>
-  <polyline points="{polyline}" fill="none"
-            stroke="{c("teal")}" stroke-width="2" stroke-linejoin="round"/>
-  {dots}
-  {labels}
-</svg>'''
+    tbl_rows.append(ft.Divider(height=1, color=c('card_border')))
+    cumul_col = cc(cumul)
+    tbl_rows.append(ft.Row([
+        ft.Container(txt(T.get('col_total', 'Total'), size=10,
+                         weight=ft.FontWeight.W_700, col='text'), width=36),
+        ft.Container(txt(fmt(tot_rev), size=10, weight=ft.FontWeight.W_700,
+                         col='teal', align=ft.TextAlign.RIGHT), expand=True),
+        ft.Container(txt(fmt(tot_rev - tot_prev), size=10,
+                         weight=ft.FontWeight.W_700, col='danger',
+                         align=ft.TextAlign.RIGHT), expand=True),
+        ft.Container(txt(fmt_sign(tot_prev), size=10, weight=ft.FontWeight.W_700,
+                         col=cc(tot_prev), align=ft.TextAlign.RIGHT), expand=True),
+    ], spacing=4))
 
-        return ft.Container(
-            ft.Column([
-                txt(T['chart_cumul_balance'], size=11,
-                    weight=ft.FontWeight.W_600, col='text3'),
-                ft.Container(height=6),
-                ft.Container(
-                    ft.Image(src=f'data:image/svg+xml;base64,{_svg_b64(svg)}',
-                             fit=ft.BoxFit.FIT_WIDTH,
-                             expand=True),
-                    expand=True,
-                ),
-                ft.Container(height=4),
-                txt(f"{T['chart_final']}: {fmt(balances[-1])} {currency}",
-                    size=12, weight=ft.FontWeight.W_700,
-                    col='green' if balances[-1] >= 0 else 'danger'),
-            ], spacing=0),
-            padding=14, bgcolor=c('card'),
-            border=B.all(1, c('card_border')), border_radius=12,
-        )
+    # Cumul annuel
+    cumul_card = ft.Container(
+        ft.Row([
+            txt(T.get('chart_annual_cumul', 'Annual cumulative'), size=13,
+                weight=ft.FontWeight.W_600, col='text2', expand=True),
+            txt(f"{fmt_sign(cumul)} {currency}", size=20,
+                weight=ft.FontWeight.W_700, col=cumul_col,
+                family='Playfair Display', align=ft.TextAlign.RIGHT),
+        ]),
+        padding=14, bgcolor=c('card'),
+        border=B.all(1, c('card_border')), border_radius=10,
+    )
 
-    # ── Summary totals ────────────────────────────────────────────────────────
-    def summary_row() -> ft.Row:
-        total_rev = sum(revenues)
-        total_exp = sum(expenses)
-        net       = total_rev - total_exp
-
-        def card(label, val, col_key):
-            return ft.Container(
-                ft.Column([
-                    txt(label, size=9, weight=ft.FontWeight.W_600, col='text3'),
-                    txt(f"{fmt(val)} {currency}", size=14,
-                        weight=ft.FontWeight.W_700, col=col_key),
-                ], spacing=2),
-                expand=True, padding=12,
-                bgcolor=c('card'), border=B.all(1, c('card_border')),
-                border_radius=10,
-            )
-
-        return ft.Row([
-            card(T['chart_total_income'],  total_rev, 'teal'),
-            card(T['chart_total_exp'],     total_exp, 'danger'),
-            card(T['chart_net'],           net,
-                 'green' if net >= 0 else 'danger'),
-        ], spacing=8)
+    table = ft.Container(
+        ft.Column(tbl_rows, spacing=4),
+        padding=12, bgcolor=c('card'),
+        border=B.all(1, c('card_border')), border_radius=10,
+    )
 
     return ft.Column([
         txt(T['tab_charts'], size=20, weight=ft.FontWeight.W_700,
             family='Playfair Display', col='text'),
-        summary_row(),
-        bar_chart(),
-        balance_chart(),
+        cards_row1,
+        cards_row2,
+        cards_row3,
+        cumul_card,
+        ft.Container(height=8),
+        table,
         ft.Container(height=40),
     ], spacing=12, scroll=ft.ScrollMode.AUTO, expand=True)
-
-
-def _svg_b64(svg: str) -> str:
-    import base64
-    return base64.b64encode(svg.encode()).decode()

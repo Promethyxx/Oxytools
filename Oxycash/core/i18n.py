@@ -95,6 +95,7 @@ _EN = {
     'rec_active':     '🔁 Recurring every {n} months',
     'rec_disabled':   '🔁 Recurrence disabled',
     'rec_na':         '⚠️ Dialog unavailable',
+    'rec_include_past': 'Also apply to past months',
 
     # ── Debts ──
     'deb_title':        'Debts',
@@ -188,6 +189,8 @@ _EN = {
     'chart_total_exp':    'TOTAL EXPENSES',
     'chart_net':          'NET',
     'chart_final':        'Year-end balance',
+    'chart_exp':          'Expenses',
+    'chart_annual_cumul': 'Annual cumulative',
 
     # ── Config currency ──
     'cfg_currency':       'Currency',
@@ -301,6 +304,7 @@ _FR = {
     'rec_active':     '🔁 Récurrent tous les {n} mois',
     'rec_disabled':   '🔁 Récurrence désactivée',
     'rec_na':         '⚠️ Dialog non disponible',
+    'rec_include_past': 'Appliquer aussi aux mois passés',
 
     # ── Debts ──
     'deb_title':        'Dettes',
@@ -394,6 +398,8 @@ _FR = {
     'chart_total_exp':    'TOTAL DÉPENSES',
     'chart_net':          'NET',
     'chart_final':        "Solde fin d'année",
+    'chart_exp':          'Dépenses',
+    'chart_annual_cumul': 'Cumul annuel',
 
     # ── Config currency ──
     'cfg_currency':       'Devise',

@@ -786,7 +786,13 @@ def build_config_view(storage, t, on_save, on_toast, on_reload, on_theme_toggle,
                                   url_tf.value.strip(),
                                   usr_tf.value.strip(),
                                   pw_tf.value)
-        status_txt.value = T['cfg_saved']; status_txt.color = c('green')
+        # Auto-test connection so badge reflects real state
+        ok, msg = storage.test_dav()
+        if ok:
+            storage.dav_ok = True
+            status_txt.value = T['cfg_saved'] + ' — ' + msg; status_txt.color = c('green')
+        else:
+            status_txt.value = T['cfg_saved']; status_txt.color = c('green')
         on_toast(T['cfg_saved']); _badge(); page.update()
 
     def test_cfg_profile(e):
