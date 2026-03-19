@@ -405,6 +405,7 @@ def build_frais_view(data: AppData, t, on_save, on_toast, on_reload=None):
     def c(k): return t.c(k)
     _font_scale[0] = t.scale
     col = ft.Column([], spacing=12, scroll=ft.ScrollMode.AUTO, expand=True)
+    frais_expanded = {'fixes': True, 'ponctuels': True, 'retraits': True}
 
     def rebuild():
         col.controls.clear()
@@ -493,16 +494,39 @@ def build_frais_view(data: AppData, t, on_save, on_toast, on_reload=None):
                 from core.model import FraisLine
                 data.frais[cat].append(FraisLine('Nouveau', [0.0]*12)); on_save(); rebuild()
 
-            return ft.Column([
-                ft.Container(_t(label, size=13, weight=ft.FontWeight.W_600,
-                                 family='Playfair Display', col=c('text')),
-                             padding=P.only(bottom=6, top=4),
-                             border=B.only(bottom=BS(1, c('card_border')))),
-                ft.Container(ft.Column(rows, spacing=4), padding=12,
-                             bgcolor=c('card'), border=B.all(1, c('card_border')),
-                             border_radius=10, clip_behavior=ft.ClipBehavior.HARD_EDGE),
-                _add_btn('Ajouter une ligne', add_line, c),
-            ], spacing=6)
+            is_open = frais_expanded.get(cat, True)
+
+            def toggle_table(e, cat=cat):
+                frais_expanded[cat] = not frais_expanded.get(cat, True)
+                rebuild()
+
+            title_row = ft.Container(
+                ft.Row([
+                    _t(label, size=13, weight=ft.FontWeight.W_600,
+                       family='Playfair Display', col=c('text'), expand=True),
+                    _t(fmt(grand), size=12, weight=ft.FontWeight.W_700, col=c(col_key)),
+                    ft.IconButton(
+                        ft.Icons.EXPAND_MORE if is_open else ft.Icons.ADD,
+                        icon_size=16,
+                        icon_color=c(col_key) if is_open else c('text3'),
+                        on_click=toggle_table,
+                        style=ft.ButtonStyle(padding=P.all(2)),
+                    ),
+                ], spacing=8, vertical_alignment=ft.CrossAxisAlignment.CENTER),
+                padding=P.only(bottom=6, top=4),
+                border=B.only(bottom=BS(1, c('card_border'))),
+            )
+
+            body = []
+            if is_open:
+                body = [
+                    ft.Container(ft.Column(rows, spacing=4), padding=12,
+                                 bgcolor=c('card'), border=B.all(1, c('card_border')),
+                                 border_radius=10, clip_behavior=ft.ClipBehavior.HARD_EDGE),
+                    _add_btn('Ajouter une ligne', add_line, c),
+                ]
+
+            return ft.Column([title_row, *body], spacing=6)
 
         return [
             _t(T['exp_title'], size=20, weight=ft.FontWeight.W_700,
