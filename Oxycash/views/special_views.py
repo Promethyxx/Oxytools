@@ -256,13 +256,161 @@ def build_epargne_view(data: AppData, t, on_save, on_toast, on_reload=None):
             ep.setdefault('wishlists', []).append({'label': 'Projet', 'items': []})
             on_save(); rebuild()
 
+        # ── Tableaux épargne ──
+        def _progress_row(pct, done):
+            bar_col = c('green') if done else c('teal')
+            return ft.Row([
+                ft.Container(height=6, bgcolor=bar_col,
+                             border_radius=3, expand=max(1, pct)),
+                ft.Container(height=6, bgcolor=c('card_border'),
+                             border_radius=3, expand=max(1, 100 - pct)),
+            ], spacing=0, expand=True)
 
+        savings_blocks = []
+        for si, sv in enumerate(ep.get('savings', [])):
+            sv_total = sum(r.get('montant', 0) for r in sv.get('rows', []))
+            sv_cible = sv.get('cible', 0)
+            sv_reste = sv_cible - sv_total if sv_cible > 0.01 else 0
+            sv_pct   = min(100, int(sv_total / sv_cible * 100)) if sv_cible > 0.01 else 0
+            sv_done  = sv_cible > 0.01 and sv_reste <= 0.01
+            sv_ck    = 'green' if sv_done else 'gold'
 
+            def upd_sv_label(e, si=si):
+                ep['savings'][si]['label'] = e.control.value; on_save()
+            def upd_sv_cible(e, si=si):
+                try: ep['savings'][si]['cible'] = float(e.control.value.replace(',','.')); on_save(); rebuild()
+                except ValueError: pass
+            def del_sv(e, si=si):
+                ep['savings'].pop(si); on_save(); rebuild()
+
+            # ── lignes ──
+            row_widgets = []
+            for ri, r in enumerate(sv.get('rows', [])):
+                r_montant = r.get('montant', 0)
+                r_cible   = r.get('cible', 0)
+                r_reste   = r_cible - r_montant if r_cible > 0.01 else 0
+                r_pct     = min(100, int(r_montant / r_cible * 100)) if r_cible > 0.01 else 0
+                r_done    = r_cible > 0.01 and r_reste <= 0.01
+                r_ck      = 'green' if r_done else 'teal'
+
+                def upd_rname(e, si=si, ri=ri):
+                    ep['savings'][si]['rows'][ri]['name'] = e.control.value; on_save()
+                def upd_rmontant(e, si=si, ri=ri):
+                    try: ep['savings'][si]['rows'][ri]['montant'] = float(e.control.value.replace(',','.')); on_save(); rebuild()
+                    except ValueError: pass
+                def upd_rcible(e, si=si, ri=ri):
+                    try: ep['savings'][si]['rows'][ri]['cible'] = float(e.control.value.replace(',','.')); on_save(); rebuild()
+                    except ValueError: pass
+                def del_row(e, si=si, ri=ri):
+                    ep['savings'][si]['rows'].pop(ri); on_save(); rebuild()
+
+                line_parts = [
+                    ft.Row([
+                        _tf(r.get('name', ''), on_blur=upd_rname,
+                            expand=True, col=c('text'), c=c),
+                        _tf(fmt(r_montant), on_blur=upd_rmontant, num=True,
+                            width=82, col=c('teal'), hint='Épargné', c=c),
+                        _t('/', size=11, col=c('text3')),
+                        _tf(fmt(r_cible) if r_cible > 0 else '', on_blur=upd_rcible,
+                            num=True, width=82, col=c('gold'), hint='Objectif', c=c),
+                        _del_btn(del_row, c),
+                    ], spacing=4, vertical_alignment=ft.CrossAxisAlignment.CENTER),
+                ]
+                if r_cible > 0.01:
+                    line_parts.append(
+                        ft.Row([
+                            _progress_row(r_pct, r_done),
+                            _t(f"{r_pct}%", size=9, weight=ft.FontWeight.W_700,
+                               col=c(r_ck)),
+                        ], spacing=6, vertical_alignment=ft.CrossAxisAlignment.CENTER)
+                    )
+
+                row_widgets.append(ft.Container(
+                    ft.Column(line_parts, spacing=4),
+                    padding=P.symmetric(horizontal=12, vertical=8),
+                    bgcolor=c('card'), border=B.all(1, c('card_border')), border_radius=8,
+                ))
+
+            def add_sv_row(e, si=si):
+                ep['savings'][si].setdefault('rows', []).append(
+                    {'name': 'Versement', 'montant': 0, 'cible': 0})
+                on_save(); rebuild()
+
+            # ── header projet ──
+            header_parts = [
+                ft.Row([
+                    ft.Text('🏦', size=16),
+                    _tf(sv.get('label', 'Épargne'), on_blur=upd_sv_label,
+                        expand=True, col=c('text'), c=c),
+                    _del_btn(del_sv, c),
+                ], spacing=8, vertical_alignment=ft.CrossAxisAlignment.CENTER),
+                ft.Divider(height=1, color=c('card_border')),
+                # objectif global (optionnel)
+                ft.Row([
+                    _t(T.get('sav_target', 'Objectif global'), size=10,
+                       weight=ft.FontWeight.W_600, col=c('text3')),
+                    ft.Container(expand=True),
+                    _tf(fmt(sv_cible) if sv_cible > 0 else '', on_blur=upd_sv_cible,
+                        num=True, width=100, col=c('gold'), hint='0', c=c),
+                    _t('CHF', size=10, col=c('text3')),
+                ], spacing=6, vertical_alignment=ft.CrossAxisAlignment.CENTER),
+            ]
+
+            # barre + résumé global seulement si objectif global défini
+            if sv_cible > 0.01:
+                header_parts += [
+                    ft.Row([
+                        _progress_row(sv_pct, sv_done),
+                        _t(f"{sv_pct}%", size=10, weight=ft.FontWeight.W_700,
+                           col=c(sv_ck)),
+                    ], spacing=8, vertical_alignment=ft.CrossAxisAlignment.CENTER),
+                    ft.Row([
+                        ft.Column([
+                            _t(T.get('sav_saved', 'Épargné'), size=9, col=c('text3')),
+                            _t(f"{fmt(sv_total)} CHF", size=13,
+                               weight=ft.FontWeight.W_700, col=c('teal')),
+                        ], spacing=2, expand=True),
+                        ft.Column([
+                            _t(T.get('sav_remaining', 'Restant'), size=9, col=c('text3')),
+                            _t(f"{fmt(max(0, sv_reste))} CHF", size=13,
+                               weight=ft.FontWeight.W_700, col=c(sv_ck)),
+                        ], spacing=2, expand=True),
+                    ]),
+                ]
+            else:
+                # pas d'objectif global : afficher juste le total épargné
+                header_parts.append(
+                    ft.Row([
+                        _t(T.get('sav_saved', 'Épargné'), size=9, col=c('text3')),
+                        ft.Container(expand=True),
+                        _t(f"{fmt(sv_total)} CHF", size=13,
+                           weight=ft.FontWeight.W_700, col=c('teal')),
+                    ], vertical_alignment=ft.CrossAxisAlignment.CENTER)
+                )
+
+            header_parts.append(ft.Divider(height=1, color=c('card_border')))
+
+            savings_blocks.append(ft.Container(
+                ft.Column([
+                    *header_parts,
+                    *row_widgets,
+                    _add_btn(T.get('sav_add_saving', '+ Entrée'), add_sv_row, c),
+                ], spacing=6),
+                padding=14, bgcolor=c('card'),
+                border=B.all(1, c('card_border')), border_radius=10,
+            ))
+
+        def add_savings(e):
+            ep.setdefault('savings', []).append({'label': 'Épargne', 'cible': 0, 'rows': []})
+            on_save(); rebuild()
 
         return [
             _t(T['sav_title'], size=20, weight=ft.FontWeight.W_700, family='Playfair Display', col=c('text')),
             *wishlist_blocks,
             _add_btn(T['sav_add_project'], add_wishlist, c),
+            ft.Container(height=8),
+            *savings_blocks,
+            _add_btn(T.get('sav_add_savings_proj', '+ Tableau épargne'), add_savings, c),
             ft.Container(height=40),
         ]
 
