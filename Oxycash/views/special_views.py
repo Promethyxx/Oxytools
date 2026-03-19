@@ -77,6 +77,7 @@ def build_dettes_view(data: AppData, t, on_save, on_toast, on_reload=None):
     def c(k): return t.c(k)
     _font_scale[0] = t.scale
     col = ft.Column([], spacing=8, scroll=ft.ScrollMode.AUTO, expand=True)
+    dette_expanded = {}  # persisté entre rebuilds
 
     def rebuild():
         col.controls.clear()
@@ -105,8 +106,9 @@ def build_dettes_view(data: AppData, t, on_save, on_toast, on_reload=None):
 
         cards = []
         for i, d in enumerate(data.dettes):
-            is_paid = d.soldeOk >= d.solde
-            accent  = c('green') if is_paid else c('danger')
+            is_paid  = d.soldeOk >= d.solde
+            accent   = c('green') if is_paid else c('danger')
+            is_open  = dette_expanded.get(i, False)
 
             def upd_str(field, i=i):
                 def _h(e): setattr(data.dettes[i], field, e.control.value); on_save()
@@ -118,13 +120,30 @@ def build_dettes_view(data: AppData, t, on_save, on_toast, on_reload=None):
                 return _h
             def del_dette(e, i=i):
                 data.dettes.pop(i); on_save(); rebuild(); on_toast(T['toast_deleted'])
+            def toggle_dette(e, i=i):
+                dette_expanded[i] = not dette_expanded.get(i, False)
+                rebuild()
 
-            cards.append(ft.Container(
-                ft.Column([
-                    ft.Row([
-                        _tf(d.creancier, on_blur=upd_str('creancier'), expand=True, col=c('text'), c=c),
-                        _del_btn(del_dette, c),
-                    ], spacing=4),
+            # ── ligne titre ──
+            title_row = ft.Row([
+                _tf(d.creancier, on_blur=upd_str('creancier'), expand=True, col=c('text'), c=c),
+                ft.IconButton(
+                    ft.Icons.EXPAND_MORE if is_open else ft.Icons.ADD,
+                    icon_size=16,
+                    icon_color=c('danger') if is_open else c('text3'),
+                    on_click=toggle_dette,
+                    style=ft.ButtonStyle(padding=P.all(2)),
+                ),
+                _tf(fmt(d.solde), on_blur=upd_num('solde'), num=True, width=82, col=c('danger'), c=c),
+                _t('/', size=13, weight=ft.FontWeight.W_700, col=c('text3')),
+                _tf(fmt(d.soldeOk), on_blur=upd_num('soldeOk'), num=True, width=82, col=c('green'), c=c),
+                _del_btn(del_dette, c),
+            ], spacing=4, vertical_alignment=ft.CrossAxisAlignment.CENTER)
+
+            detail_parts = []
+            if is_open:
+                detail_parts = [
+                    ft.Divider(height=1, color=c('card_border')),
                     ft.Row([
                         ft.Column([_t(T['deb_representative'], size=9, col=c('text3')),
                                    _tf(d.rep, on_blur=upd_str('rep'), col=c('text2'), c=c)],
@@ -149,7 +168,25 @@ def build_dettes_view(data: AppData, t, on_save, on_toast, on_reload=None):
                                    _tf(d.date, on_blur=upd_str('date'), col=c('text3'), c=c)],
                                   expand=True, spacing=2),
                     ], spacing=8),
-                ], spacing=6),
+                    ft.Row([
+                        ft.Column([_t(T.get('deb_ref', 'Référence'), size=9, col=c('text3')),
+                                   _tf(d.ref, on_blur=upd_str('ref'), col=c('text2'), c=c)],
+                                  expand=True, spacing=2),
+                    ], spacing=8),
+                    ft.Column([
+                        _t(T.get('deb_note', 'Note'), size=9, col=c('text3')),
+                        ft.TextField(
+                            value=d.note, multiline=True, min_lines=2, max_lines=4,
+                            text_size=12, color=c('text2'), bgcolor='transparent',
+                            border_color=c('card_border'), focused_border_color=c('gold'),
+                            content_padding=P.symmetric(horizontal=8, vertical=6),
+                            on_blur=upd_str('note'),
+                        ),
+                    ], spacing=2),
+                ]
+
+            cards.append(ft.Container(
+                ft.Column([title_row, *detail_parts], spacing=6),
                 padding=14, bgcolor=c('card'),
                 border=B.only(left=BS(3, accent), top=BS(1, c('card_border')),
                               right=BS(1, c('card_border')), bottom=BS(1, c('card_border'))),
@@ -159,7 +196,7 @@ def build_dettes_view(data: AppData, t, on_save, on_toast, on_reload=None):
         def add_dette(e):
             from core.model import Dette
             data.dettes.append(Dette(rep='', creancier='Nouveau', poursuite='',
-                                     solde=0, soldeOk=0, etat='', date=''))
+                                     solde=0, soldeOk=0, etat='', date='', ref='', note=''))
             on_save(); rebuild()
 
         return [

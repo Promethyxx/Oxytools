@@ -117,6 +117,8 @@ class Dette:
     soldeOk: float = 0
     etat: str = ''
     date: str = ''
+    ref: str = ''
+    note: str = ''
 
     def to_dict(self): return self.__dict__.copy()
 
