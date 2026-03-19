@@ -131,12 +131,12 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
 
         # Prévision (si tout payé)
         prev_banque = rev_banque - dep_banque - ret_a_retirer
-        prev_cash   = ret_a_retirer - dep_cash
+        prev_cash   = rev_cash + ret_a_retirer - dep_cash
         prev_total  = prev_banque + prev_cash
 
         # Solde réel
         solde_banque = rev_recu_b - paye_banque
-        solde_cash   = ret_retire  - paye_cash
+        solde_cash   = ret_retire + rev_recu_c - paye_cash
         solde_total  = solde_banque + solde_cash
 
         def cc(n): return 'green' if n > 0.01 else ('danger' if n < -0.01 else 'text')

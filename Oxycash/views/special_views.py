@@ -523,7 +523,7 @@ def build_frais_view(data: AppData, t, on_save, on_toast, on_reload=None):
                     ft.Container(ft.Column(rows, spacing=4), padding=12,
                                  bgcolor=c('card'), border=B.all(1, c('card_border')),
                                  border_radius=10, clip_behavior=ft.ClipBehavior.HARD_EDGE),
-                    _add_btn('Ajouter une ligne', add_line, c),
+                    _add_btn(T['exp_add_line'], add_line, c),
                 ]
 
             return ft.Column([title_row, *body], spacing=6)
@@ -553,73 +553,242 @@ def build_viabilite_view(data: AppData, t, on_save, on_toast, on_reload=None):
         col.controls.extend(_build())
         col.update()
 
+    def _next_val(val, dt, dv):
+        """Applique un delta (fixed ou pct) à une valeur."""
+        if dt == 'pct':
+            return round(val * (1 + dv / 100), 2)
+        return round(val + dv, 2)
+
+    def _compute_solde(vc, palier):
+        s = 0.0
+        for ci, col_def in enumerate(vc.colonnes):
+            v = palier.valeurs[ci] if ci < len(palier.valeurs) else 0.0
+            s += v if col_def.is_income else -v
+        return s
+
     def _build():
-        COLS = [(T['via_salary'],'gold',60),(T['via_rent'],'text3',None),(T['via_insurance'],'text3',None),
-                (T['via_expenses'],'text3',None),(T['via_tax'],'text3',None),(T['via_subsidy'],'teal',None),(T['via_balance'],'green',58)]
+        from core.model import ViabiliteColonne, ViabilitePalier, ViabiliteConfig
+        vc = data.viabilite  # ViabiliteConfig
 
-        def hdr(s, ck, width=None):
-            ct = _t(s, size=9, weight=ft.FontWeight.W_600, col=c(ck), align=ft.TextAlign.RIGHT)
-            return ft.Container(ct, width=width) if width else ft.Container(ct, expand=True)
+        # ── Section config colonnes ──
+        col_rows = []
+        for ci, col_def in enumerate(vc.colonnes):
+            def upd_cname(e, ci=ci):
+                vc.colonnes[ci].name = e.control.value; on_save()
+            def upd_ctype(e, ci=ci):
+                vc.colonnes[ci].delta_type = 'pct' if vc.colonnes[ci].delta_type == 'fixed' else 'fixed'
+                on_save(); rebuild()
+            def del_col(e, ci=ci):
+                vc.colonnes.pop(ci)
+                for p in vc.paliers:
+                    if ci < len(p.valeurs): p.valeurs.pop(ci)
+                on_save(); rebuild()
+            def toggle_income(e, ci=ci):
+                vc.colonnes[ci].is_income = not vc.colonnes[ci].is_income
+                on_save(); rebuild()
 
-        header = ft.Row(
-            [hdr(s, ck, w) for s, ck, w in COLS] + [ft.Container(width=28)],
-            spacing=4,
+            income_btn = ft.Container(
+                _t('+' if col_def.is_income else '−', size=12,
+                   weight=ft.FontWeight.W_700,
+                   col=c('teal') if col_def.is_income else c('danger')),
+                width=24, height=24,
+                border=B.all(1, c('teal') if col_def.is_income else c('danger')),
+                border_radius=4,
+                alignment=ft.Alignment(0, 0),
+                on_click=toggle_income, ink=True,
+            )
+            type_btn = ft.Container(
+                _t('%' if col_def.delta_type == 'pct' else '+',
+                   size=11, weight=ft.FontWeight.W_700, col=c('gold')),
+                width=24, height=24,
+                border=B.all(1, c('gold')), border_radius=4,
+                alignment=ft.Alignment(0, 0),
+                on_click=upd_ctype, ink=True,
+            )
+
+            def upd_cvaleur(e, ci=ci):
+                try: vc.colonnes[ci].valeur = float(e.control.value.replace(',','.') or '0'); on_save()
+                except ValueError: pass
+            def upd_cdelta(e, ci=ci):
+                try: vc.colonnes[ci].delta_val = float(e.control.value.replace(',','.') or '0'); on_save()
+                except ValueError: pass
+
+            col_rows.append(ft.Row([
+                income_btn,
+                _tf(col_def.name, on_blur=upd_cname, expand=True, col=c('text'), c=c),
+                _tf(fmt(col_def.valeur), on_blur=upd_cvaleur, num=True,
+                    width=80, col=c('teal') if col_def.is_income else c('text2'),
+                    hint='Base', c=c),
+                type_btn,
+                _tf(fmt(col_def.delta_val), on_blur=upd_cdelta, num=True,
+                    width=64, col=c('gold'),
+                    hint='%' if col_def.delta_type == 'pct' else '+', c=c),
+                _del_btn(del_col, c),
+            ], spacing=6, vertical_alignment=ft.CrossAxisAlignment.CENTER))
+
+        def add_col(e):
+            vc.colonnes.append(ViabiliteColonne('Nouveau', 0, False, 'fixed', 0))
+            for p in vc.paliers:
+                p.valeurs.append(0.0)
+            on_save(); rebuild()
+
+        config_card = ft.Container(
+            ft.Column([
+                ft.Row([
+                    _t(T.get('via_columns', 'Colonnes'), size=12,
+                       weight=ft.FontWeight.W_600, col=c('text2'), expand=True),
+                    _t(T.get('via_income_legend', '+revenu / −charge'), size=9, col=c('text3')),
+                ]),
+                ft.Divider(height=1, color=c('card_border')),
+                *col_rows,
+                _add_btn(T.get('via_add_col', '+ Colonne'), add_col, c),
+            ], spacing=6),
+            padding=14, bgcolor=c('card'),
+            border=B.all(1, c('card_border')), border_radius=10,
         )
-        rows = [header, ft.Divider(height=1, color=c('card_border'))]
 
-        for vi, v in enumerate(data.viabilite):
-            charges = v.loyer + v.assurance + v.fraisMin + v.impotM - v.subside
-            solde   = v.salaire - charges
-            sc      = 'green' if solde >= 0 else 'danger'
+        # ── Générateur ──
+        def upd_npal(e):
+            try: vc.n_paliers = max(1, int(e.control.value.replace(',','.') or '1')); on_save()
+            except ValueError: pass
 
-            def upd(field, vi=vi):
-                def _h(e):
+        def generate(e):
+            if not vc.paliers:
+                on_toast(T.get('via_need_first', 'Ajoutez un palier de base dabord')); return
+            last = vc.paliers[-1]
+            for _ in range(vc.n_paliers):
+                new_vals = []
+                # passe 1 : calculer les colonnes non-pct
+                for ci, col_def in enumerate(vc.colonnes):
+                    prev = last.valeurs[ci] if ci < len(last.valeurs) else 0.0
+                    if col_def.delta_type == 'pct':
+                        new_vals.append(None)  # placeholder
+                    else:
+                        new_vals.append(_next_val(prev, 'fixed', col_def.delta_val))
+                # passe 2 : colonnes pct = delta_val% de la première colonne income du nouveau palier
+                income_new = next((new_vals[ci] for ci, cd in enumerate(vc.colonnes)
+                                   if cd.is_income and new_vals[ci] is not None), 0)
+                for ci, col_def in enumerate(vc.colonnes):
+                    if new_vals[ci] is None:
+                        new_vals[ci] = round(income_new * col_def.delta_val / 100, 2)
+                new_p = ViabilitePalier(valeurs=new_vals)
+                vc.paliers.append(new_p)
+                last = new_p
+            on_save(); rebuild()
+
+        n_field = ft.TextField(
+            value=str(vc.n_paliers), width=60, height=34, text_size=12,
+            text_align=ft.TextAlign.CENTER,
+            bgcolor='transparent', border_color=c('card_border'),
+            focused_border_color=c('gold'),
+            content_padding=P.symmetric(horizontal=6, vertical=2),
+            keyboard_type=ft.KeyboardType.NUMBER,
+            on_blur=upd_npal,
+        )
+        gen_card = ft.Container(
+            ft.Row([
+                _t(T.get('via_generate', 'Générer'), size=12,
+                   weight=ft.FontWeight.W_600, col=c('text2'), expand=True),
+                n_field,
+                _t(T.get('via_paliers', 'paliers'), size=11, col=c('text3')),
+                ft.ElevatedButton(
+                    T.get('via_gen_btn', '▶ Go'), height=34,
+                    on_click=generate,
+                    style=ft.ButtonStyle(
+                        bgcolor=c('teal'), color='#1a1a1a',
+                        shape=ft.RoundedRectangleBorder(radius=8),
+                        padding=P.symmetric(horizontal=14),
+                    ),
+                ),
+            ], spacing=8, vertical_alignment=ft.CrossAxisAlignment.CENTER),
+            padding=14, bgcolor=c('card'),
+            border=B.all(1, c('card_border')), border_radius=10,
+        )
+
+        # ── Tableau des paliers ──
+        def hdr(s, ck='text3'):
+            return ft.Container(
+                _t(s, size=9, weight=ft.FontWeight.W_600, col=c(ck),
+                   align=ft.TextAlign.RIGHT),
+                expand=True,
+            )
+
+        header_cells = [hdr(cd.name, 'teal' if cd.is_income else 'text3')
+                        for cd in vc.colonnes]
+        header_cells += [hdr(T.get('via_balance', 'Solde'), 'green'),
+                         ft.Container(width=28)]
+        rows = [ft.Row(header_cells, spacing=4),
+                ft.Divider(height=1, color=c('card_border'))]
+
+        for pi, palier in enumerate(vc.paliers):
+            solde = _compute_solde(vc, palier)
+            sc    = 'green' if solde >= 0 else 'danger'
+
+            def upd_val(e, pi=pi, ci_=None):
+                # ci_ capturé dans la closure ci-dessous
+                try:
+                    vc.paliers[pi].valeurs[ci_] = float(e.control.value.replace(',','.') or '0')
+                    on_save(); rebuild()
+                except ValueError: pass
+
+            def del_p(e, pi=pi):
+                vc.paliers.pop(pi); on_save(); rebuild()
+
+            cells = []
+            for ci, col_def in enumerate(vc.colonnes):
+                v = palier.valeurs[ci] if ci < len(palier.valeurs) else 0.0
+                def _upd(e, pi=pi, ci=ci):
                     try:
-                        setattr(data.viabilite[vi], field, float(e.control.value.replace(',','.') or '0'))
+                        vc.paliers[pi].valeurs[ci] = float(e.control.value.replace(',','.') or '0')
                         on_save(); rebuild()
                     except ValueError: pass
-                return _h
+                ck = 'teal' if col_def.is_income else 'text2'
+                cells.append(ft.Container(
+                    ft.TextField(
+                        value=fmt(v), text_size=10, text_align=ft.TextAlign.RIGHT,
+                        color=c(ck), bgcolor='transparent', border_color='transparent',
+                        focused_border_color=c('gold'),
+                        content_padding=P.symmetric(horizontal=4, vertical=4),
+                        keyboard_type=ft.KeyboardType.NUMBER, on_blur=_upd,
+                    ), expand=True,
+                ))
 
-            def del_v(e, vi=vi):
-                data.viabilite.pop(vi); on_save(); rebuild()
+            cells.append(ft.Container(
+                _t(fmt(solde), size=11, weight=ft.FontWeight.W_700,
+                   col=c(sc), align=ft.TextAlign.RIGHT),
+                expand=True,
+            ))
+            cells.append(_del_btn(del_p, c))
+            rows.append(ft.Row(cells, spacing=4))
 
-            def cell(val, field, width=None, ck='text2'):
-                tf = ft.TextField(
-                    value=fmt(val), text_size=10, text_align=ft.TextAlign.RIGHT,
-                    color=c(ck), bgcolor='transparent', border_color='transparent',
-                    focused_border_color=c('gold'),
-                    content_padding=P.symmetric(horizontal=4, vertical=4),
-                    keyboard_type=ft.KeyboardType.NUMBER, on_blur=upd(field),
-                )
-                return ft.Container(tf, width=width) if width else ft.Container(tf, expand=True)
-
-            rows.append(ft.Row([
-                cell(v.salaire,   'salaire',   60,   'gold'),
-                cell(v.loyer,     'loyer',     None, 'text2'),
-                cell(v.assurance, 'assurance', None, 'text2'),
-                cell(v.fraisMin,  'fraisMin',  None, 'text2'),
-                cell(v.impotM,    'impotM',    None, 'text2'),
-                cell(v.subside,   'subside',   None, 'teal'),
-                ft.Container(_t(fmt(solde), size=11, weight=ft.FontWeight.W_700,
-                                 col=c(sc), align=ft.TextAlign.RIGHT), width=58),
-                _del_btn(del_v, c),
-            ], spacing=4))
-
-        def add_palier(e):
-            from core.model import ViabilitePalier
-            last = data.viabilite[-1] if data.viabilite else None
-            s = (last.salaire + 500) if last else 3000
-            ass = 520 if s <= 6000 else 495 if s <= 7000 else 444
-            data.viabilite.append(ViabilitePalier(s, 1412, ass, 500, round(s*0.125), 0))
+        def add_first(e):
+            # Pour les colonnes en %, calcule la valeur de base depuis la première colonne revenu
+            income_base = next((cd.valeur for cd in vc.colonnes if cd.is_income), 0)
+            vals = []
+            for cd in vc.colonnes:
+                if cd.delta_type == 'pct' and not cd.is_income:
+                    vals.append(round(income_base * cd.delta_val / 100, 2))
+                else:
+                    vals.append(cd.valeur)
+            vc.paliers.append(ViabilitePalier(valeurs=vals))
             on_save(); rebuild()
+
+        table_card = ft.Container(
+            ft.Column(rows, spacing=2), padding=12,
+            bgcolor=c('card'), border=B.all(1, c('card_border')), border_radius=10,
+        ) if vc.paliers else ft.Container(
+            _t(T.get('via_empty', 'Aucun palier — ajoutez le premier ci-dessous.'),
+               size=11, col=c('text3')),
+            padding=14,
+        )
 
         return [
             _t(T['via_title'], size=20, weight=ft.FontWeight.W_700,
                family='Playfair Display', col=c('text')),
-            _t(T['via_subtitle'], size=12, col=c('text2')),
-            ft.Container(ft.Column(rows, spacing=2), padding=12,
-                         bgcolor=c('card'), border=B.all(1, c('card_border')), border_radius=10),
-            _add_btn(T['via_add'], add_palier, c),
+            config_card,
+            gen_card,
+            table_card,
+            _add_btn(T['via_add'], add_first, c),
             ft.Container(height=40),
         ]
 

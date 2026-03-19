@@ -117,8 +117,6 @@ class Dette:
     soldeOk: float = 0
     etat: str = ''
     date: str = ''
-    ref: str = ''
-    note: str = ''
 
     def to_dict(self): return self.__dict__.copy()
 
@@ -166,16 +164,74 @@ class FraisLine:
 
 
 @dataclass
-class ViabilitePalier:
-    salaire: float = 3000
-    loyer: float = 1412
-    assurance: float = 444
-    fraisMin: float = 500
-    impotM: float = 0
-    subside: float = 0
+class ViabiliteColonne:
+    """Définition d'une colonne : nom, valeur de base, delta_type, delta_val, couleur."""
+    name: str = ''
+    valeur: float = 0.0
+    is_income: bool = False   # True = revenu, False = charge
+    delta_type: str = 'fixed' # 'fixed' | 'pct'
+    delta_val: float = 0.0
+
     def to_dict(self): return self.__dict__.copy()
     @staticmethod
-    def from_dict(d): return ViabilitePalier(**{k: float(d.get(k,0)) for k in ViabilitePalier().__dict__})
+    def from_dict(d):
+        return ViabiliteColonne(
+            name=d.get('name',''),
+            valeur=float(d.get('valeur',0)),
+            is_income=bool(d.get('is_income',False)),
+            delta_type=d.get('delta_type','fixed'),
+            delta_val=float(d.get('delta_val',0)),
+        )
+
+@dataclass
+class ViabilitePalier:
+    """Un palier = liste de valeurs dans l'ordre des colonnes de ViabiliteConfig."""
+    valeurs: List[float] = field(default_factory=list)
+
+    def to_dict(self): return {'valeurs': self.valeurs}
+    @staticmethod
+    def from_dict(d):
+        # compat ancien format (champs nommés)
+        if 'valeurs' in d:
+            return ViabilitePalier(valeurs=[float(x) for x in d['valeurs']])
+        # migration depuis ancien modèle
+        return ViabilitePalier(valeurs=[
+            float(d.get('salaire',0)), float(d.get('loyer',0)),
+            float(d.get('assurance',0)), float(d.get('fraisMin',0)),
+            float(d.get('impotM',0)), float(d.get('subside',0)),
+        ])
+
+@dataclass
+class ViabiliteConfig:
+    """Config globale : colonnes + paliers générés."""
+    colonnes: List[ViabiliteColonne] = field(default_factory=list)
+    paliers:  List[ViabilitePalier]  = field(default_factory=list)
+    n_paliers: int = 5
+
+    def to_dict(self):
+        return {
+            'colonnes':  [c.to_dict() for c in self.colonnes],
+            'paliers':   [p.to_dict() for p in self.paliers],
+            'n_paliers': self.n_paliers,
+        }
+    @staticmethod
+    def from_dict(d):
+        return ViabiliteConfig(
+            colonnes=[ViabiliteColonne.from_dict(c) for c in d.get('colonnes',[])],
+            paliers =[ViabilitePalier.from_dict(p)  for p in d.get('paliers', [])],
+            n_paliers=int(d.get('n_paliers', 5)),
+        )
+
+def default_viabilite_config() -> ViabiliteConfig:
+    cols = [
+        ViabiliteColonne('Salaire',   3000, is_income=True,  delta_type='fixed', delta_val=500),
+        ViabiliteColonne('Loyer',     1412, is_income=False, delta_type='fixed', delta_val=0),
+        ViabiliteColonne('Assurance',  444, is_income=False, delta_type='fixed', delta_val=0),
+        ViabiliteColonne('Frais',      500, is_income=False, delta_type='fixed', delta_val=0),
+        ViabiliteColonne('Impôt',        0, is_income=False, delta_type='pct',   delta_val=12.5),
+        ViabiliteColonne('Subside',      0, is_income=True,  delta_type='fixed', delta_val=0),
+    ]
+    return ViabiliteConfig(colonnes=cols, paliers=[], n_paliers=5)
 
 
 # ─── Root data ────────────────────────────────────────────────────────────────
@@ -186,7 +242,7 @@ class AppData:
     dettes: List[Dette] = field(default_factory=list)
     epargne: dict = field(default_factory=dict)
     frais: dict = field(default_factory=dict)
-    viabilite: List[ViabilitePalier] = field(default_factory=list)
+    viabilite: 'ViabiliteConfig' = field(default_factory=lambda: ViabiliteConfig())
 
     def to_dict(self):
         ep = {
@@ -207,7 +263,7 @@ class AppData:
             'dettes': [d.to_dict() for d in self.dettes],
             'epargne': ep,
             'frais': fr,
-            'viabilite': [v.to_dict() for v in self.viabilite],
+            'viabilite': self.viabilite.to_dict(),
         }
 
     @staticmethod
@@ -235,7 +291,15 @@ class AppData:
             'ponctuels': [FraisLine.from_dict(x) for x in fr_raw.get('ponctuels', [])],
             'retraits':  [FraisLine.from_dict(x) for x in fr_raw.get('retraits', [])],
         }
-        viabilite = [ViabilitePalier.from_dict(x) for x in d.get('viabilite', [])]
+        via_raw = d.get('viabilite', {})
+        if isinstance(via_raw, list):
+            # migration ancien format
+            from .model import default_viabilite_config
+            vc = default_viabilite_config()
+            vc.paliers = [ViabilitePalier.from_dict(x) for x in via_raw]
+        else:
+            vc = ViabiliteConfig.from_dict(via_raw)
+        viabilite = vc
         return AppData(months=months, dettes=dettes, epargne=epargne, frais=frais, viabilite=viabilite)
 
     def to_json(self) -> str:
@@ -267,7 +331,7 @@ def default_data() -> AppData:
     d.dettes    = []
     d.frais     = {'fixes': [], 'ponctuels': [], 'retraits': []}
     d.epargne   = {'sondages': [], 'wishlists': [], 'pc_legacy': [], 'savings': []}
-    d.viabilite = []
+    d.viabilite = default_viabilite_config()
     return d
 
 

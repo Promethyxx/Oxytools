@@ -149,6 +149,15 @@ _EN = {
     'via_subsidy':      'Subsidy',
     'via_balance':      'Balance',
     'via_add':          'Add a bracket',
+    'via_columns':      'Columns',
+    'via_income_legend':'+ income / − expense',
+    'via_add_col':      '+ Column',
+    'via_generate':     'Generate',
+    'via_paliers':      'brackets',
+    'via_gen_btn':      '▶ Go',
+    'via_need_first':   'Add a base bracket first',
+    'via_empty':        'No brackets yet — add the first one below.',
+    'exp_add_line':     'Add a line',
 
     # ── Config ──
     'cfg_title':        'Configuration',
@@ -357,7 +366,16 @@ _FR = {
     'via_tax':          'Impôt',
     'via_subsidy':      'Subside',
     'via_balance':      'Solde',
-    'via_add':          'Ajouter un palier',
+    'via_add':          'Ajouter un palier de base',
+    'via_columns':      'Colonnes',
+    'via_income_legend':'+ revenu / − charge',
+    'via_add_col':      '+ Colonne',
+    'via_generate':     'Générer',
+    'via_paliers':      'paliers',
+    'via_gen_btn':      '▶ Go',
+    'via_need_first':   'Ajoutez un palier de base dabord',
+    'via_empty':        'Aucun palier — ajoutez le premier ci-dessous.',
+    'exp_add_line':     'Ajouter une ligne',
 
     # ── Config ──
     'cfg_title':        'Configuration',
