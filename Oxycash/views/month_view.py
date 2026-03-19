@@ -120,7 +120,7 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
         dep_cash   = sum(l.cash   for l in all_dep)
 
         # Payé
-        paye_banque = sum(l.etat() for l in all_dep if l.banque > 0.01) + ret_retire
+        paye_banque = sum(l.etat() for l in all_dep if l.banque > 0.01)
         paye_cash   = sum(l.etat() for l in all_dep if l.cash   > 0.01)
         paye_total  = paye_banque + paye_cash
 
@@ -131,12 +131,12 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
 
         # Prévision (si tout payé)
         prev_banque = rev_banque - dep_banque - ret_a_retirer
-        prev_cash   = ret_a_retirer - dep_cash
+        prev_cash   = rev_cash + ret_a_retirer - dep_cash
         prev_total  = prev_banque + prev_cash
 
         # Solde réel
-        solde_banque = rev_recu_b - paye_banque
-        solde_cash   = ret_retire  - paye_cash
+        solde_banque = rev_recu_b - paye_banque - ret_retire
+        solde_cash   = ret_retire + rev_recu_c - paye_cash
         solde_total  = solde_banque + solde_cash
 
         def cc(n): return 'green' if n > 0.01 else ('danger' if n < -0.01 else 'text')
@@ -155,7 +155,7 @@ def build_month_view(month_key, month: Month, t, on_save: Callable, on_toast: Ca
             rows.append(ft.Container(
                 ft.Row([
                     txt('Total', size=11, weight=ft.FontWeight.W_600, col='text2'),
-                    txt(fmt(total_val) if not big else fmt_sign(total_val),
+                    txt(fmt(total_val),
                         size=total_size, weight=total_w, col=total_col,
                         align=ft.TextAlign.RIGHT, family='Playfair Display' if big else 'DM Sans'),
                 ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
