@@ -49,6 +49,7 @@ def build_charts_view(data: AppData, t, currency: str) -> ft.Column:
         dep_cash   = sum(l.cash   for l in all_dep)
 
         rev_recu_b = sum(l.etat() for l in m.revenus if l.banque > 0.01)
+        rev_recu_c = sum(l.etat() for l in m.revenus if l.cash   > 0.01)
         paye_banque = sum(l.etat() for l in all_dep if l.banque > 0.01) + ret_retire
         paye_cash   = sum(l.etat() for l in all_dep if l.cash > 0.01)
         paye_total  = paye_banque + paye_cash
@@ -57,11 +58,11 @@ def build_charts_view(data: AppData, t, currency: str) -> ft.Column:
         a_payer_c = dep_cash - sum(l.etat() for l in all_dep if l.cash > 0.01)
 
         prev_banque = rev_banque - dep_banque - ret_a_retirer
-        prev_cash   = ret_a_retirer - dep_cash
+        prev_cash   = rev_cash + ret_a_retirer - dep_cash
         prev_total  = prev_banque + prev_cash
 
         solde_banque = rev_recu_b - paye_banque
-        solde_cash   = ret_retire - paye_cash
+        solde_cash   = ret_retire + rev_recu_c - paye_cash
         solde_total  = solde_banque + solde_cash
 
         tot_rev     += rev_total
@@ -73,7 +74,7 @@ def build_charts_view(data: AppData, t, currency: str) -> ft.Column:
 
         month_rows.append({
             'rev': rev_total,
-            'dep': dep_banque + dep_cash + ret_a_retirer,
+            'dep': dep_banque + dep_cash,
             'prev': prev_total,
         })
 

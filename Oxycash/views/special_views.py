@@ -599,13 +599,12 @@ def build_viabilite_view(data: AppData, t, on_save, on_toast, on_reload=None):
                 vc.colonnes[ci].is_income = not vc.colonnes[ci].is_income
                 on_save(); rebuild()
 
-            # ── bouton Actuel / Augmentation ──
-            inc_lbl = T.get('via_income_lbl', 'Actuel') if col_def.is_income else T.get('via_charge_lbl', 'Augm.')
+            # ── bouton +/− (is_income) ──
             income_btn = ft.Container(
-                _t(inc_lbl, size=9, weight=ft.FontWeight.W_700,
-                   col=c('teal') if col_def.is_income else c('danger'),
-                   align=ft.TextAlign.CENTER),
-                width=52, height=28,
+                _t('+' if col_def.is_income else '−', size=12,
+                   weight=ft.FontWeight.W_700,
+                   col=c('teal') if col_def.is_income else c('danger')),
+                width=24, height=24,
                 border=B.all(1, c('teal') if col_def.is_income else c('danger')),
                 border_radius=4,
                 alignment=ft.Alignment(0, 0),
@@ -649,16 +648,30 @@ def build_viabilite_view(data: AppData, t, on_save, on_toast, on_reload=None):
                 on_click=toggle_valeur_type, ink=True,
             )
 
-            # Champ valeur : cliquable pour ouvrir panneau si valeur_type='pct'
             valeur_hint = '%' if vtype_is_pct else (T.get('via_income_lbl', 'Actuel') if col_def.is_income else T.get('via_charge_lbl', 'Augm.'))
-            valeur_field = _tf(fmt(col_def.valeur), on_blur=upd_cvaleur, num=True,
-                               width=80, col=c('teal') if col_def.is_income else c('text2'),
-                               hint=valeur_hint, c=c)
+
             if vtype_is_pct:
-                valeur_field = ft.GestureDetector(
-                    content=valeur_field,
-                    on_tap=lambda e, ci=ci: open_val_panel(e, ci),
+                def make_focus(ci=ci):
+                    def _h(e, ci=ci):
+                        if ci not in vc._val_open:
+                            vc._val_open.add(ci)
+                            rebuild()
+                    return _h
+                valeur_field = ft.TextField(
+                    value=fmt(col_def.valeur), text_size=12,
+                    color=c('teal') if col_def.is_income else c('text2'),
+                    bgcolor='transparent', border_color=c('card_border'),
+                    focused_border_color=c('gold'),
+                    content_padding=P.symmetric(horizontal=8, vertical=6),
+                    hint_text=valeur_hint, width=80,
+                    keyboard_type=ft.KeyboardType.NUMBER,
+                    on_blur=upd_cvaleur,
+                    on_focus=make_focus(ci),
                 )
+            else:
+                valeur_field = _tf(fmt(col_def.valeur), on_blur=upd_cvaleur, num=True,
+                                   width=80, col=c('teal') if col_def.is_income else c('text2'),
+                                   hint=valeur_hint, c=c)
 
             # ── bouton delta +/% (type d'augmentation) — toujours bascule ──
             def make_type_click(ci=ci):
