@@ -1,10 +1,2 @@
-Oxywall/.env
-Oxy_Wall/.env
-"C:\Users\peter\Documents\GitHub\Oxytools\Oxy_Wall\wallpapers"
-/Oxy_Wall/wallpapers
-Oxycash/.oxycash/
-Oxycash/build/
-Oxycash/core/__pycache__/
-Oxywatch/target/
-
-Oxycash/views/__pycache__/
+**/build/
+**/target/
