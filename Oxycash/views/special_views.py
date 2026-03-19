@@ -571,60 +571,175 @@ def build_viabilite_view(data: AppData, t, on_save, on_toast, on_reload=None):
         vc = data.viabilite  # ViabiliteConfig
 
         # ── Section config colonnes ──
+        # pct_bases : dict ci -> liste de ci-income servant de base (stocké sur vc)
+        if not hasattr(vc, 'pct_bases') or not isinstance(getattr(vc, 'pct_bases', None), dict):
+            vc.pct_bases = {}
+
         col_rows = []
+        # Pour le panneau de sélection de base % : on garde une ref au container expandable par colonne
+        pct_panels = {}  # ci -> ft.Column (le sous-panneau)
+
+        income_cols = [(ci, cd) for ci, cd in enumerate(vc.colonnes) if cd.is_income]
+
         for ci, col_def in enumerate(vc.colonnes):
             def upd_cname(e, ci=ci):
                 vc.colonnes[ci].name = e.control.value; on_save()
             def upd_ctype(e, ci=ci):
-                vc.colonnes[ci].delta_type = 'pct' if vc.colonnes[ci].delta_type == 'fixed' else 'fixed'
+                was_pct = vc.colonnes[ci].delta_type == 'pct'
+                vc.colonnes[ci].delta_type = 'fixed' if was_pct else 'pct'
                 on_save(); rebuild()
             def del_col(e, ci=ci):
                 vc.colonnes.pop(ci)
                 for p in vc.paliers:
                     if ci < len(p.valeurs): p.valeurs.pop(ci)
+                # nettoyer pct_bases
+                vc.pct_bases.pop(str(ci), None)
                 on_save(); rebuild()
             def toggle_income(e, ci=ci):
                 vc.colonnes[ci].is_income = not vc.colonnes[ci].is_income
                 on_save(); rebuild()
 
+            # ── bouton Actuel / Augmentation ──
+            inc_lbl = T.get('via_income_lbl', 'Actuel') if col_def.is_income else T.get('via_charge_lbl', 'Augm.')
             income_btn = ft.Container(
-                _t('+' if col_def.is_income else '−', size=12,
-                   weight=ft.FontWeight.W_700,
-                   col=c('teal') if col_def.is_income else c('danger')),
-                width=24, height=24,
+                _t(inc_lbl, size=9, weight=ft.FontWeight.W_700,
+                   col=c('teal') if col_def.is_income else c('danger'),
+                   align=ft.TextAlign.CENTER),
+                width=52, height=28,
                 border=B.all(1, c('teal') if col_def.is_income else c('danger')),
                 border_radius=4,
                 alignment=ft.Alignment(0, 0),
                 on_click=toggle_income, ink=True,
             )
+
+            # ── bouton +/% devant le 1er champ (valeur_type : montant fixe ou % d'une base) ──
+            if not hasattr(col_def, 'valeur_type'):
+                col_def.valeur_type = 'fixed'
+
+            def upd_cvaleur(e, ci=ci):
+                try: vc.colonnes[ci].valeur = float(e.control.value.replace(',','.') or '0'); on_save()
+                except ValueError: pass
+
+            def toggle_valeur_type(e, ci=ci):
+                cd = vc.colonnes[ci]
+                if not hasattr(cd, 'valeur_type'): cd.valeur_type = 'fixed'
+                cd.valeur_type = 'pct' if cd.valeur_type == 'fixed' else 'fixed'
+                on_save(); rebuild()
+
+            # Clic sur le champ valeur en mode % : ouvre/ferme sous-panneau bases
+            if not hasattr(vc, '_val_open'):
+                vc._val_open = set()
+
+            def open_val_panel(e, ci=ci):
+                if ci in vc._val_open:
+                    vc._val_open.discard(ci)
+                else:
+                    vc._val_open.add(ci)
+                rebuild()
+
+            vtype_is_pct = getattr(col_def, 'valeur_type', 'fixed') == 'pct'
+            valeur_type_btn = ft.Container(
+                _t('%' if vtype_is_pct else '+', size=11, weight=ft.FontWeight.W_700,
+                   col=c('gold') if vtype_is_pct else c('text3'),
+                   align=ft.TextAlign.CENTER),
+                width=24, height=24,
+                border=B.all(1, c('gold') if vtype_is_pct else c('card_border')),
+                border_radius=4,
+                alignment=ft.Alignment(0, 0),
+                on_click=toggle_valeur_type, ink=True,
+            )
+
+            # Champ valeur : cliquable pour ouvrir panneau si valeur_type='pct'
+            valeur_hint = '%' if vtype_is_pct else (T.get('via_income_lbl', 'Actuel') if col_def.is_income else T.get('via_charge_lbl', 'Augm.'))
+            valeur_field = _tf(fmt(col_def.valeur), on_blur=upd_cvaleur, num=True,
+                               width=80, col=c('teal') if col_def.is_income else c('text2'),
+                               hint=valeur_hint, c=c)
+            if vtype_is_pct:
+                valeur_field = ft.GestureDetector(
+                    content=valeur_field,
+                    on_tap=lambda e, ci=ci: open_val_panel(e, ci),
+                )
+
+            # ── bouton delta +/% (type d'augmentation) — toujours bascule ──
+            def make_type_click(ci=ci):
+                def _h(e, ci=ci):
+                    vc.colonnes[ci].delta_type = 'fixed' if vc.colonnes[ci].delta_type == 'pct' else 'pct'
+                    on_save(); rebuild()
+                return _h
+
+            delta_hint = '%' if col_def.delta_type == 'pct' else '+'
             type_btn = ft.Container(
                 _t('%' if col_def.delta_type == 'pct' else '+',
                    size=11, weight=ft.FontWeight.W_700, col=c('gold')),
                 width=24, height=24,
                 border=B.all(1, c('gold')), border_radius=4,
                 alignment=ft.Alignment(0, 0),
-                on_click=upd_ctype, ink=True,
+                on_click=make_type_click(ci), ink=True,
             )
 
-            def upd_cvaleur(e, ci=ci):
-                try: vc.colonnes[ci].valeur = float(e.control.value.replace(',','.') or '0'); on_save()
-                except ValueError: pass
             def upd_cdelta(e, ci=ci):
                 try: vc.colonnes[ci].delta_val = float(e.control.value.replace(',','.') or '0'); on_save()
                 except ValueError: pass
 
-            col_rows.append(ft.Row([
+            main_row = ft.Row([
                 income_btn,
                 _tf(col_def.name, on_blur=upd_cname, expand=True, col=c('text'), c=c),
-                _tf(fmt(col_def.valeur), on_blur=upd_cvaleur, num=True,
-                    width=80, col=c('teal') if col_def.is_income else c('text2'),
-                    hint='Base', c=c),
+                valeur_type_btn,
+                valeur_field,
                 type_btn,
                 _tf(fmt(col_def.delta_val), on_blur=upd_cdelta, num=True,
-                    width=64, col=c('gold'),
-                    hint='%' if col_def.delta_type == 'pct' else '+', c=c),
+                    width=64, col=c('gold'), hint=delta_hint, c=c),
                 _del_btn(del_col, c),
-            ], spacing=6, vertical_alignment=ft.CrossAxisAlignment.CENTER))
+            ], spacing=6, vertical_alignment=ft.CrossAxisAlignment.CENTER)
+
+            # ── sous-panneau bases pour valeur_type='pct' ──
+            col_parts = [main_row]
+            if vtype_is_pct and ci in getattr(vc, '_val_open', set()):
+                bases_key = str(ci)
+                selected = set(vc.pct_bases.get(bases_key, []))
+
+                def make_toggle_base(ci=ci, bci=0):
+                    def _h(e, ci=ci, bci=bci):
+                        key = str(ci)
+                        sel = set(vc.pct_bases.get(key, []))
+                        if bci in sel: sel.discard(bci)
+                        else: sel.add(bci)
+                        vc.pct_bases[key] = list(sel)
+                        on_save(); rebuild()
+                    return _h
+
+                base_checks = []
+                for bci, bcd in income_cols:
+                    is_sel = bci in selected
+                    base_checks.append(ft.Container(
+                        ft.Row([
+                            ft.Container(
+                                _t('✓' if is_sel else '○', size=11,
+                                   col=c('gold') if is_sel else c('text3'),
+                                   weight=ft.FontWeight.W_700),
+                                width=20,
+                            ),
+                            _t(bcd.name, size=11, col=c('text2') if is_sel else c('text3')),
+                        ], spacing=6),
+                        on_click=make_toggle_base(ci, bci),
+                        ink=True,
+                        padding=P.symmetric(horizontal=8, vertical=4),
+                        border_radius=6,
+                        bgcolor=c('card_border') if is_sel else 'transparent',
+                    ))
+
+                pct_panel = ft.Container(
+                    ft.Column([
+                        _t(T.get('via_pct_base', 'Base du calcul %'), size=9,
+                           col=c('text3'), weight=ft.FontWeight.W_600),
+                        *base_checks,
+                    ], spacing=2),
+                    padding=P.only(left=48, top=4, bottom=4, right=8),
+                    border=B.only(left=BS(2, c('gold'))),
+                )
+                col_parts.append(pct_panel)
+
+            col_rows.append(ft.Column(col_parts, spacing=4))
 
         def add_col(e):
             vc.colonnes.append(ViabiliteColonne('Nouveau', 0, False, 'fixed', 0))
@@ -637,7 +752,7 @@ def build_viabilite_view(data: AppData, t, on_save, on_toast, on_reload=None):
                 ft.Row([
                     _t(T.get('via_columns', 'Colonnes'), size=12,
                        weight=ft.FontWeight.W_600, col=c('text2'), expand=True),
-                    _t(T.get('via_income_legend', '+revenu / −charge'), size=9, col=c('text3')),
+                    _t(T.get('via_income_legend', 'Actuel / Augmentation'), size=9, col=c('text3')),
                 ]),
                 ft.Divider(height=1, color=c('card_border')),
                 *col_rows,
@@ -653,28 +768,72 @@ def build_viabilite_view(data: AppData, t, on_save, on_toast, on_reload=None):
             except ValueError: pass
 
         def generate(e):
+            if not hasattr(vc, 'pct_bases') or not isinstance(getattr(vc, 'pct_bases', None), dict):
+                vc.pct_bases = {}
+
+            def _get_base_sum(ci, val_map):
+                """Somme des colonnes cochées comme base pour ci."""
+                bases = vc.pct_bases.get(str(ci), [])
+                if bases:
+                    return sum(val_map.get(bci, 0.0) for bci in bases)
+                # fallback : première colonne is_income
+                return next((val_map.get(bci, 0.0)
+                             for bci, cd in enumerate(vc.colonnes)
+                             if cd.is_income and bci != ci), 0.0)
+
+            # taux_courant : pour chaque colonne valeur_type='pct', le taux évolue palier par palier
+            # initialisé depuis cd.valeur
+            taux_courant = {ci: getattr(cd, 'valeur', 0.0)
+                            for ci, cd in enumerate(vc.colonnes)
+                            if getattr(cd, 'valeur_type', 'fixed') == 'pct'}
+
+            # ── Premier palier si vide ──
             if not vc.paliers:
-                on_toast(T.get('via_need_first', 'Ajoutez un palier de base dabord')); return
+                val_map = {}
+                # passe 1 : colonnes montant fixe
+                for bci, cd in enumerate(vc.colonnes):
+                    if getattr(cd, 'valeur_type', 'fixed') == 'fixed':
+                        val_map[bci] = cd.valeur
+                # passe 2 : colonnes taux (valeur = % des bases)
+                for bci, cd in enumerate(vc.colonnes):
+                    if getattr(cd, 'valeur_type', 'fixed') == 'pct':
+                        base = _get_base_sum(bci, val_map)
+                        val_map[bci] = round(base * taux_courant[bci] / 100, 2)
+                vc.paliers.append(ViabilitePalier(
+                    valeurs=[val_map.get(i, 0.0) for i in range(len(vc.colonnes))]))
+
+            # ── Paliers suivants ──
             last = vc.paliers[-1]
             for _ in range(vc.n_paliers):
-                new_vals = []
-                # passe 1 : calculer les colonnes non-pct
-                for ci, col_def in enumerate(vc.colonnes):
-                    prev = last.valeurs[ci] if ci < len(last.valeurs) else 0.0
-                    if col_def.delta_type == 'pct':
-                        new_vals.append(None)  # placeholder
-                    else:
-                        new_vals.append(_next_val(prev, 'fixed', col_def.delta_val))
-                # passe 2 : colonnes pct = delta_val% de la première colonne income du nouveau palier
-                income_new = next((new_vals[ci] for ci, cd in enumerate(vc.colonnes)
-                                   if cd.is_income and new_vals[ci] is not None), 0)
-                for ci, col_def in enumerate(vc.colonnes):
-                    if new_vals[ci] is None:
-                        new_vals[ci] = round(income_new * col_def.delta_val / 100, 2)
-                new_p = ViabilitePalier(valeurs=new_vals)
+                prev_map = {i: (last.valeurs[i] if i < len(last.valeurs) else 0.0)
+                            for i in range(len(vc.colonnes))}
+                new_map = {}
+
+                # passe 1 : colonnes montant fixe — delta_type='fixed' → ajoute delta_val
+                for bci, cd in enumerate(vc.colonnes):
+                    if getattr(cd, 'valeur_type', 'fixed') == 'fixed':
+                        new_map[bci] = _next_val(prev_map[bci], 'fixed', cd.delta_val)
+
+                # passe 2 : colonnes taux (valeur_type='pct')
+                # le taux évolue selon delta_type :
+                #   delta_type='fixed' → taux fixe (inchangé), montant = base_new * taux / 100
+                #   delta_type='pct'   → taux += delta_val, montant = base_new * taux / 100
+                for bci, cd in enumerate(vc.colonnes):
+                    if getattr(cd, 'valeur_type', 'fixed') == 'pct':
+                        if cd.delta_type == 'pct':
+                            taux_courant[bci] = round(taux_courant[bci] + cd.delta_val, 10)
+                        # base = nouvelles valeurs fixed déjà calculées
+                        base = _get_base_sum(bci, new_map)
+                        new_map[bci] = round(base * taux_courant[bci] / 100, 2)
+
+                new_p = ViabilitePalier(
+                    valeurs=[new_map.get(i, 0.0) for i in range(len(vc.colonnes))])
                 vc.paliers.append(new_p)
                 last = new_p
             on_save(); rebuild()
+
+        def clear_all(e):
+            vc.paliers.clear(); on_save(); rebuild()
 
         n_field = ft.TextField(
             value=str(vc.n_paliers), width=60, height=34, text_size=12,
@@ -698,6 +857,16 @@ def build_viabilite_view(data: AppData, t, on_save, on_toast, on_reload=None):
                         bgcolor=c('teal'), color='#1a1a1a',
                         shape=ft.RoundedRectangleBorder(radius=8),
                         padding=P.symmetric(horizontal=14),
+                    ),
+                ),
+                ft.ElevatedButton(
+                    T.get('via_clear_all', 'Tout supprimer'), height=34,
+                    on_click=clear_all,
+                    style=ft.ButtonStyle(
+                        bgcolor='transparent', color=c('danger'),
+                        side=ft.BorderSide(1, c('danger')),
+                        shape=ft.RoundedRectangleBorder(radius=8),
+                        padding=P.symmetric(horizontal=10),
                     ),
                 ),
             ], spacing=8, vertical_alignment=ft.CrossAxisAlignment.CENTER),
@@ -761,23 +930,12 @@ def build_viabilite_view(data: AppData, t, on_save, on_toast, on_reload=None):
             cells.append(_del_btn(del_p, c))
             rows.append(ft.Row(cells, spacing=4))
 
-        def add_first(e):
-            # Pour les colonnes en %, calcule la valeur de base depuis la première colonne revenu
-            income_base = next((cd.valeur for cd in vc.colonnes if cd.is_income), 0)
-            vals = []
-            for cd in vc.colonnes:
-                if cd.delta_type == 'pct' and not cd.is_income:
-                    vals.append(round(income_base * cd.delta_val / 100, 2))
-                else:
-                    vals.append(cd.valeur)
-            vc.paliers.append(ViabilitePalier(valeurs=vals))
-            on_save(); rebuild()
 
         table_card = ft.Container(
             ft.Column(rows, spacing=2), padding=12,
             bgcolor=c('card'), border=B.all(1, c('card_border')), border_radius=10,
         ) if vc.paliers else ft.Container(
-            _t(T.get('via_empty', 'Aucun palier — ajoutez le premier ci-dessous.'),
+            _t(T.get('via_empty', 'Aucun palier — cliquez ▶ Go pour générer.'),
                size=11, col=c('text3')),
             padding=14,
         )
@@ -788,7 +946,6 @@ def build_viabilite_view(data: AppData, t, on_save, on_toast, on_reload=None):
             config_card,
             gen_card,
             table_card,
-            _add_btn(T['via_add'], add_first, c),
             ft.Container(height=40),
         ]
 
