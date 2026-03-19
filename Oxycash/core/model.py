@@ -193,6 +193,7 @@ class AppData:
                            'items': [a.to_dict() for a in wl.get('items', [])]}
                           for wl in self.epargne.get('wishlists', [])],
             'pc_legacy': [x.to_dict() for x in self.epargne.get('pc_legacy', [])],
+            'savings':   self.epargne.get('savings', []),
         }
         fr = {
             'fixes':     [x.to_dict() for x in self.frais.get('fixes', [])],
@@ -224,6 +225,7 @@ class AppData:
             'sondages':  [EpargneSondage.from_dict(x) for x in ep_raw.get('sondages', [])],
             'wishlists': wishlists,
             'pc_legacy': [EpargnePcLegacy.from_dict(x) for x in ep_raw.get('pc_legacy', [])],
+            'savings':   ep_raw.get('savings', []),
         }
         fr_raw = d.get('frais', {})
         frais = {
@@ -262,7 +264,7 @@ def default_data() -> AppData:
 
     d.dettes    = []
     d.frais     = {'fixes': [], 'ponctuels': [], 'retraits': []}
-    d.epargne   = {'sondages': [], 'wishlists': [], 'pc_legacy': []}
+    d.epargne   = {'sondages': [], 'wishlists': [], 'pc_legacy': [], 'savings': []}
     d.viabilite = []
     return d
 
