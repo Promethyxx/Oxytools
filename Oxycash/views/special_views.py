@@ -413,7 +413,9 @@ def build_frais_view(data: AppData, t, on_save, on_toast, on_reload=None):
 
     def _build():
         def table(cat, label, col_key):
-            lines  = data.frais.get(cat, [])
+            lines  = sorted(data.frais.get(cat, []), key=lambda l: l.name.lower())
+            # réordonner la liste source aussi pour que les index soient cohérents
+            data.frais[cat] = lines
             totals = [sum(l.monthly[mi] for l in lines) for mi in range(12)]
             grand  = sum(totals)
 
