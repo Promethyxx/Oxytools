@@ -8,3 +8,7 @@
   1. Checks VLC playback status (>90% = watched)
   2. Writes the result to a text file for later tagging
 - Requirements: VLC
+
+# Roadmap
+You can find the roadmap at :
+https://github.com/Promethyxx/Roadmap
