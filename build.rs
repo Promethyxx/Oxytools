@@ -1,0 +1,8 @@
+fn main() {
+    if std::env::var("CARGO_CFG_WINDOWS").is_ok() {
+        let mut res = winres::WindowsResource::new();
+        res.set_icon("assets/Oxyon_icon.ico");
+        res.set_language(0x040c); 
+        res.compile().unwrap();
+    }
+}

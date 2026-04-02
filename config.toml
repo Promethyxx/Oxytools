@@ -1,0 +1,41 @@
+[app]
+lang = "en"
+
+[archive]
+backup_dest = 'C:\Users\peter\Downloads'
+backup_exclusions = ".git, .github, target"
+backup_source = 'C:\Users\peter\Documents\GitHub\oxyon\tests\formats'
+multi_source = 'C:\Users\peter\Documents\GitHub\Oxyon\tests'
+niveau = 1
+
+[audio]
+qualite = 9
+
+[display]
+theme = "Dark"
+
+[image]
+ratio_img = 1
+
+[performance]
+max_parallel_jobs = 16
+
+[tools]
+list_dir = 'C:\Users\peter\kDrive\Documents\Listes'
+
+[tools_files]
+Animes = 'E:\Animes'
+Docs = 'H:\Docs'
+"Docs Nat" = 'H:\Docs Nat'
+Films = 'F:\Films'
+"Films Animes" = 'E:\Films Animes'
+Reste = 'H:\Reste'
+Series = 'G:\Series'
+Shows = 'H:\Shows'
+
+[tools_folders]
+sources = ['E:\Animes', 'G:\Series', 'H:\Reste\Ebooks']
+
+[video]
+copie_flux = false
+speed = 3

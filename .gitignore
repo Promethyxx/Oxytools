@@ -1,0 +1,26 @@
+# Rust
+/target
+/bin-linux-arm
+/bin-linux-x64
+/bin-mac-arm
+**/*.rs.bk
+/vendor
+*.log
+tests/_output/
+# Archives
+*.zip
+*.7z
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# Clés sensibles
+key.envbin/
+bin/
+target/
+.env
+config.toml
+flatpak-cargo-generator.py
+cargo-sources.json
