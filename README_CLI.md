@@ -1,8 +1,8 @@
 # oxy
 
-Command-line interface for Oxyon — multimedia processing toolbox.
+Command-line interface for Oxytools — multimedia processing toolbox.
 
-`oxyon-cli` provides access to all Oxyon modules without launching the GUI. Ideal for batch scripting, task schedulers, and system administration.
+`oxyon-cli` provides access to all Oxytools modules without launching the GUI. Ideal for batch scripting, task schedulers, and system administration.
 
 All bundled tools (ffmpeg, ffprobe, mkvpropedit) are included — no external dependencies required.
 
@@ -406,9 +406,9 @@ To schedule a task, create an entry in Windows Task Scheduler:
 
 | Field | Value |
 |-------|-------|
-| Program | `C:\Oxyon\oxyon-cli.exe` |
+| Program | `C:\Oxytools\oxyon-cli.exe` |
 | Arguments | `tag marquer-vu "D:\Films\*.mkv" --lang fr` |
-| Start in | `C:\Oxyon` |
+| Start in | `C:\Oxytools` |
 
 Example scheduled tasks:
 

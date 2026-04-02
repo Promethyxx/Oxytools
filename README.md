@@ -1,13 +1,13 @@
-# Oxyon & Oxydesk & Oxy
+# Oxytools & Oxydesk & Oxy
 
-![Oxyon Logo](https://raw.githubusercontent.com/Promethyxx/Oxyon/main/assets/Oxyon_logo.png)
+![Oxytools Logo](https://raw.githubusercontent.com/Promethyxx/Oxytools/main/assets/Oxytools_logo.png)
 
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE.txt)
 [![Rust](https://img.shields.io/badge/rust-2024%20edition-orange.svg)](https://www.rust-lang.org/)
 
-## What is Oxyon?
+## What is Oxytools?
 
-Oxyon is a portable desktop toolkit that centralizes a collection of everyday multimedia scripts into a single GUI application.
+Oxytools is a portable desktop toolkit that centralizes a collection of everyday multimedia scripts into a single GUI application.
 
 Built with Rust and [egui](https://github.com/emilide/egui).
 
@@ -30,7 +30,7 @@ It's built for professional use where privacy and autonomy matter.
 
 ## What is Oxy?
 
-Oxy (`oxy`) is the command-line version of Oxyon, designed for system administrators, automation, and task scheduling.
+Oxy (`oxy`) is the command-line version of Oxytools, designed for system administrators, automation, and task scheduling.
 
 It exposes the same modules as the GUI but through a terminal interface — ideal for cron jobs (Linux/macOS) or Windows Task Scheduler.
 Same bundled binaries, same processing logic, no GUI required.
@@ -39,7 +39,7 @@ See [README_CLI.md](README_CLI.md) for full documentation and usage examples.
 
 ## Modules
 
-| Module | Oxyon | Oxydesk | Oxy |
+| Module | Oxytools | Oxydesk | Oxy |
 |--------|:-----:|:----------:|:---------:|
 | Archives (7Z, ZIP, TAR) | ✅ | ✅ | ✅ |
 | Audio (MP3, FLAC, AAC, OGG) | ✅ | ❌ | ❌ |
@@ -53,7 +53,7 @@ See [README_CLI.md](README_CLI.md) for full documentation and usage examples.
 
 ## Key differences
 
-| | Key differences | Oxyon | Oxydesk | Oxy |
+| | Key differences | Oxytools | Oxydesk | Oxy |
 |---|:---:|:---:|:---:|:---:|
 | Purpose | | Swiss army knife for multimedia | Offline document & image processing | Automation & task scheduling |
 | Interface | | GUI | GUI | Terminal |
@@ -66,7 +66,7 @@ See [README_CLI.md](README_CLI.md) for full documentation and usage examples.
 
 | | Linux ARM64 | Linux x64 | Mac ARM64 | Windows x64 |
 |---|:---:|:---:|:---:|:---:|
-| Oxyon | ✅ | ✅ | ✅ | ✅ |
+| Oxytools | ✅ | ✅ | ✅ | ✅ |
 | Oxydesk | ✅ | ✅ | ✅ | ✅ |
 | Oxy | ✅ | ✅ | ✅ | ✅ |
 
@@ -97,7 +97,7 @@ oxy --help
 ## Building from source
 
 ```bash
-# Full build (Oxyon GUI + CLI)
+# Full build (Oxytools GUI + CLI)
 cargo build --release
 
 # CLI only
@@ -126,6 +126,7 @@ https://github.com/Promethyxx/Roadmap
 
 This project is licensed under the GNU General Public License v3.0 — see Licenses.md for details.
 
-Binaries required by Oxyon
+Binaries required by Oxytools
 FFmpeg : https://ffmpeg.org — LGPLv2.1+
 mkvpropedit (MKVToolNix) : https://mkvtoolnix.download — GPLv2.
+

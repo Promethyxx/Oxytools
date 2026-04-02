@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
-/// Sous-commandes CLI d'Oxyon
+/// Sous-commandes CLI d'Oxytools
 #[derive(clap::Parser)]
-#[command(name = "oxyon-cli", version = env!("CARGO_PKG_VERSION"), about = "Oxyon CLI — multimedia processing toolbox")]
+#[command(name = "oxyon-cli", version = env!("CARGO_PKG_VERSION"), about = "Oxytools CLI — multimedia processing toolbox")]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Command,

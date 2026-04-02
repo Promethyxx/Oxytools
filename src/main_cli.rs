@@ -14,7 +14,7 @@ fn main() -> ExitCode {
     let args = Cli::parse();
     let lang_id = args.lang.as_str();
 
-    eprintln!("Oxyon CLI v{}", VERSION);
+    eprintln!("Oxytools CLI v{}", VERSION);
 
     // Extraire les binaires bundled (ffmpeg, mkvpropedit, ffprobe)
     let _ = modules::binaries::extraire_deps();

@@ -1,4 +1,4 @@
-# Oxyon > Copyright (C) 2026 Promethyxx
+# Oxytools > Copyright (C) 2026 Promethyxx
 
 # GNU GENERAL PUBLIC LICENSE
 

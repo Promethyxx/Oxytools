@@ -37,7 +37,7 @@ enum ModuleType {
     Tools,
     Settings,
 }
-struct OxyonApp {
+struct OxytoolsApp {
     #[cfg(feature = "api")]
     copie_flux: bool,
     current_files: Vec<PathBuf>,
@@ -148,7 +148,7 @@ struct OxyonApp {
         tools_new_folder: String,
         tools_result: String,
 }
-impl Default for OxyonApp {
+impl Default for OxytoolsApp {
     fn default() -> Self {
         Self {
             #[cfg(feature = "api")]
@@ -263,7 +263,7 @@ impl Default for OxyonApp {
         }
     }
 }
-impl OxyonApp {
+impl OxytoolsApp {
     fn config_dir() -> std::path::PathBuf {
         let dir = std::env::current_exe()
             .unwrap_or_default()
@@ -1019,7 +1019,7 @@ impl OxyonApp {
         });
     }
 }
-impl eframe::App for OxyonApp {
+impl eframe::App for OxytoolsApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
         let ctx = &ctx;
@@ -2370,19 +2370,19 @@ fn main() -> eframe::Result {
     let _ = modules::binaries::extraire_deps();
     let mut options = eframe::NativeOptions::default();
     #[cfg(target_os = "windows")]
-    let icon_bytes: &[u8] = include_bytes!("../assets/Oxyon_icon.ico");
+    let icon_bytes: &[u8] = include_bytes!("../assets/Oxytools_icon.ico");
     #[cfg(not(target_os = "windows"))]
-    let icon_bytes: &[u8] = include_bytes!("../assets/Oxyon_icon.png");
+    let icon_bytes: &[u8] = include_bytes!("../assets/Oxytools_icon.png");
     if let Ok(icon_data) = image::load_from_memory(icon_bytes) {
         let icon_rgba = icon_data.to_rgba8();
         let (width, height) = icon_rgba.dimensions();
         options.viewport.icon = Some(std::sync::Arc::new(egui::IconData { rgba: icon_rgba.into_raw(), width, height }));
     }
     let result = eframe::run_native(
-        &format!("Oxyon v{}", VERSION),
+        &format!("Oxytools v{}", VERSION),
         options,
         Box::new(|cc| {
-            let mut app = OxyonApp::default();
+            let mut app = OxytoolsApp::default();
             app.load_config();
             app.apply_theme(&cc.egui_ctx);
             Ok(Box::new(app))

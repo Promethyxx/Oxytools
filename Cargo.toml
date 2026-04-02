@@ -3,10 +3,10 @@ name = "oxyon"
 version = "2.0.6"
 edition = "2024"
 license = "GPL-3.0-or-later"
-default-run = "Oxyon"
+default-run = "Oxytools"
 
 [[bin]]
-name = "Oxyon"
+name = "Oxytools"
 path = "src/main.rs"
 
 [[bin]]
@@ -62,3 +62,4 @@ codegen-units = 1
 default = ["api", "bundled"]
 api = [] # No binaries
 bundled = [] #Desk version
+

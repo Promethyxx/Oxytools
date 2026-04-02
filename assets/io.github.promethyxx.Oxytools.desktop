@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Oxytools
+Exec=Oxytools
+Terminal=false
+Type=Application
+Icon=io.github.promethyxx.Oxytools
+Categories=Utility;
+Comment=Oxytools
+
