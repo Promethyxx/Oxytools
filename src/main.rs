@@ -1075,7 +1075,7 @@ impl eframe::App for OxytoolsApp {
             ctx.request_repaint();
         }
         egui::CentralPanel::default().show_inside(ui, |ui| {
-            ui.vertical_centered(|ui| ui.heading(format!("OXYON v{}", VERSION)));
+            ui.vertical_centered(|ui| ui.heading(format!("OXYTOOLS v{}", VERSION)));
             if !self.deps_manquantes.is_empty() {
                 ui.colored_label(egui::Color32::RED, self.lang.missing.replace("{}", &self.deps_manquantes.join(", ")));
             }
@@ -2366,7 +2366,7 @@ fn parse_pages_spec(spec: &str) -> Option<Vec<u32>> {
     if pages.is_empty() { None } else { Some(pages) }
 }
 fn main() -> eframe::Result {
-    log_info(&format!("=== OXYON v{} START ===", VERSION));
+    log_info(&format!("=== OXYTOOLS v{} START ===", VERSION));
     let _ = modules::binaries::extraire_deps();
     let mut options = eframe::NativeOptions::default();
     #[cfg(target_os = "windows")]
@@ -2388,7 +2388,7 @@ fn main() -> eframe::Result {
             Ok(Box::new(app))
         }),
     );
-    log_info("=== OXYON FERMETURE ===");
+    log_info("=== OXYTOOLS FERMETURE ===");
     modules::binaries::cleanup();
     result
 }
