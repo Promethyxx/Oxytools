@@ -1,4 +1,4 @@
-# Oxytools & Oxydesk & Oxy
+# Oxytools & Oxytools_Desk & Oxy
 
 ![Oxytools Logo](https://raw.githubusercontent.com/Promethyxx/Oxytools/main/assets/Oxytools_logo.png)
 
@@ -16,14 +16,14 @@ All in one place, with bundled binaries (ffmpeg, ffprobe, mkvpropedit) so there'
 
 Available in English and French.
 
-## What is Oxydesk?
+## What is Oxytools_Desk?
 
-Oxydesk was born from a real need.
+Oxytools_Desk was born from a real need.
 
 In a professional environment where tools like Adobe Acrobat Pro aren't available,
 the only option is often to upload sensitive documents to third-party websites (iLovePDF, iLoveIMG) — which never feels right.
 
-Oxydesk brings those capabilities locally: document conversion, image processing, archiving, renaming.
+Oxytools_Desk brings those capabilities locally: document conversion, image processing, archiving, renaming.
 All offline, with no external binaries, no API calls, and no data leaving your machine.
 
 It's built for professional use where privacy and autonomy matter.
@@ -39,7 +39,7 @@ See [README_CLI.md](README_CLI.md) for full documentation and usage examples.
 
 ## Modules
 
-| Module | Oxytools | Oxydesk | Oxy |
+| Module | Oxytools | Oxytools_Desk | Oxy |
 |--------|:-----:|:----------:|:---------:|
 | Archives (7Z, ZIP, TAR) | ✅ | ✅ | ✅ |
 | Audio (MP3, FLAC, AAC, OGG) | ✅ | ❌ | ❌ |
@@ -53,7 +53,7 @@ See [README_CLI.md](README_CLI.md) for full documentation and usage examples.
 
 ## Key differences
 
-| | Key differences | Oxytools | Oxydesk | Oxy |
+| | Key differences | Oxytools | Oxytools_Desk | Oxy |
 |---|:---:|:---:|:---:|:---:|
 | Purpose | | Swiss army knife for multimedia | Offline document & image processing | Automation & task scheduling |
 | Interface | | GUI | GUI | Terminal |
@@ -67,7 +67,7 @@ See [README_CLI.md](README_CLI.md) for full documentation and usage examples.
 | | Linux ARM64 | Linux x64 | Mac ARM64 | Windows x64 |
 |---|:---:|:---:|:---:|:---:|
 | Oxytools | ✅ | ✅ | ✅ | ✅ |
-| Oxydesk | ✅ | ✅ | ✅ | ✅ |
+| Oxytools_Desk | ✅ | ✅ | ✅ | ✅ |
 | Oxy | ✅ | ✅ | ✅ | ✅ |
 
 The source code is Mac ARM ready.
@@ -129,4 +129,5 @@ This project is licensed under the GNU General Public License v3.0 — see Licen
 Binaries required by Oxytools
 FFmpeg : https://ffmpeg.org — LGPLv2.1+
 mkvpropedit (MKVToolNix) : https://mkvtoolnix.download — GPLv2.
+
 
