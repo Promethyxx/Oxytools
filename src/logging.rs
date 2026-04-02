@@ -8,7 +8,7 @@ fn log_path() -> std::path::PathBuf {
         .unwrap_or(std::path::Path::new("."))
         .join("config");
     let _ = std::fs::create_dir_all(&dir);
-    dir.join("oxyon.log")
+    dir.join("oxytools.log")
 }
 
 pub fn log_entry(level: &str, message: &str) {

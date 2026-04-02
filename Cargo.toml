@@ -1,5 +1,5 @@
 [package]
-name = "oxyon"
+name = "oxytools"
 version = "2.0.6"
 edition = "2024"
 license = "GPL-3.0-or-later"
@@ -62,4 +62,5 @@ codegen-units = 1
 default = ["api", "bundled"]
 api = [] # No binaries
 bundled = [] #Desk version
+
 

@@ -2,7 +2,7 @@
 
 Command-line interface for Oxytools — multimedia processing toolbox.
 
-`oxyon-cli` provides access to all Oxytools modules without launching the GUI. Ideal for batch scripting, task schedulers, and system administration.
+`oxytools-cli` provides access to all Oxytools modules without launching the GUI. Ideal for batch scripting, task schedulers, and system administration.
 
 All bundled tools (ffmpeg, ffprobe, mkvpropedit) are included — no external dependencies required.
 
@@ -15,9 +15,9 @@ All bundled tools (ffmpeg, ffprobe, mkvpropedit) are included — no external de
 | `--version` | Show version | |
 
 ```bash
-oxyon-cli --help
-oxyon-cli pic --help
-oxyon-cli doc pdf-rotate --help
+oxytools-cli --help
+oxytools-cli pic --help
+oxytools-cli doc pdf-rotate --help
 ```
 
 ---
@@ -29,11 +29,11 @@ oxyon-cli doc pdf-rotate --help
 Convert image(s) to another format (png, jpg, webp, bmp, tiff, jxl…).
 
 ```bash
-oxyon-cli pic convert photo.png --to webp
-oxyon-cli pic convert photo.png --to jpg --quality 4
-oxyon-cli pic convert *.png --to jxl
-oxyon-cli pic convert *.png --to jxl --jxl-mode folder
-oxyon-cli pic convert *.png --to jxl --jxl-mode pivot
+oxytools-cli pic convert photo.png --to webp
+oxytools-cli pic convert photo.png --to jpg --quality 4
+oxytools-cli pic convert *.png --to jxl
+oxytools-cli pic convert *.png --to jxl --jxl-mode folder
+oxytools-cli pic convert *.png --to jxl --jxl-mode pivot
 ```
 
 | Option | Description | Default |
@@ -45,9 +45,9 @@ oxyon-cli pic convert *.png --to jxl --jxl-mode pivot
 ### Resize
 
 ```bash
-oxyon-cli pic resize photo.jpg --width 1920 --height 1080
-oxyon-cli pic resize photo.jpg --max-kb 500
-oxyon-cli pic resize photo.jpg --width 1920 --height 1080 --max-kb 500
+oxytools-cli pic resize photo.jpg --width 1920 --height 1080
+oxytools-cli pic resize photo.jpg --max-kb 500
+oxytools-cli pic resize photo.jpg --width 1920 --height 1080 --max-kb 500
 ```
 
 | Option | Description |
@@ -59,8 +59,8 @@ oxyon-cli pic resize photo.jpg --width 1920 --height 1080 --max-kb 500
 ### Rotate
 
 ```bash
-oxyon-cli pic rotate photo.jpg --angle 90
-oxyon-cli pic rotate *.jpg --angle 180
+oxytools-cli pic rotate photo.jpg --angle 90
+oxytools-cli pic rotate *.jpg --angle 180
 ```
 
 | Option | Description | Default |
@@ -72,7 +72,7 @@ oxyon-cli pic rotate *.jpg --angle 180
 Crop using percentages of the original dimensions.
 
 ```bash
-oxyon-cli pic crop photo.jpg --x 10 --y 10 --width 80 --height 80
+oxytools-cli pic crop photo.jpg --x 10 --y 10 --width 80 --height 80
 ```
 
 ### Exif
@@ -80,8 +80,8 @@ oxyon-cli pic crop photo.jpg --x 10 --y 10 --width 80 --height 80
 Read or strip EXIF metadata.
 
 ```bash
-oxyon-cli pic exif photo.jpg
-oxyon-cli pic strip-exif photo.jpg
+oxytools-cli pic exif photo.jpg
+oxytools-cli pic strip-exif photo.jpg
 ```
 
 ---
@@ -93,9 +93,9 @@ oxyon-cli pic strip-exif photo.jpg
 Convert between document formats (md, html, txt, docx, odt → pdf, md, html, txt).
 
 ```bash
-oxyon-cli doc convert rapport.md --to pdf
-oxyon-cli doc convert page.html --to md
-oxyon-cli doc convert *.txt --to pdf
+oxytools-cli doc convert rapport.md --to pdf
+oxytools-cli doc convert page.html --to md
+oxytools-cli doc convert *.txt --to pdf
 ```
 
 ### PDF Split
@@ -103,7 +103,7 @@ oxyon-cli doc convert *.txt --to pdf
 Split a PDF into individual pages.
 
 ```bash
-oxyon-cli doc pdf-split document.pdf
+oxytools-cli doc pdf-split document.pdf
 ```
 
 Output: a `document_pages/` folder with one PDF per page.
@@ -113,14 +113,14 @@ Output: a `document_pages/` folder with one PDF per page.
 Merge multiple PDFs into one.
 
 ```bash
-oxyon-cli doc pdf-merge a.pdf b.pdf c.pdf --output merged.pdf
+oxytools-cli doc pdf-merge a.pdf b.pdf c.pdf --output merged.pdf
 ```
 
 ### PDF Rotate
 
 ```bash
-oxyon-cli doc pdf-rotate document.pdf --angle 90
-oxyon-cli doc pdf-rotate document.pdf --angle 180 --pages 1,3,5
+oxytools-cli doc pdf-rotate document.pdf --angle 90
+oxytools-cli doc pdf-rotate document.pdf --angle 180 --pages 1,3,5
 ```
 
 | Option | Description | Default |
@@ -131,7 +131,7 @@ oxyon-cli doc pdf-rotate document.pdf --angle 180 --pages 1,3,5
 ### PDF Compress
 
 ```bash
-oxyon-cli doc pdf-compress document.pdf
+oxytools-cli doc pdf-compress document.pdf
 ```
 
 ### PDF Crop
@@ -139,8 +139,8 @@ oxyon-cli doc pdf-compress document.pdf
 Crop pages using percentages.
 
 ```bash
-oxyon-cli doc pdf-crop document.pdf --x 10 --y 10 --width 80 --height 80
-oxyon-cli doc pdf-crop document.pdf --x 5 --y 5 --width 90 --height 90 --pages 1,2
+oxytools-cli doc pdf-crop document.pdf --x 10 --y 10 --width 80 --height 80
+oxytools-cli doc pdf-crop document.pdf --x 5 --y 5 --width 90 --height 90 --pages 1,2
 ```
 
 ### PDF Organize
@@ -148,7 +148,7 @@ oxyon-cli doc pdf-crop document.pdf --x 5 --y 5 --width 90 --height 90 --pages 1
 Reorder pages.
 
 ```bash
-oxyon-cli doc pdf-organize document.pdf --order 3,1,2,4
+oxytools-cli doc pdf-organize document.pdf --order 3,1,2,4
 ```
 
 ### PDF Delete
@@ -156,7 +156,7 @@ oxyon-cli doc pdf-organize document.pdf --order 3,1,2,4
 Remove specific pages.
 
 ```bash
-oxyon-cli doc pdf-delete document.pdf --pages 2,5,8
+oxytools-cli doc pdf-delete document.pdf --pages 2,5,8
 ```
 
 ### PDF Number
@@ -164,8 +164,8 @@ oxyon-cli doc pdf-delete document.pdf --pages 2,5,8
 Add page numbers.
 
 ```bash
-oxyon-cli doc pdf-number document.pdf
-oxyon-cli doc pdf-number document.pdf --start 1 --position BasDroite --size 12
+oxytools-cli doc pdf-number document.pdf
+oxytools-cli doc pdf-number document.pdf --start 1 --position BasDroite --size 12
 ```
 
 | Option | Description | Default |
@@ -177,28 +177,28 @@ oxyon-cli doc pdf-number document.pdf --start 1 --position BasDroite --size 12
 ### PDF Protect
 
 ```bash
-oxyon-cli doc pdf-protect document.pdf --owner-pass secret --user-pass read123
-oxyon-cli doc pdf-protect document.pdf --owner-pass secret --user-pass read123 --allow-print false --allow-copy false
+oxytools-cli doc pdf-protect document.pdf --owner-pass secret --user-pass read123
+oxytools-cli doc pdf-protect document.pdf --owner-pass secret --user-pass read123 --allow-print false --allow-copy false
 ```
 
 ### PDF Unlock
 
 ```bash
-oxyon-cli doc pdf-unlock document.pdf --password secret
+oxytools-cli doc pdf-unlock document.pdf --password secret
 ```
 
 ### PDF Repair
 
 ```bash
-oxyon-cli doc pdf-repair document.pdf
+oxytools-cli doc pdf-repair document.pdf
 ```
 
 ### PDF Watermark
 
 ```bash
-oxyon-cli doc pdf-watermark document.pdf --text "CONFIDENTIEL"
-oxyon-cli doc pdf-watermark document.pdf --text "DRAFT" --size 80 --opacity 0.3
-oxyon-cli doc pdf-watermark document.pdf --text "DRAFT" --pages 1,2,3
+oxytools-cli doc pdf-watermark document.pdf --text "CONFIDENTIEL"
+oxytools-cli doc pdf-watermark document.pdf --text "DRAFT" --size 80 --opacity 0.3
+oxytools-cli doc pdf-watermark document.pdf --text "DRAFT" --pages 1,2,3
 ```
 
 | Option | Description | Default |
@@ -217,21 +217,21 @@ oxyon-cli doc pdf-watermark document.pdf --text "DRAFT" --pages 1,2,3
 Cumulative: increments PLAYCOUNT each time.
 
 ```bash
-oxyon-cli tag marquer-vu film.mkv --lang fr
-oxyon-cli tag marquer-vu *.mkv --lang en
+oxytools-cli tag marquer-vu film.mkv --lang fr
+oxytools-cli tag marquer-vu *.mkv --lang en
 ```
 
 ### Edit a single tag
 
 ```bash
-oxyon-cli tag edit film.mkv --tag TITLE --value "My Movie"
-oxyon-cli tag edit film.mkv --tag COMMENT --value "8.5 / 10"
+oxytools-cli tag edit film.mkv --tag TITLE --value "My Movie"
+oxytools-cli tag edit film.mkv --tag COMMENT --value "8.5 / 10"
 ```
 
 ### Inject NFO metadata
 
 ```bash
-oxyon-cli tag nfo film.mkv --nfo film.nfo
+oxytools-cli tag nfo film.mkv --nfo film.nfo
 ```
 
 ### Attach images
@@ -239,15 +239,15 @@ oxyon-cli tag nfo film.mkv --nfo film.nfo
 Looks for poster/fanart/clearlogo images next to the MKV file.
 
 ```bash
-oxyon-cli tag images film.mkv
-oxyon-cli tag images *.mkv
+oxytools-cli tag images film.mkv
+oxytools-cli tag images *.mkv
 ```
 
 ### Reset (remove all tags and attachments)
 
 ```bash
-oxyon-cli tag reset film.mkv
-oxyon-cli tag reset *.mkv
+oxytools-cli tag reset film.mkv
+oxytools-cli tag reset *.mkv
 ```
 
 ---
@@ -257,30 +257,30 @@ oxyon-cli tag reset *.mkv
 ### Find and replace
 
 ```bash
-oxyon-cli rename *.mp4 --find "S01" --replace "Saison 1"
-oxyon-cli rename *.mp4 --find "S(\d+)" --replace "Season $1" --regex
+oxytools-cli rename *.mp4 --find "S01" --replace "Saison 1"
+oxytools-cli rename *.mp4 --find "S(\d+)" --replace "Season $1" --regex
 ```
 
 ### Preview without renaming
 
 ```bash
-oxyon-cli rename *.mp4 --find "test" --replace "ok" --dry-run
+oxytools-cli rename *.mp4 --find "test" --replace "ok" --dry-run
 ```
 
 ### Case transform
 
 ```bash
-oxyon-cli rename *.txt --case lower
-oxyon-cli rename *.txt --case upper
-oxyon-cli rename *.txt --case title
-oxyon-cli rename *.txt --case sentence
+oxytools-cli rename *.txt --case lower
+oxytools-cli rename *.txt --case upper
+oxytools-cli rename *.txt --case title
+oxytools-cli rename *.txt --case sentence
 ```
 
 ### Numbering
 
 ```bash
-oxyon-cli rename *.jpg --number prefix --num-start 1 --num-pad 3 --num-sep " - "
-oxyon-cli rename *.jpg --number suffix --num-step 10
+oxytools-cli rename *.jpg --number prefix --num-start 1 --num-pad 3 --num-sep " - "
+oxytools-cli rename *.jpg --number suffix --num-step 10
 ```
 
 | Option | Description | Default |
@@ -294,10 +294,10 @@ oxyon-cli rename *.jpg --number suffix --num-step 10
 ### Extension
 
 ```bash
-oxyon-cli rename *.TXT --ext lower
-oxyon-cli rename *.txt --ext upper
-oxyon-cli rename *.jpeg --ext replace --ext-new jpg
-oxyon-cli rename *.bak --ext remove
+oxytools-cli rename *.TXT --ext lower
+oxytools-cli rename *.txt --ext upper
+oxytools-cli rename *.jpeg --ext replace --ext-new jpg
+oxytools-cli rename *.bak --ext remove
 ```
 
 ### Multiple replacements from file
@@ -305,7 +305,7 @@ oxyon-cli rename *.bak --ext remove
 Load a TSV replace list (tab-separated: find → replace).
 
 ```bash
-oxyon-cli rename *.mp4 --list rules.tsv
+oxytools-cli rename *.mp4 --list rules.tsv
 ```
 
 TSV file format:
@@ -318,8 +318,8 @@ S02	Saison 2	false	true
 ### Import Ant Renamer rules
 
 ```bash
-oxyon-cli rename *.mp4 --ant renamer.xml
-oxyon-cli rename *.mp4 --ant renamer.xml --ant-set "My Set"
+oxytools-cli rename *.mp4 --ant renamer.xml
+oxytools-cli rename *.mp4 --ant renamer.xml --ant-set "My Set"
 ```
 
 ### Combine options
@@ -327,7 +327,7 @@ oxyon-cli rename *.mp4 --ant renamer.xml --ant-set "My Set"
 All options can be combined in a single command:
 
 ```bash
-oxyon-cli rename *.mp4 --find "old" --replace "new" --case title --number prefix --num-pad 3 --ext lower --dry-run
+oxytools-cli rename *.mp4 --find "old" --replace "new" --case title --number prefix --num-pad 3 --ext lower --dry-run
 ```
 
 ---
@@ -337,9 +337,9 @@ oxyon-cli rename *.mp4 --find "old" --replace "new" --case title --number prefix
 ### Compress
 
 ```bash
-oxyon-cli archive compress "C:\my\folder" --to zip
-oxyon-cli archive compress "C:\my\folder" --to 7z --level 9
-oxyon-cli archive compress file.txt --to gz
+oxytools-cli archive compress "C:\my\folder" --to zip
+oxytools-cli archive compress "C:\my\folder" --to 7z --level 9
+oxytools-cli archive compress file.txt --to gz
 ```
 
 | Option | Description | Default |
@@ -350,8 +350,8 @@ oxyon-cli archive compress file.txt --to gz
 ### Extract
 
 ```bash
-oxyon-cli archive extract archive.zip
-oxyon-cli archive extract archive.7z --dest "C:\destination"
+oxytools-cli archive extract archive.zip
+oxytools-cli archive extract archive.7z --dest "C:\destination"
 ```
 
 ### Convert
@@ -359,7 +359,7 @@ oxyon-cli archive extract archive.7z --dest "C:\destination"
 Convert an archive to another format.
 
 ```bash
-oxyon-cli archive convert archive.zip --to 7z
+oxytools-cli archive convert archive.zip --to 7z
 ```
 
 ### Backup
@@ -367,8 +367,8 @@ oxyon-cli archive convert archive.zip --to 7z
 Create a zip backup with exclusions.
 
 ```bash
-oxyon-cli archive backup "C:\project" --dest "C:\backups"
-oxyon-cli archive backup "C:\project" --dest "C:\backups" --exclude ".git,target,node_modules"
+oxytools-cli archive backup "C:\project" --dest "C:\backups"
+oxytools-cli archive backup "C:\project" --dest "C:\backups" --exclude ".git,target,node_modules"
 ```
 
 | Option | Description | Default |
@@ -385,7 +385,7 @@ oxyon-cli archive backup "C:\project" --dest "C:\backups" --exclude ".git,target
 Generate a .txt file per source with all files listed recursively.
 
 ```bash
-oxyon-cli tools list-files --output "C:\lists" --source "movies=D:\Films" --source "series=D:\Series"
+oxytools-cli tools list-files --output "C:\lists" --source "movies=D:\Films" --source "series=D:\Series"
 ```
 
 This creates `C:\lists\movies.txt` and `C:\lists\series.txt`.
@@ -395,7 +395,7 @@ This creates `C:\lists\movies.txt` and `C:\lists\series.txt`.
 Generate `multimedia.txt` with all subfolders listed recursively.
 
 ```bash
-oxyon-cli tools list-folders --output "C:\lists" --source "D:\Films" --source "D:\Series"
+oxytools-cli tools list-folders --output "C:\lists" --source "D:\Films" --source "D:\Series"
 ```
 
 ---
@@ -406,7 +406,7 @@ To schedule a task, create an entry in Windows Task Scheduler:
 
 | Field | Value |
 |-------|-------|
-| Program | `C:\Oxytools\oxyon-cli.exe` |
+| Program | `C:\Oxytools\oxytools-cli.exe` |
 | Arguments | `tag marquer-vu "D:\Films\*.mkv" --lang fr` |
 | Start in | `C:\Oxytools` |
 
@@ -414,25 +414,25 @@ Example scheduled tasks:
 
 ```
 # Nightly: mark all MKVs as watched
-oxyon-cli tag marquer-vu "D:\Films\*.mkv" --lang fr
+oxytools-cli tag marquer-vu "D:\Films\*.mkv" --lang fr
 
 # Weekly: backup project
-oxyon-cli archive backup "C:\Dev\MyProject" --dest "E:\Backups" --exclude ".git,target"
+oxytools-cli archive backup "C:\Dev\MyProject" --dest "E:\Backups" --exclude ".git,target"
 
 # Daily: regenerate file listings
-oxyon-cli tools list-files --output "C:\Lists" --source "films=D:\Films" --source "series=D:\Series"
+oxytools-cli tools list-files --output "C:\Lists" --source "films=D:\Films" --source "series=D:\Series"
 ```
 
 ---
 
 ## Output naming
 
-By default, output files are created next to the source with `_oxyon` suffix:
+By default, output files are created next to the source with `_oxytools` suffix:
 
 ```
-photo.png → photo_oxyon.webp
-document.md → document_oxyon.pdf
-archive.zip → archive_oxyon.7z
+photo.png → photo_oxytools.webp
+document.md → document_oxytools.pdf
+archive.zip → archive_oxytools.7z
 ```
 
 Exceptions:
@@ -453,3 +453,4 @@ https://github.com/Promethyxx/Roadmap/blob/main/manifest.md
 # Roadmap
 You can find the roadmap at :
 https://github.com/Promethyxx/Roadmap
+

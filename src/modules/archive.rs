@@ -358,7 +358,7 @@ pub fn compresser_multi(parent: &Path, format_archive: &str, niveau: u32) -> (us
 
 /// Conversion : Change le format via dossier temporaire
 pub fn convertir(input: &Path, format_cible: &str) -> bool {
-    let temp_dir = std::env::temp_dir().join("oxyon_archive_conv");
+    let temp_dir = std::env::temp_dir().join("oxytools_archive_conv");
     let temp_str = temp_dir.to_string_lossy().to_string();
 
     // 1. Extraire

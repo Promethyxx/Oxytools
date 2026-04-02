@@ -685,7 +685,7 @@ fn est_pdf(path: &Path) -> bool {
 /// Convertit un fichier non-PDF en PDF temporaire (Rust pur)
 fn vers_pdf_temp(input: &Path) -> Result<String, String> {
     let tmp = std::env::temp_dir().join(format!(
-        "oxyon_tmp_{}.pdf",
+        "oxytools_tmp_{}.pdf",
         input.file_stem().unwrap_or_default().to_string_lossy()
     ));
     let tmp_str = tmp.to_str().ok_or("Chemin temp invalide")?;

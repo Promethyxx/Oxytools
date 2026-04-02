@@ -727,7 +727,7 @@ pub fn convertir_jxl_pivot(input: &Path) -> Result<(), String> {
         .map_err(|e| format!("Impossible d'ouvrir {:?} : {}", input, e))?;
 
     // Sauvegarder en PNG temporaire (format pivot propre)
-    let temp_png = std::env::temp_dir().join(format!("oxyon_pivot_{}.png", stem));
+    let temp_png = std::env::temp_dir().join(format!("oxytools_pivot_{}.png", stem));
     img.save(&temp_png)
         .map_err(|e| format!("Impossible de sauvegarder PNG pivot : {}", e))?;
 

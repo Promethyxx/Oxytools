@@ -3697,7 +3697,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "oxyon"
+name = "oxytools"
 version = "2.0.6"
 dependencies = [
  "chrono",
@@ -7300,3 +7300,4 @@ dependencies = [
  "syn",
  "winnow 0.7.15",
 ]
+

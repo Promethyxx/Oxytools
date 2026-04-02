@@ -4,7 +4,7 @@ lang = "en"
 [archive]
 backup_dest = 'C:\Users\peter\Downloads'
 backup_exclusions = ".git, .github, target"
-backup_source = 'C:\Users\peter\Documents\GitHub\oxyon\tests\formats'
+backup_source = 'C:\Users\peter\Documents\GitHub\oxytools\tests\formats'
 multi_source = 'C:\Users\peter\Documents\GitHub\Oxytools\tests'
 niveau = 1
 
@@ -39,4 +39,5 @@ sources = ['E:\Animes', 'G:\Series', 'H:\Reste\Ebooks']
 [video]
 copie_flux = false
 speed = 3
+
 

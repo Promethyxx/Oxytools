@@ -53,7 +53,7 @@ fn main() -> ExitCode {
 fn make_output(input: &Path, ext: &str) -> String {
     let parent = input.parent().unwrap_or(Path::new("."));
     let stem = input.file_stem().unwrap_or_default().to_string_lossy();
-    parent.join(format!("{}_oxyon.{}", stem, ext)).to_string_lossy().to_string()
+    parent.join(format!("{}_oxytools.{}", stem, ext)).to_string_lossy().to_string()
 }
 
 fn parse_pages(spec: &Option<String>) -> Option<Vec<u32>> {
@@ -493,3 +493,4 @@ fn run_tools(action: ToolsAction) -> Result<(), String> {
         }
     }
 }
+

@@ -92,7 +92,7 @@ pub fn save_metadata(input_path: PathBuf, data: ScrapeResult) {
     let parent_dir = input_path.parent().unwrap_or(&input_path);
 
     let mut xml = String::from("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n");
-    xml.push_str(&format!("<!--created on {} by oxyon for KODI-->\n", now));
+    xml.push_str(&format!("<!--created on {} by oxytools for KODI-->\n", now));
     xml.push_str(&format!("<{}>\n", tag));
     xml.push_str(&format!("  <title>{}</title>\n", escape_xml(&data.title)));
     xml.push_str(&format!("  <originaltitle>{}</originaltitle>\n", escape_xml(&data.original_title)));

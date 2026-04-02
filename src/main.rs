@@ -610,7 +610,7 @@ impl OxytoolsApp {
                     fmt.clone()
                 };
                 let output = input.parent().unwrap().join(format!(
-                    "{}_oxyon.{}",
+                    "{}_oxytools.{}",
                     input.file_stem().unwrap_or_default().to_string_lossy(),
                     effective_fmt
                 ));
@@ -681,7 +681,7 @@ impl OxytoolsApp {
                                 log_info(&format!("Audio: extraction | {:?}", input));
                                 let ext = modules::audio::detecter_extension(&input);
                                 let extract_out = input.parent().unwrap().join(format!(
-                                    "{}_oxyon.{}",
+                                    "{}_oxytools.{}",
                                     input.file_stem().unwrap_or_default().to_string_lossy(),
                                     if ext.is_empty() { "mka".to_string() } else { ext }
                                 ));
@@ -752,7 +752,7 @@ impl OxytoolsApp {
                             },
                             "pdf_merge" => {
                                 let paths: Vec<&Path> = pdf_merge_list.iter().map(|p| p.as_path()).collect();
-                                let output_merge = input.parent().unwrap().join("merged_oxyon.pdf");
+                                let output_merge = input.parent().unwrap().join("merged_oxytools.pdf");
                                 log_info(&format!("Doc pdf_merge: {} fichiers -> {:?}", paths.len(), output_merge));
                                 modules::doc::pdf_merge(&paths, output_merge.to_str().unwrap())
                                     .map_err(|e| format!("pdf_merge failed: {}", e))
@@ -962,7 +962,7 @@ impl OxytoolsApp {
                             },
                             "html_to_image" => {
                                 let png_out = input.parent().unwrap().join(format!(
-                                    "{}_oxyon.png",
+                                    "{}_oxytools.png",
                                     input.file_stem().unwrap_or_default().to_string_lossy()
                                 ));
                                 let png_str = png_out.to_str().unwrap().to_string();
@@ -2276,8 +2276,8 @@ impl eframe::App for OxytoolsApp {
                         if ui.button("📋 Open log file").clicked() {
                             let log_path = std::env::current_exe()
                                 .ok()
-                                .and_then(|p| p.parent().map(|d| d.join("config").join("oxyon.log")))
-                                .unwrap_or_else(|| std::path::PathBuf::from("oxyon.log"));
+                                .and_then(|p| p.parent().map(|d| d.join("config").join("oxytools.log")))
+                                .unwrap_or_else(|| std::path::PathBuf::from("oxytools.log"));
                             if log_path.exists() {
                                 let _ = open::that(&log_path);
                             } else {
@@ -2392,3 +2392,4 @@ fn main() -> eframe::Result {
     modules::binaries::cleanup();
     result
 }
+

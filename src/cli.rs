@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 /// Sous-commandes CLI d'Oxytools
 #[derive(clap::Parser)]
-#[command(name = "oxyon-cli", version = env!("CARGO_PKG_VERSION"), about = "Oxytools CLI — multimedia processing toolbox")]
+#[command(name = "oxytools-cli", version = env!("CARGO_PKG_VERSION"), about = "Oxytools CLI — multimedia processing toolbox")]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Command,
@@ -402,3 +402,4 @@ pub enum ToolsAction {
         source: Vec<String>,
     },
 }
+

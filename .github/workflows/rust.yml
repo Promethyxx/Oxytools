@@ -80,34 +80,34 @@ jobs:
 
     - name: Prepare Binary (Windows)
       if: runner.os == 'Windows'
-      run: Copy-Item target/${{ matrix.target }}/dist/oxyon.exe oxyon-${{ matrix.label }}.exe
+      run: Copy-Item target/${{ matrix.target }}/dist/oxytools.exe oxytools-${{ matrix.label }}.exe
       shell: pwsh
 
     - name: Prepare Binary (Linux)
       if: runner.os == 'Linux'
       run: |
-        cp target/${{ matrix.target }}/dist/oxyon oxyon-${{ matrix.label }}
-        chmod +x oxyon-${{ matrix.label }}
+        cp target/${{ matrix.target }}/dist/oxytools oxytools-${{ matrix.label }}
+        chmod +x oxytools-${{ matrix.label }}
 
     - name: Build Office
       run: cargo build --profile dist --no-default-features --target ${{ matrix.target }}
 
     - name: Prepare Office Binary (Windows)
       if: runner.os == 'Windows'
-      run: Copy-Item target/${{ matrix.target }}/dist/oxyon.exe oxyon-office-${{ matrix.label }}.exe
+      run: Copy-Item target/${{ matrix.target }}/dist/oxytools.exe oxytools-office-${{ matrix.label }}.exe
       shell: pwsh
 
     - name: Prepare Office Binary (Linux)
       if: runner.os == 'Linux'
       run: |
-        cp target/${{ matrix.target }}/dist/oxyon oxyon-office-${{ matrix.label }}
-        chmod +x oxyon-office-${{ matrix.label }}
+        cp target/${{ matrix.target }}/dist/oxytools oxytools-office-${{ matrix.label }}
+        chmod +x oxytools-office-${{ matrix.label }}
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: binaries-${{ matrix.label }}
-        path: oxyon-*
+        path: oxytools-*
 
   release:
     needs: build
@@ -129,11 +129,11 @@ jobs:
         merge-multiple: true
 
     - name: List files
-      run: ls -lh oxyon-*
+      run: ls -lh oxytools-*
 
     - name: Generate SHA256
       run: |
-        sha256sum oxyon-* > SHA256SUMS.txt
+        sha256sum oxytools-* > SHA256SUMS.txt
         cat SHA256SUMS.txt
 
     - name: Deploy to GitHub Release
@@ -146,14 +146,15 @@ jobs:
 
           | Platform | Full | Office |
           |----------|------|--------|
-          | Windows x64 | `oxyon-windows-x64.exe` | `oxyon-office-windows-x64.exe` |
-          | Linux x64 | `oxyon-linux-x64` | `oxyon-office-linux-x64` |
-          | Linux ARM64 | `oxyon-linux-arm64` | `oxyon-office-linux-arm64` |
+          | Windows x64 | `oxytools-windows-x64.exe` | `oxytools-office-windows-x64.exe` |
+          | Linux x64 | `oxytools-linux-x64` | `oxytools-office-linux-x64` |
+          | Linux ARM64 | `oxytools-linux-arm64` | `oxytools-office-linux-arm64` |
 
           ### SHA256 Checksums
           See `SHA256SUMS.txt` asset for all hashes.
         files: |
-          oxyon-*
+          oxytools-*
           SHA256SUMS.txt
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

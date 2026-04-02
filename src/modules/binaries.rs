@@ -43,7 +43,7 @@ mod embedded {
 pub fn extraire_deps() -> Result<(), String> {
     #[cfg(feature = "bundled")]
     {
-        let temp_dir = std::env::temp_dir().join("oxyon_tools");
+        let temp_dir = std::env::temp_dir().join("oxytools_tools");
         crate::log_info(&format!("binaries::extraire_deps | dossier temp={:?}", temp_dir));
         if !temp_dir.exists() {
             std::fs::create_dir_all(&temp_dir).map_err(|e| e.to_string())?;
