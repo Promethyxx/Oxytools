@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Oxyon
+Exec=Oxyon
+Terminal=false
+Type=Application
+Icon=io.github.promethyxx.Oxyon
+Categories=Utility;
+Comment=Oxyon

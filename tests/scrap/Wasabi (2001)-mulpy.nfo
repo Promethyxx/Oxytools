@@ -1,0 +1,411 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--created on 2026-01-20 13:20:38 by manvid 0.1 for KODI-->
+<movie>
+  <title>Wasabi</title>
+  <originaltitle>Wasabi</originaltitle>
+  <sorttitle/>
+  <epbookmark/>
+  <year>2001</year>
+  <ratings>
+    <rating default="false" max="10" name="themoviedb">
+      <value>6.7</value>
+      <votes>1382</votes>
+    </rating>
+  </ratings>
+  <userrating>0</userrating>
+  <top250>0</top250>
+  <set/>
+  <plot>Flic solitaire au grand cœur mais aux méthodes parfois musclées, l&apos;inspecteur Hubert se retrouve en vacances forcées après avoir rossé le fils du préfet. Un jour, il reçoit le coup de fil d&apos;un notaire qui lui annonce que Miko, la femme de sa vie disparue vingt ans auparavant, vient de mourir dans d&apos;étranges circonstances. Seul légataire testamentaire, Hubert débarque au Japon, accueilli par son ancien équipier, pour découvrir ce dont il a hérité.</plot>
+  <outline>Flic solitaire au grand cœur mais aux méthodes parfois musclées, l&apos;inspecteur Hubert se retrouve en vacances forcées après avoir rossé le fils du préfet. Un jour, il reçoit le coup de fil d&apos;un notaire qui lui annonce que Miko, la femme de sa vie disparue vingt ans auparavant, vient de mourir dans d&apos;étranges circonstances. Seul légataire testamentaire, Hubert débarque au Japon, accueilli par son ancien équipier, pour découvrir ce dont il a hérité.</outline>
+  <tagline>La petite moutarde qui monte au nez.</tagline>
+  <runtime>95</runtime>
+  <thumb aspect="poster">https://image.tmdb.org/t/p/original/7TbnpjIKzq5OKUyF72rcwNDyI5f.jpg</thumb>
+  <thumb aspect="clearlogo">Wasabi (2001)-clearlogo.png</thumb>
+  <fanart>
+    <thumb>https://image.tmdb.org/t/p/original/kSpfkuIykUsXr6XSU8NdyqiVcR4.jpg</thumb>
+  </fanart>
+  <mpaa>FR:U</mpaa>
+  <certification>FR:U</certification>
+  <id>tt0281364</id>
+  <tmdbid>2110</tmdbid>
+  <uniqueid default="false" type="tmdb">2110</uniqueid>
+  <uniqueid default="true" type="imdb">tt0281364</uniqueid>
+  <uniqueid default="false" type="wikidata">Q906639</uniqueid>
+  <country>JP, FR</country>
+  <status/>
+  <code/>
+  <premiered>2001-10-31</premiered>
+  <watched>false</watched>
+  <playcount>0</playcount>
+  <genre>Drame</genre>
+  <genre>Action</genre>
+  <genre>Comédie</genre>
+  <studio>Canal+</studio>
+  <studio>TF1 Films Production</studio>
+  <studio>Tobis</studio>
+  <studio>Destiny</studio>
+  <studio>EuropaCorp</studio>
+  <studio>Victor Company of Japan (JVC)</studio>
+  <studio>Samitose Productions</studio>
+  <credits tmdbid="59">Luc Besson</credits>
+  <director tmdbid="21647">Gérard Krawczyk</director>
+  <tag>police brutality</tag>
+  <tag>hitman</tag>
+  <tag>handcuffs</tag>
+  <tag>yakuza</tag>
+  <tag>love letter</tag>
+  <tag>police operation</tag>
+  <tag>golf club</tag>
+  <tag>brutal cop</tag>
+  <tag>transphobia</tag>
+  <tag>abuse of power</tag>
+  <actor>
+    <name>Jean Reno</name>
+    <role>Hubert Fiorentini</role>
+    <thumb>https://image.tmdb.org/t/p/h632/mw0EZJYz3kiFq9fNxsML773gotF.jpg</thumb>
+    <profile>https://www.themoviedb.org/person/1003</profile>
+    <tmdbid>1003</tmdbid>
+  </actor>
+  <actor>
+    <name>Ryôko Hirosue</name>
+    <role>Yumi Yoshimido</role>
+    <thumb>https://image.tmdb.org/t/p/h632/tenRQzr0fGI0KVBOtLPUrHHE963.jpg</thumb>
+    <profile>https://www.themoviedb.org/person/21658</profile>
+    <tmdbid>21658</tmdbid>
+  </actor>
+  <actor>
+    <name>Michel Muller</name>
+    <role>Maurice &apos;Momo&apos;</role>
+    <thumb>https://image.tmdb.org/t/p/h632/wo6dxf2CPxpbII7NZs5cZrZt4JN.jpg</thumb>
+    <profile>https://www.themoviedb.org/person/21659</profile>
+    <tmdbid>21659</tmdbid>
+  </actor>
+  <actor>
+    <name>Carole Bouquet</name>
+    <role>Sofia</role>
+    <thumb>https://image.tmdb.org/t/p/h632/nCyI95wVvhXFH1GiornFHsL9YOx.jpg</thumb>
+    <profile>https://www.themoviedb.org/person/10500</profile>
+    <tmdbid>10500</tmdbid>
+  </actor>
+  <actor>
+    <name>Yoshi Oida</name>
+    <role>Takanawa &apos;Zébra&apos;</role>
+    <thumb>https://image.tmdb.org/t/p/h632/A1ow9mQH5lbOaha9XCn27LAB2s9.jpg</thumb>
+    <profile>https://www.themoviedb.org/person/21663</profile>
+    <tmdbid>21663</tmdbid>
+  </actor>
+  <actor>
+    <name>Christian Sinniger</name>
+    <role>&apos;Le Squale&apos;</role>
+    <thumb>https://image.tmdb.org/t/p/h632/wKE2EopoX6RGu6VJmkH6pw6RRXz.jpg</thumb>
+    <profile>https://www.themoviedb.org/person/21664</profile>
+    <tmdbid>21664</tmdbid>
+  </actor>
+  <actor>
+    <name>Alexandre Brik</name>
+    <role>Irène</role>
+    <thumb>https://image.tmdb.org/t/p/h632/pzMey0PUuJfgZYG49KOJ5ClmpPU.jpg</thumb>
+    <profile>https://www.themoviedb.org/person/21665</profile>
+    <tmdbid>21665</tmdbid>
+  </actor>
+  <actor>
+    <name>Jean-Marc Montalto</name>
+    <role>Olivier</role>
+    <thumb>https://image.tmdb.org/t/p/h632/qNfn2xO9yKVbCFR5FTLs9y9VTWr.jpg</thumb>
+    <profile>https://www.themoviedb.org/person/21666</profile>
+    <tmdbid>21666</tmdbid>
+  </actor>
+  <actor>
+    <name>Véronique Balme</name>
+    <role>Betty</role>
+    <thumb>https://image.tmdb.org/t/p/h632/ancIfwVha75MlFKkgadCbkBClhZ.jpg</thumb>
+    <profile>https://www.themoviedb.org/person/21667</profile>
+    <tmdbid>21667</tmdbid>
+  </actor>
+  <actor>
+    <name>Fabio Zenoni</name>
+    <role>Josy</role>
+    <thumb>https://image.tmdb.org/t/p/h632/f0OSZyEZZbcChQh0CFoEmg5m4O9.jpg</thumb>
+    <profile>https://www.themoviedb.org/person/21668</profile>
+    <tmdbid>21668</tmdbid>
+  </actor>
+  <actor>
+    <name>Haruhiko Hirata</name>
+    <role>Ishibashi</role>
+    <thumb>https://image.tmdb.org/t/p/h632/my8pIemyGIoVy16IL0FNd9Qt5zG.jpg</thumb>
+    <profile>https://www.themoviedb.org/person/554597</profile>
+    <tmdbid>554597</tmdbid>
+  </actor>
+  <actor>
+    <name>Michel Scourneau</name>
+    <role>Van Eyck</role>
+    <thumb>https://image.tmdb.org/t/p/h632/jlwp4eoZP7KKbPJDCr07Kz87Q3z.jpg</thumb>
+    <profile>https://www.themoviedb.org/person/185395</profile>
+    <tmdbid>185395</tmdbid>
+  </actor>
+  <actor>
+    <name>Jacques Bondoux</name>
+    <role>Del Rio</role>
+    <thumb>https://image.tmdb.org/t/p/h632/3P4Qg6RIc7inY5nci6CE900lqmU.jpg</thumb>
+    <profile>https://www.themoviedb.org/person/1620857</profile>
+    <tmdbid>1620857</tmdbid>
+  </actor>
+  <actor>
+    <name>Kiyohiko Shibukawa</name>
+    <role>Ryuichi</role>
+    <thumb>https://image.tmdb.org/t/p/h632/eeQ3Dbrz7e09rJzcR31uxiH8xji.jpg</thumb>
+    <profile>https://www.themoviedb.org/person/58611</profile>
+    <tmdbid>58611</tmdbid>
+  </actor>
+  <actor>
+    <name>Osamu Tsuruya</name>
+    <role>Customs officer</role>
+    
+    <profile>https://www.themoviedb.org/person/1677014</profile>
+    <tmdbid>1677014</tmdbid>
+  </actor>
+  <actor>
+    <name>Akihiro Nishida</name>
+    <role>Customs officer</role>
+    <thumb>https://image.tmdb.org/t/p/h632/zd8RSGGtkCbph2Irnk5TCzwVsgm.jpg</thumb>
+    <profile>https://www.themoviedb.org/person/1677015</profile>
+    <tmdbid>1677015</tmdbid>
+  </actor>
+  <actor>
+    <name>Anthony Decadi</name>
+    <role>Son of the Prefect</role>
+    <thumb>https://image.tmdb.org/t/p/h632/4PIT6j4nO9yawSw78GuTPnhP47h.jpg</thumb>
+    <profile>https://www.themoviedb.org/person/130452</profile>
+    <tmdbid>130452</tmdbid>
+  </actor>
+  <actor>
+    <name>Yan Epstein</name>
+    <role>Jean Baptiste 2</role>
+    <thumb>https://image.tmdb.org/t/p/h632/jHiebrh5X7G9S3klVRH1tWI8Jjp.jpg</thumb>
+    <profile>https://www.themoviedb.org/person/185355</profile>
+    <tmdbid>185355</tmdbid>
+  </actor>
+  <actor>
+    <name>Ludovic Berthillot</name>
+    <role>Jean Baptiste 1</role>
+    <thumb>https://image.tmdb.org/t/p/h632/sDXedVjb1kSvanqlKVpoLek79bQ.jpg</thumb>
+    <profile>https://www.themoviedb.org/person/62452</profile>
+    <tmdbid>62452</tmdbid>
+  </actor>
+  <actor>
+    <name>Elodie Frenck</name>
+    <role>Secretary of the Banque de la Trinité</role>
+    <thumb>https://image.tmdb.org/t/p/h632/bP0ys3W1JBBD6w1r5uHox5D7juw.jpg</thumb>
+    <profile>https://www.themoviedb.org/person/42718</profile>
+    <tmdbid>42718</tmdbid>
+  </actor>
+  <actor>
+    <name>Dorothée Brière</name>
+    <role>Air stewardess</role>
+    <thumb>https://image.tmdb.org/t/p/h632/piWqusoRdhKnv6IahwjGXtCooSp.jpg</thumb>
+    <profile>https://www.themoviedb.org/person/1632523</profile>
+    <tmdbid>1632523</tmdbid>
+  </actor>
+  <actor>
+    <name>Stefan Nelet</name>
+    <role>Young banker</role>
+    <thumb>https://image.tmdb.org/t/p/h632/vKmfxklbQ7ELsTGgU6kTHv44lHd.jpg</thumb>
+    <profile>https://www.themoviedb.org/person/1622946</profile>
+    <tmdbid>1622946</tmdbid>
+  </actor>
+  <actor>
+    <name>Karine Stoffer</name>
+    <role>Dancer</role>
+    
+    <profile>https://www.themoviedb.org/person/1677019</profile>
+    <tmdbid>1677019</tmdbid>
+  </actor>
+  <actor>
+    <name>Yuki Sakai</name>
+    <role>Miko Kobayashi</role>
+    
+    <profile>https://www.themoviedb.org/person/1677020</profile>
+    <tmdbid>1677020</tmdbid>
+  </actor>
+  <actor>
+    <name>Massaro Nagahishi</name>
+    <role>Plane commissioner</role>
+    
+    <profile>https://www.themoviedb.org/person/1677031</profile>
+    <tmdbid>1677031</tmdbid>
+  </actor>
+  <actor>
+    <name>Makiko Kishi</name>
+    <role>Ishibashi&apos;s secretary</role>
+    
+    <profile>https://www.themoviedb.org/person/1677032</profile>
+    <tmdbid>1677032</tmdbid>
+  </actor>
+  <actor>
+    <name>Kinshiro Oyama</name>
+    <role>Japanese Commissioner</role>
+    <thumb>https://image.tmdb.org/t/p/h632/iiuGJ5HE2dZE9osqPtO92x3aU94.jpg</thumb>
+    <profile>https://www.themoviedb.org/person/1677033</profile>
+    <tmdbid>1677033</tmdbid>
+  </actor>
+  <actor>
+    <name>真木洋子</name>
+    <role>Atsuko Nakano</role>
+    <thumb>https://image.tmdb.org/t/p/h632/23wwb2mTKJfyZ4atqTgTwMxR743.jpg</thumb>
+    <profile>https://www.themoviedb.org/person/1201020</profile>
+    <tmdbid>1201020</tmdbid>
+  </actor>
+  <actor>
+    <name>Tomo Fukui</name>
+    <role>Receptionist</role>
+    <thumb>https://image.tmdb.org/t/p/h632/tDBFS4Eu1h2VqANVaxRgEeqLJk2.jpg</thumb>
+    <profile>https://www.themoviedb.org/person/1677034</profile>
+    <tmdbid>1677034</tmdbid>
+  </actor>
+  <actor>
+    <name>瀬木一将</name>
+    <role>Katana Guard</role>
+    
+    <profile>https://www.themoviedb.org/person/2480015</profile>
+    <tmdbid>2480015</tmdbid>
+  </actor>
+  <actor>
+    <name>森聖二</name>
+    <role>Katana Guard</role>
+    
+    <profile>https://www.themoviedb.org/person/1633884</profile>
+    <tmdbid>1633884</tmdbid>
+  </actor>
+  <actor>
+    <name>Tenmei Basara</name>
+    <role>Golf bodyguard</role>
+    
+    <profile>https://www.themoviedb.org/person/3624140</profile>
+    <tmdbid>3624140</tmdbid>
+  </actor>
+  <actor>
+    <name>加賀谷圭</name>
+    <role>Man in black</role>
+    <thumb>https://image.tmdb.org/t/p/h632/6ja9pUIHg7QqHVdmH9EjcFkSCcv.jpg</thumb>
+    <profile>https://www.themoviedb.org/person/2122683</profile>
+    <tmdbid>2122683</tmdbid>
+  </actor>
+  <actor>
+    <name>おぐらとしひろ</name>
+    <role>Man in black</role>
+    <thumb>https://image.tmdb.org/t/p/h632/m2sCFNLnAWxALpzP9wkOw1YgYbm.jpg</thumb>
+    <profile>https://www.themoviedb.org/person/1946272</profile>
+    <tmdbid>1946272</tmdbid>
+  </actor>
+  <actor>
+    <name>Kiyoshi Iwata</name>
+    <role>Man in black</role>
+    
+    <profile>https://www.themoviedb.org/person/3624146</profile>
+    <tmdbid>3624146</tmdbid>
+  </actor>
+  <actor>
+    <name>Tooru Edomatsu</name>
+    <role>Man in black</role>
+    
+    <profile>https://www.themoviedb.org/person/3624150</profile>
+    <tmdbid>3624150</tmdbid>
+  </actor>
+  <actor>
+    <name>Hiroshi Urushiyama</name>
+    <role>Man in black</role>
+    
+    <profile>https://www.themoviedb.org/person/3624151</profile>
+    <tmdbid>3624151</tmdbid>
+  </actor>
+  <actor>
+    <name>和興</name>
+    <role>Man with glasses</role>
+    <thumb>https://image.tmdb.org/t/p/h632/A1fhulA3ribsTgutTryIZnf7EVZ.jpg</thumb>
+    <profile>https://www.themoviedb.org/person/1628092</profile>
+    <tmdbid>1628092</tmdbid>
+  </actor>
+  <actor>
+    <name>Hiroyuki Ootsuki</name>
+    <role>Man with glasses</role>
+    
+    <profile>https://www.themoviedb.org/person/3624163</profile>
+    <tmdbid>3624163</tmdbid>
+  </actor>
+  <actor>
+    <name>伊藤俊輔</name>
+    <role></role>
+    
+    <profile>https://www.themoviedb.org/person/1202959</profile>
+    <tmdbid>1202959</tmdbid>
+  </actor>
+  <actor>
+    <name>Lukas Delcourt</name>
+    <role>Clubber (uncredited)</role>
+    <thumb>https://image.tmdb.org/t/p/h632/sQsg5vblKTNFzTnRTbwHMSwyRE1.jpg</thumb>
+    <profile>https://www.themoviedb.org/person/118597</profile>
+    <tmdbid>118597</tmdbid>
+  </actor>
+  <actor>
+    <name>Eric Moreau</name>
+    <role>Extra (uncredited)</role>
+    <thumb>https://image.tmdb.org/t/p/h632/n2pIKg4u3rWkz1ZHOOFSUjN7h0e.jpg</thumb>
+    <profile>https://www.themoviedb.org/person/1747039</profile>
+    <tmdbid>1747039</tmdbid>
+  </actor>
+  <actor>
+    <name>Tsukasa Kadota</name>
+    <role>Policeman (uncredited)</role>
+    
+    <profile>https://www.themoviedb.org/person/3624185</profile>
+    <tmdbid>3624185</tmdbid>
+  </actor>
+  <actor>
+    <name>Yuji Yamashita</name>
+    <role>Rebel (uncredited)</role>
+    
+    <profile>https://www.themoviedb.org/person/3624189</profile>
+    <tmdbid>3624189</tmdbid>
+  </actor>
+  <actor>
+    <name>Junko Murakami</name>
+    <role>Miko Kobayashi (voice) (uncredited)</role>
+    <thumb>https://image.tmdb.org/t/p/h632/f59V4Arxd3NszcUHC6yrtbjBic6.jpg</thumb>
+    <profile>https://www.themoviedb.org/person/2642221</profile>
+    <tmdbid>2642221</tmdbid>
+  </actor>
+  <producer tmdbid="59">
+    <name>Luc Besson</name>
+    <role>Producer</role>
+    <thumb>https://image.tmdb.org/t/p/h632/dXJdczT1NcvcZtnoWVGT0NmG11v.jpg</thumb>
+    <profile>https://www.themoviedb.org/person/59</profile>
+  </producer>
+  <trailer>plugin://plugin.video.youtube/play/?video_id=yhAqbCsz684</trailer>
+  <languages>Japanese, French</languages>
+  <dateadded>2026-01-20 13:20:38</dateadded>
+  <fileinfo>
+    <streamdetails>
+      <video>
+        <codec>hevc</codec>
+        <aspect>2.36</aspect>
+        <width>1920</width>
+        <height>812</height>
+        <resolution>720</resolution>
+        <bitrate>0</bitrate>
+        <durationinseconds>5630</durationinseconds>
+      </video>
+      <audio>
+        <codec>dts</codec>
+        <language>fre</language>
+        <channels>6</channels>
+      </audio>
+
+    </streamdetails>
+  </fileinfo>
+  <!--tinyMediaManager meta data-->
+  <source>WEBRIP</source>
+  <edition>NONE</edition>
+  <original_filename>Wasabi (2001).mkv</original_filename>
+  <user_note/>
+  <english_title>Wasabi</english_title>
+</movie>

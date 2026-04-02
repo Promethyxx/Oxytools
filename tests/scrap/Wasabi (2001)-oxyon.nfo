@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+2026-01-20 13:19:14
+<movie>
+  <title>Wasabi</title>
+  <originaltitle>Wasabi</originaltitle>
+  <year>2001</year>
+  <ratings>
+    <rating default="false" max="10" name="themoviedb">
+      <value>6.652</value>
+      <votes>1382</votes>
+    </rating>
+  </ratings>
+  <userrating>0</userrating>
+  <top250>0</top250>
+  <plot>Flic solitaire au grand cœur mais aux méthodes parfois musclées, l&apos;inspecteur Hubert se retrouve en vacances forcées après avoir rossé le fils du préfet. Un jour, il reçoit le coup de fil d&apos;un notaire qui lui annonce que Miko, la femme de sa vie disparue vingt ans auparavant, vient de mourir dans d&apos;étranges circonstances. Seul légataire testamentaire, Hubert débarque au Japon, accueilli par son ancien équipier, pour découvrir ce dont il a hérité.</plot>
+  <outline>Flic solitaire au grand cœur mais aux méthodes parfois musclées, l&apos;inspecteur Hubert se retrouve en vacances forcées après avoir rossé le fils du préfet. Un jour, il reçoit le coup de fil d&apos;un notaire qui lui annonce que Miko, la femme de sa vie disparue vingt ans auparavant, vient de mourir dans d&apos;étranges circonstances. Seul légataire testamentaire, Hubert débarque au Japon, accueilli par son ancien équipier, pour découvrir ce dont il a hérité.</outline>
+  <tagline>La petite moutarde qui monte au nez.</tagline>
+  <runtime>95</runtime>
+  <thumb aspect="poster">https://image.tmdb.org/t/p/original/7TbnpjIKzq5OKUyF72rcwNDyI5f.jpg</thumb>
+  <tmdbid>2110</tmdbid>
+  <uniqueid default="true" type="tmdb">2110</uniqueid>
+  <uniqueid default="false" type="imdb">tt0281364</uniqueid>
+  <premiered>2001-10-31</premiered>
+  <watched>false</watched>
+  <playcount>0</playcount>
+  <genre>Drame</genre>
+  <genre>Action</genre>
+  <genre>Comédie</genre>
+  <studio>Canal+</studio>
+  <studio>TF1 Films Production</studio>
+  <studio>Tobis</studio>
+  <studio>Destiny</studio>
+  <studio>EuropaCorp</studio>
+  <studio>Victor Company of Japan (JVC)</studio>
+  <studio>Samitose Productions</studio>
+  <director>Gérard Krawczyk</director>
+  <actor>
+    <name>Jean Reno</name>
+    <role>Hubert Fiorentini</role>
+    <thumb>https://image.tmdb.org/t/p/h632/mw0EZJYz3kiFq9fNxsML773gotF.jpg</thumb>
+    <tmdbid>1003</tmdbid>
+  </actor>
+  <actor>
+    <name>Ryôko Hirosue</name>
+    <role>Yumi Yoshimido</role>
+    <thumb>https://image.tmdb.org/t/p/h632/tenRQzr0fGI0KVBOtLPUrHHE963.jpg</thumb>
+    <tmdbid>21658</tmdbid>
+  </actor>
+  <actor>
+    <name>Michel Muller</name>
+    <role>Maurice &apos;Momo&apos;</role>
+    <thumb>https://image.tmdb.org/t/p/h632/wo6dxf2CPxpbII7NZs5cZrZt4JN.jpg</thumb>
+    <tmdbid>21659</tmdbid>
+  </actor>
+  <actor>
+    <name>Carole Bouquet</name>
+    <role>Sofia</role>
+    <thumb>https://image.tmdb.org/t/p/h632/nCyI95wVvhXFH1GiornFHsL9YOx.jpg</thumb>
+    <tmdbid>10500</tmdbid>
+  </actor>
+  <actor>
+    <name>Yoshi Oida</name>
+    <role>Takanawa &apos;Zébra&apos;</role>
+    <thumb>https://image.tmdb.org/t/p/h632/A1ow9mQH5lbOaha9XCn27LAB2s9.jpg</thumb>
+    <tmdbid>21663</tmdbid>
+  </actor>
+  <actor>
+    <name>Christian Sinniger</name>
+    <role>&apos;Le Squale&apos;</role>
+    <thumb>https://image.tmdb.org/t/p/h632/wKE2EopoX6RGu6VJmkH6pw6RRXz.jpg</thumb>
+    <tmdbid>21664</tmdbid>
+  </actor>
+  <actor>
+    <name>Alexandre Brik</name>
+    <role>Irène</role>
+    <thumb>https://image.tmdb.org/t/p/h632/pzMey0PUuJfgZYG49KOJ5ClmpPU.jpg</thumb>
+    <tmdbid>21665</tmdbid>
+  </actor>
+  <actor>
+    <name>Jean-Marc Montalto</name>
+    <role>Olivier</role>
+    <thumb>https://image.tmdb.org/t/p/h632/qNfn2xO9yKVbCFR5FTLs9y9VTWr.jpg</thumb>
+    <tmdbid>21666</tmdbid>
+  </actor>
+  <actor>
+    <name>Véronique Balme</name>
+    <role>Betty</role>
+    <thumb>https://image.tmdb.org/t/p/h632/ancIfwVha75MlFKkgadCbkBClhZ.jpg</thumb>
+    <tmdbid>21667</tmdbid>
+  </actor>
+  <actor>
+    <name>Fabio Zenoni</name>
+    <role>Josy</role>
+    <thumb>https://image.tmdb.org/t/p/h632/f0OSZyEZZbcChQh0CFoEmg5m4O9.jpg</thumb>
+    <tmdbid>21668</tmdbid>
+  </actor>
+  <actor>
+    <name>Haruhiko Hirata</name>
+    <role>Ishibashi</role>
+    <thumb>https://image.tmdb.org/t/p/h632/my8pIemyGIoVy16IL0FNd9Qt5zG.jpg</thumb>
+    <tmdbid>554597</tmdbid>
+  </actor>
+  <actor>
+    <name>Michel Scourneau</name>
+    <role>Van Eyck</role>
+    <thumb>https://image.tmdb.org/t/p/h632/jlwp4eoZP7KKbPJDCr07Kz87Q3z.jpg</thumb>
+    <tmdbid>185395</tmdbid>
+  </actor>
+  <actor>
+    <name>Jacques Bondoux</name>
+    <role>Del Rio</role>
+    <thumb>https://image.tmdb.org/t/p/h632/3P4Qg6RIc7inY5nci6CE900lqmU.jpg</thumb>
+    <tmdbid>1620857</tmdbid>
+  </actor>
+  <actor>
+    <name>Kiyohiko Shibukawa</name>
+    <role>Ryuichi</role>
+    <thumb>https://image.tmdb.org/t/p/h632/eeQ3Dbrz7e09rJzcR31uxiH8xji.jpg</thumb>
+    <tmdbid>58611</tmdbid>
+  </actor>
+  <actor>
+    <name>Osamu Tsuruya</name>
+    <role>Customs officer</role>
+    <tmdbid>1677014</tmdbid>
+  </actor>
+  <fileinfo>
+    <streamdetails>
+    </streamdetails>
+  </fileinfo>
+  <original_filename>Wasabi (2001).mkv</original_filename>
+</movie>
