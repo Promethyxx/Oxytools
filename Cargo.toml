@@ -27,7 +27,7 @@ lopdf = "0.40"
 open = "5"
 psd = "0.3"
 pulldown-cmark = "0.13"
-quick-xml = "0.39"
+quick-xml = "0.40"
 rawloader = "0.37"
 regex = "1"
 reqwest = { version = "0.13", features = ["blocking", "json", "query"] }
