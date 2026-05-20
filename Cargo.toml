@@ -1,5 +1,5 @@
 [package]
-name = "oxytools"
+name = "Oxytools"
 version = "2.0.7"
 edition = "2024"
 license = "GPL-3.0-or-later"
