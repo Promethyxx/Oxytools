@@ -1,4 +1,4 @@
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+#![windows_subsystem = "windows"]
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub mod lang;
 pub mod logging;
