@@ -309,3 +309,38 @@ pub fn apply_renames(previews: &[(PathBuf, String)]) -> Vec<RenameResult> {
         }
     }).collect()
 }
+
+/// Annule les renommages réussis d'un batch précédent.
+/// `results` est la liste retournée par `apply_renames`.
+/// Chaque entrée réussie est inversée : le fichier renommé reprend son nom d'origine.
+pub fn undo_renames(results: &[RenameResult]) -> Vec<RenameResult> {
+    results.iter().filter(|r| r.success).map(|r| {
+        let parent = r.original.parent().unwrap_or(Path::new(""));
+        let current = parent.join(&r.new_name);
+        let dest    = r.original.clone();
+        let dest_name = dest.file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
+        if !current.exists() {
+            return RenameResult {
+                original: current,
+                new_name: dest_name,
+                success: false,
+                error: Some("File not found".into()),
+            };
+        }
+        if dest.exists() {
+            return RenameResult {
+                original: current,
+                new_name: dest_name,
+                success: false,
+                error: Some(format!("Already exists: {}", dest.display())),
+            };
+        }
+        match std::fs::rename(&current, &dest) {
+            Ok(_)  => RenameResult { original: current, new_name: dest_name, success: true,  error: None },
+            Err(e) => RenameResult { original: current, new_name: dest_name, success: false, error: Some(e.to_string()) },
+        }
+    }).collect()
+}

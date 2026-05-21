@@ -1,6 +1,6 @@
 [package]
 name = "Oxytools"
-version = "2.0.7"
+version = "3.0.0"
 edition = "2024"
 license = "GPL-3.0-or-later"
 default-run = "Oxytools"
@@ -9,13 +9,8 @@ default-run = "Oxytools"
 name = "Oxytools"
 path = "src/main.rs"
 
-[[bin]]
-name = "oxy"
-path = "src/main_cli.rs"
-
 [dependencies]
 chrono = "0.4"
-clap = { version = "4", features = ["derive"] }
 dotenvy = "0.15"
 eframe = "0.34.1"
 flate2 = "1"
@@ -62,5 +57,3 @@ codegen-units = 1
 default = ["api", "bundled"]
 api = [] # No binaries
 bundled = [] #Desk version
-
-

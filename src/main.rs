@@ -66,6 +66,8 @@ struct OxytoolsApp {
         rename_multi_replace: String,
         rename_ant_sets: Vec<String>,
         rename_ant_path: Option<PathBuf>,
+        rename_undo_stack: Vec<Vec<modules::rename::RenameResult>>,
+        rename_last_list_path: Option<PathBuf>,
         tmdb_api_key: String,
         fanart_api_key: String,
         save_doc_format: bool,
@@ -258,6 +260,8 @@ impl Default for OxytoolsApp {
                 rename_multi_replace: String::new(),
                 rename_ant_sets: Vec::new(),
                 rename_ant_path: None,
+                rename_undo_stack: Vec::new(),
+                rename_last_list_path: None,
                 lang: &crate::lang::EN,
                 lang_id: "en",
         }
@@ -361,6 +365,23 @@ impl OxytoolsApp {
                     }
                     if let Some(speed) = vid.get("speed").and_then(|s| s.as_integer()) {
                         self.video_speed = speed as u32;
+                    }
+                }
+            }
+        }
+        // ── Charger le dernier profil multi-replace ──────────────
+        if let Ok(c) = std::fs::read_to_string(Self::config_dir().join("config.toml")) {
+            if let Ok(parsed) = c.parse::<toml::Table>() {
+                if let Some(rn) = parsed.get("rename") {
+                    if let Some(p) = rn.get("last_list_path").and_then(|v| v.as_str()) {
+                        let path = std::path::PathBuf::from(p);
+                        if path.exists() {
+                            if let Ok(list) = modules::rename::ReplaceList::load(&path) {
+                                self.rename_cfg.replace_list = list;
+                                self.rename_cfg.multi_replace = true;
+                                self.rename_last_list_path = Some(path);
+                            }
+                        }
                     }
                 }
             }
@@ -471,6 +492,17 @@ impl OxytoolsApp {
             }
         }
         self.tools_cfg.save(&mut parsed);
+        // ── Persister le dernier profil multi-replace ────────────
+        {
+            let rename_table = parsed.entry("rename").or_insert(toml::Value::Table(toml::Table::new()));
+            if let Some(rt) = rename_table.as_table_mut() {
+                if let Some(ref p) = self.rename_last_list_path {
+                    rt.insert("last_list_path".to_string(), toml::Value::String(p.to_string_lossy().to_string()));
+                } else {
+                    rt.remove("last_list_path");
+                }
+            }
+        }
         let _ = std::fs::write(Self::config_dir().join("config.toml"), toml::to_string(&parsed).unwrap_or_default());
     }
     fn apply_theme(&self, ctx: &egui::Context) {
@@ -1812,6 +1844,15 @@ impl eframe::App for OxytoolsApp {
                                 });
                                 // Import / Export (toujours visible en haut)
                                 ui.horizontal(|ui| {
+                                    // ── Profil actif ────────────────────────────────
+                                    if let Some(ref p) = self.rename_last_list_path {
+                                        ui.small(format!("📌 {}", p.file_name().unwrap_or_default().to_string_lossy()));
+                                        if ui.small_button("✖").on_hover_text("Forget profile").clicked() {
+                                            self.rename_last_list_path = None;
+                                            self.save_config();
+                                        }
+                                        ui.separator();
+                                    }
                                     if ui.button("💾 Save").clicked() { // TODO lang
                                         if let Some(path) = rfd::FileDialog::new()
                                             .add_filter("TSV", &["tsv"])
@@ -1829,7 +1870,11 @@ impl eframe::App for OxytoolsApp {
                                             .pick_file()
                                         {
                                             match modules::rename::ReplaceList::load(&path) {
-                                                Ok(list) => self.rename_cfg.replace_list = list,
+                                                Ok(list) => {
+                                                    self.rename_cfg.replace_list = list;
+                                                    self.rename_last_list_path = Some(path);
+                                                    self.save_config();
+                                                },
                                                 Err(e) => log_error(&format!("Load replace list: {}", e)),
                                             }
                                         }
@@ -1865,6 +1910,8 @@ impl eframe::App for OxytoolsApp {
                                     }
                                     if ui.button("🗑").on_hover_text("Clear all rules").clicked() { // TODO lang
                                         self.rename_cfg.replace_list.rules.clear();
+                                        self.rename_last_list_path = None;
+                                        self.save_config();
                                     }
                                 });
                                 // Sélecteur de Set Ant Renamer (affiché si plusieurs sets disponibles)
@@ -2082,13 +2129,40 @@ impl eframe::App for OxytoolsApp {
                             }
                             if ui.button(self.lang.rename_apply).clicked() {
                                 self.rename_results = modules::rename::apply_renames(&self.rename_previews);
+                                let mut applied: Vec<modules::rename::RenameResult> = Vec::new();
                                 for r in &self.rename_results {
                                     if r.success {
                                         if let Some(pos) = self.current_files.iter().position(|f| *f == r.original) {
                                             let parent = r.original.parent().unwrap_or(std::path::Path::new(""));
                                             self.current_files[pos] = parent.join(&r.new_name);
                                         }
+                                        applied.push(modules::rename::RenameResult {
+                                            original: r.original.clone(),
+                                            new_name: r.new_name.clone(),
+                                            success: true,
+                                            error: None,
+                                        });
                                     }
+                                }
+                                if !applied.is_empty() {
+                                    self.rename_undo_stack.push(applied);
+                                }
+                            }
+                            if let Some(last) = self.rename_undo_stack.last() {
+                                let count = last.len();
+                                if ui.button(format!("↩ Undo ({})", count)).clicked() {
+                                    let batch = self.rename_undo_stack.pop().unwrap();
+                                    let undo_results = modules::rename::undo_renames(&batch);
+                                    for r in &undo_results {
+                                        if r.success {
+                                            let parent = r.original.parent().unwrap_or(std::path::Path::new(""));
+                                            let restored = parent.join(&r.new_name);
+                                            if let Some(pos) = self.current_files.iter().position(|f| *f == r.original) {
+                                                self.current_files[pos] = restored;
+                                            }
+                                        }
+                                    }
+                                    self.rename_results = undo_results;
                                 }
                             }
                         }
