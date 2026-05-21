@@ -7,7 +7,36 @@ permissions:
   contents: write
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    name: Tests
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Cache Cargo
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: test-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: test-cargo-
+
+    - name: Install Linux deps
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gcc g++ cmake pkg-config libfontconfig1-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev libgl1-mesa-dev libwayland-dev libxkbcommon-dev libssl-dev ffmpeg
+
+    - name: Run tests
+      run: cargo test --features api -- --test-threads=1
+
   build:
+    needs: test
     strategy:
       matrix:
         include:
@@ -157,4 +186,3 @@ jobs:
           SHA256SUMS.txt
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
