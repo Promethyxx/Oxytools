@@ -30,7 +30,15 @@ jobs:
     - name: Install Linux deps
       run: |
         sudo apt-get update
-        sudo apt-get install -y gcc g++ cmake pkg-config libfontconfig1-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev libgl1-mesa-dev libwayland-dev libxkbcommon-dev libssl-dev ffmpeg
+        sudo apt-get install -y gcc g++ cmake pkg-config libfontconfig1-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev libgl1-mesa-dev libwayland-dev libxkbcommon-dev libssl-dev
+
+    - name: Download assets (Linux x64)
+      run: |
+        mkdir -p bin-linux-x64
+        gh release download assets-linux-x64 --dir bin-linux-x64 --repo ${{ github.repository }}
+        chmod +x bin-linux-x64/*
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Run tests
       run: cargo test --features api -- --test-threads=1
