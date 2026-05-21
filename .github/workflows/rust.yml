@@ -35,7 +35,7 @@ jobs:
     - name: Download assets (Linux x64)
       run: |
         mkdir -p bin-linux-x64
-        gh release download assets-linux-x64 --dir bin-linux-x64 --repo ${{ github.repository }}
+        gh release download Assets_Linux_x64 --dir bin-linux-x64 --repo ${{ github.repository }}
         chmod +x bin-linux-x64/*
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -52,19 +52,19 @@ jobs:
             target: x86_64-pc-windows-msvc
             label: windows-x64
             bin_dir: bin
-            asset_tag: assets-win-x64
+            asset_tag: Assets_Windows_x64
 
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             label: linux-x64
             bin_dir: bin-linux-x64
-            asset_tag: assets-linux-x64
+            asset_tag: Assets_Linux_x64
 
           - os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
             label: linux-arm64
             bin_dir: bin-linux-arm
-            asset_tag: assets-linux-arm
+            asset_tag: Assets_Mac_ARM
 
     runs-on: ${{ matrix.os }}
     name: Build ${{ matrix.label }}
@@ -117,13 +117,13 @@ jobs:
 
     - name: Prepare Binary (Windows)
       if: runner.os == 'Windows'
-      run: Copy-Item target/${{ matrix.target }}/dist/oxytools.exe oxytools-${{ matrix.label }}.exe
+      run: Copy-Item target/${{ matrix.target }}/dist/Oxytools.exe oxytools-${{ matrix.label }}.exe
       shell: pwsh
 
     - name: Prepare Binary (Linux)
       if: runner.os == 'Linux'
       run: |
-        cp target/${{ matrix.target }}/dist/oxytools oxytools-${{ matrix.label }}
+        cp target/${{ matrix.target }}/dist/Oxytools oxytools-${{ matrix.label }}
         chmod +x oxytools-${{ matrix.label }}
 
     - name: Build Office
@@ -131,13 +131,13 @@ jobs:
 
     - name: Prepare Office Binary (Windows)
       if: runner.os == 'Windows'
-      run: Copy-Item target/${{ matrix.target }}/dist/oxytools.exe oxytools-office-${{ matrix.label }}.exe
+      run: Copy-Item target/${{ matrix.target }}/dist/Oxytools.exe oxytools-office-${{ matrix.label }}.exe
       shell: pwsh
 
     - name: Prepare Office Binary (Linux)
       if: runner.os == 'Linux'
       run: |
-        cp target/${{ matrix.target }}/dist/oxytools oxytools-office-${{ matrix.label }}
+        cp target/${{ matrix.target }}/dist/Oxytools oxytools-office-${{ matrix.label }}
         chmod +x oxytools-office-${{ matrix.label }}
 
     - name: Upload artifacts
