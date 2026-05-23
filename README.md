@@ -1,4 +1,4 @@
-# Oxytools & Oxytools_Desk & Oxy
+# Oxytools & Oxytools_Desk
 
 ![Oxytools Logo](https://raw.githubusercontent.com/Promethyxx/Oxytools/main/assets/Oxytools_dark.png)
 
@@ -28,39 +28,30 @@ All offline, with no external binaries, no API calls, and no data leaving your m
 
 It's built for professional use where privacy and autonomy matter.
 
-## What is Oxy?
-
-Oxy (`oxy`) is the command-line version of Oxytools, designed for system administrators, automation, and task scheduling.
-
-It exposes the same modules as the GUI but through a terminal interface — ideal for cron jobs (Linux/macOS) or Windows Task Scheduler.
-Same bundled binaries, same processing logic, no GUI required.
-
-See [README_CLI.md](README_CLI.md) for full documentation and usage examples.
-
 ## Modules
 
-| Module | Oxytools | Oxytools_Desk | Oxy |
-|--------|:-----:|:----------:|:---------:|
-| Archives (7Z, ZIP, TAR) | ✅ | ✅ | ✅ |
-| Audio (MP3, FLAC, AAC, OGG) | ✅ | ❌ | ❌ |
-| Documents (DOCX, PDF, MD, ODT, HTML, LaTeX) | ✅ | ✅ | ✅ |
-| File renamer (find/replace, insert, numbering, case, extensions) | ✅ | ✅ | ✅ |
-| Pictures (15+ formats: AVIF, JXL, RAW, SVG, PSD, WebP, EXR…) | ✅ | ✅ | ✅ |
-| Scraper (TMDB, Fanart) | ✅ | ❌ | ❌ |
-| Tagger (MKV tagging) | ✅ | ❌ | ✅ |
+| Module | Oxytools | Oxytools_Desk |
+|--------|:-----:|:----------:|
+| Archives (7Z, ZIP, TAR) | ✅ | ✅ |
+| Audio (MP3, FLAC, AAC, OGG) | ✅ | ❌ |
+| Documents (DOCX, PDF, MD, ODT, HTML, LaTeX) | ✅ | ✅ |
+| File renamer (find/replace, insert, numbering, case, extensions) | ✅ | ✅ |
+| Pictures (15+ formats: AVIF, JXL, RAW, SVG, PSD, WebP, EXR…) | ✅ | ✅ |
+| Scraper (TMDB, Fanart) | ✅ | ❌ |
+| Tagger (MKV tagging) | ✅ | ❌ |
 | Tools | ✅ | ✅ | ✅ |
-| Video (mkv, mp4, webm) | ✅ | ❌ | ❌ |
+| Video (mkv, mp4, webm) | ✅ | ❌ |
 
 ## Key differences
 
-| | Key differences | Oxytools | Oxytools_Desk | Oxy |
-|---|:---:|:---:|:---:|:---:|
-| Purpose | | Swiss army knife for multimedia | Offline document & image processing | Automation & task scheduling |
-| Interface | | GUI | GUI | Terminal |
-| Bundled binaries |  ffmpeg, ffprobe, mkvpropedit | ✅ | ❌ | ✅ |
-| API keys required | FanArt, TMDB (for scraping only) | ✅ | ❌ | ❌ |
-| Internet access | for scraping only | ✅ | ❌ | ❌ |
-| Portable | | ✅ | ✅ | ✅ |
+| | Key differences | Oxytools | Oxytools_Desk |
+|---|:---:|:---:|:---:|
+| Purpose | | Swiss army knife for multimedia | Offline document & image processing |
+| Interface | | GUI | GUI |
+| Bundled binaries |  ffmpeg, ffprobe, mkvpropedit | ✅ | ❌ |
+| API keys required | FanArt, TMDB (for scraping only) | ✅ | ❌ |
+| Internet access | for scraping only | ✅ | ❌ |
+| Portable | | ✅ | ✅ |
 
 ## Platforms
 
@@ -68,7 +59,6 @@ See [README_CLI.md](README_CLI.md) for full documentation and usage examples.
 |---|:---:|:---:|:---:|:---:|
 | Oxytools | ✅ | ✅ | ✅ | ✅ |
 | Oxytools_Desk | ✅ | ✅ | ✅ | ✅ |
-| Oxy | ✅ | ✅ | ✅ | ✅ |
 
 The source code is Mac ARM ready.
 I don't have any, so I need to compile this with Github CI, which cost a lot of ratio compare to other platforms.
@@ -82,26 +72,11 @@ i will post sometimes.
 4. Choose your output format
 5. Click "Execute"
 
-### CLI Quick Start
-
-```bash
-oxy pic convert photo.png --to webp
-oxy doc convert rapport.md --to pdf
-oxy tag marquer-vu film.mkv --lang fr
-oxy rename *.mp4 --find "S01" --replace "Saison 1" --dry-run
-oxy archive compress ./dossier --to zip
-oxy tools list-files --output ./listes --source "Films=/media/films"
-oxy --help
-```
-
 ## Building from source
 
 ```bash
-# Full build (Oxytools GUI + CLI)
+# Full build (Oxytools GUI)
 cargo build --release
-
-# CLI only
-cargo build --release --bin oxy
 
 # Desk variant (GUI only, no bundled binaries)
 cargo build --release --no-default-features --features bundled
