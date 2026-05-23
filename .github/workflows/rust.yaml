@@ -34,13 +34,12 @@ jobs:
 
     - name: Download assets (Linux x64)
       run: |
-        # On recrée bin-linux-x64 pour include_bytes! dans binaries.rs
+        # Crée le dossier bin-linux-x64 attendu par include_bytes!
         mkdir -p bin-linux-x64
         gh release download Assets_Linux_x64 --dir bin-linux-x64 --repo ${{ github.repository }}
         chmod +x bin-linux-x64/*
         
-        # Sûreté : On crée un lien symbolique "bin" vers "bin-linux-x64" 
-        # au cas où doc.rs ou pic.rs cherchent dans "./bin/"
+        # Crée le lien symbolique "bin" vers "bin-linux-x64" au besoin
         ln -s bin-linux-x64 bin
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
