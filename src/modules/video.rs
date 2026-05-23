@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 use std::path::PathBuf;
-use std::process::Child;
+use std::process::{Child, Stdio}; // Stdio importé pour pouvoir utiliser .null()
 use crate::modules::binaries;
 
 /// Convertit ou change le conteneur d'une vidéo
@@ -16,7 +16,9 @@ pub fn traiter_video(
         "video::traiter_video | ffmpeg={:?} | copie_flux={} | audio_only={} | speed={} | {:?} -> {}",
         ffmpeg, copie_flux, est_audio_uniquement, speed, input, output
     ));
-    let mut args = vec!["-i".to_string(), input.to_str().unwrap().to_string()];
+    
+    // -nostdin évite que FFmpeg attende une commande utilisateur en arrière-plan
+    let mut args = vec!["-nostdin".to_string(), "-i".to_string(), input.to_str().unwrap().to_string()];
 
     if copie_flux {
         if est_audio_uniquement {
@@ -27,7 +29,6 @@ pub fn traiter_video(
     } else if est_audio_uniquement {
         args.push("-vn".to_string());
     } else {
-        // Appliquer preset selon le format de sortie
         let ext = std::path::Path::new(output)
             .extension()
             .and_then(|e| e.to_str())
@@ -36,7 +37,8 @@ pub fn traiter_video(
         match ext.as_str() {
             "webm" => {
                 let threads = num_cpus();
-                args.extend(["-c:v", "libvpx-vp9", "-row-mt", "1"].map(String::from));
+                // Ajout de -deadline realtime pour booster la vitesse du VP9
+                args.extend(["-c:v", "libvpx-vp9", "-row-mt", "1", "-deadline", "realtime"].map(String::from));
                 args.extend(["-threads".to_string(), threads.to_string()]);
                 args.extend(["-speed".to_string(), speed.to_string()]);
             },
@@ -55,11 +57,14 @@ pub fn traiter_video(
 
     args.extend(["-y".to_string(), output.to_string()]);
 
+    // On redirige tout vers le néant : pas de logs, pas de buffers pleins, pas de blocage
     let child = binaries::silent_cmd(binaries::get_ffmpeg())
         .args(&args)
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
         .spawn();
+
     if let Err(ref e) = child {
         crate::log_error(&format!("video::traiter_video impossible de lancer ffmpeg : {}", e));
     }
@@ -75,6 +80,7 @@ fn num_cpus() -> usize {
 /// Analyse le codec audio d'un fichier via ffprobe
 pub fn extraire_nom_codec(input: &PathBuf) -> String {
     let out = binaries::silent_cmd(binaries::get_ffprobe())
+        .stdin(Stdio::null()) 
         .args(&[
             "-v",
             "error",
