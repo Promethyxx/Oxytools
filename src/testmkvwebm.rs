@@ -32,7 +32,7 @@ fn cleanup(path: &str) {
 #[test]
 fn test_video_mkv_vers_webm() {
     setup();
-    let input = std::path::PathBuf::from(format!("{TEST_VIDEO}/MKV.mkv"));
+    let input = std::path::PathBuf::from(format!("{TEST_VIDEO}/mkv.mkv"));
     let output = format!("{OUT}/vid_mkv2webm.webm");
     cleanup(&output);
     let result = crate::modules::video::traiter_video(&input, &output, false, false);
