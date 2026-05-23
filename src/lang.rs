@@ -115,6 +115,7 @@ pub struct Lang {
     pub tag_mark_watched: &'static str,
     pub tag_inject_nfo: &'static str,
     pub tag_add_poster: &'static str,
+    pub tag_inject_nfo_and_poster: &'static str,
     pub tag_reset_tags: &'static str,
     pub tag_edit_title: &'static str,
 
@@ -264,6 +265,7 @@ pub const EN: Lang = Lang {
     tag_mark_watched: "✅ Mark as WATCHED",
     tag_inject_nfo: "📥 Inject tags from NFO",
     tag_add_poster: "🖼️ Add poster / fanart",
+    tag_inject_nfo_and_poster: "📎 Inject NFO + Poster",
     tag_reset_tags: "🗑️ Reset Tags",
     tag_edit_title: "✏️ Edit Title",
 
@@ -411,6 +413,7 @@ pub const FR: Lang = Lang {
     tag_mark_watched: "✅ Marquer VU",
     tag_inject_nfo: "📥 Injecter tags depuis NFO",
     tag_add_poster: "🖼️ Ajouter poster / fanart",
+    tag_inject_nfo_and_poster: "📎 Injecter NFO + Poster",
     tag_reset_tags: "🗑️ Reset Tags",
     tag_edit_title: "✏️ Modifier Titre",
 

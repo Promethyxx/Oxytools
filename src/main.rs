@@ -1791,15 +1791,77 @@ impl eframe::App for OxytoolsApp {
                 },
                 #[cfg(feature = "api")]
                 ModuleType::Tag => {
-                    let path_opt = self.current_files.get(0).cloned();
+                    let has_files = !self.current_files.is_empty();
                     ui.vertical(|ui| {
-                        if ui.button(self.lang.tag_mark_watched).clicked() { if let Some(path) = &path_opt { let _ = modules::tag::marquer_vu(&path, &path.with_extension("nfo"), self.lang_id); } }
-                        if ui.button(self.lang.tag_inject_nfo).clicked() { if let Some(path) = &path_opt { let _ = modules::tag::appliquer_tags(&path, &path.with_extension("nfo")); } }
-                        if ui.button(self.lang.tag_add_poster).clicked() { if let Some(path) = &path_opt { let _ = modules::tag::ajouter_images_mkv(&path); } }
-                        if ui.button(self.lang.tag_reset_tags).clicked() { if let Some(path) = &path_opt { let _ = modules::tag::supprimer_tous_tags(&path); } }
-                        ui.horizontal(|ui| {
-                            ui.text_edit_singleline(&mut self.tag_edit_val);
-                            if ui.button(self.lang.tag_edit_title).clicked() { if let Some(path) = &path_opt { let _ = modules::tag::modifier_tag(&path, "title", &self.tag_edit_val); } }
+                        ui.add_enabled_ui(has_files, |ui| {
+                            if ui.button(self.lang.tag_mark_watched).clicked() {
+                                let (mut ok, mut err) = (0usize, 0usize);
+                                for path in &self.current_files {
+                                    match modules::tag::marquer_vu(path, &path.with_extension("nfo"), self.lang_id) {
+                                        Ok(_) => ok += 1,
+                                        Err(e) => { crate::log_error(&format!("marquer_vu {:?}: {}", path, e)); err += 1; }
+                                    }
+                                }
+                                *self.status.lock().unwrap() = format!("✅ {ok} VU | ⚠️ {err}");
+                            }
+                            if ui.button(self.lang.tag_inject_nfo).clicked() {
+                                let (mut ok, mut err) = (0usize, 0usize);
+                                for path in &self.current_files {
+                                    match modules::tag::appliquer_tags(path, &path.with_extension("nfo")) {
+                                        Ok(_) => ok += 1,
+                                        Err(e) => { crate::log_error(&format!("appliquer_tags {:?}: {}", path, e)); err += 1; }
+                                    }
+                                }
+                                *self.status.lock().unwrap() = format!("✅ {ok} NFO | ⚠️ {err}");
+                            }
+                            if ui.button(self.lang.tag_add_poster).clicked() {
+                                let (mut ok, mut err) = (0usize, 0usize);
+                                for path in &self.current_files {
+                                    match modules::tag::ajouter_images_mkv(path) {
+                                        Ok(_) => ok += 1,
+                                        Err(e) => { crate::log_error(&format!("ajouter_images {:?}: {}", path, e)); err += 1; }
+                                    }
+                                }
+                                *self.status.lock().unwrap() = format!("✅ {ok} images | ⚠️ {err}");
+                            }
+                            if ui.button(self.lang.tag_inject_nfo_and_poster).clicked() {
+                                let (mut ok, mut err) = (0usize, 0usize);
+                                for path in &self.current_files {
+                                    let nfo = path.with_extension("nfo");
+                                    let r1 = modules::tag::ajouter_images_mkv(path);
+                                    let r2 = modules::tag::appliquer_tags(path, &nfo);
+                                    match (r1, r2) {
+                                        (Ok(_), Ok(_)) => ok += 1,
+                                        (Err(e), _) => { crate::log_error(&format!("ajouter_images {:?}: {}", path, e)); err += 1; }
+                                        (_, Err(e)) => { crate::log_error(&format!("appliquer_tags {:?}: {}", path, e)); err += 1; }
+                                    }
+                                }
+                                *self.status.lock().unwrap() = format!("✅ {ok} NFO+poster | ⚠️ {err}");
+                            }
+                            if ui.button(self.lang.tag_reset_tags).clicked() {
+                                let (mut ok, mut err) = (0usize, 0usize);
+                                for path in &self.current_files {
+                                    match modules::tag::supprimer_tous_tags(path) {
+                                        Ok(_) => ok += 1,
+                                        Err(e) => { crate::log_error(&format!("supprimer_tags {:?}: {}", path, e)); err += 1; }
+                                    }
+                                }
+                                *self.status.lock().unwrap() = format!("✅ {ok} reset | ⚠️ {err}");
+                            }
+                            ui.horizontal(|ui| {
+                                ui.text_edit_singleline(&mut self.tag_edit_val);
+                                if ui.button(self.lang.tag_edit_title).clicked() {
+                                    let (mut ok, mut err) = (0usize, 0usize);
+                                    let val = self.tag_edit_val.clone();
+                                    for path in &self.current_files {
+                                        match modules::tag::modifier_tag(path, "title", &val) {
+                                            Ok(_) => ok += 1,
+                                            Err(e) => { crate::log_error(&format!("modifier_tag {:?}: {}", path, e)); err += 1; }
+                                        }
+                                    }
+                                    *self.status.lock().unwrap() = format!("✅ {ok} title | ⚠️ {err}");
+                                }
+                            });
                         });
                     });
                 },
