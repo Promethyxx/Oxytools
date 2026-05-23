@@ -54,7 +54,7 @@ fn cleanup(path: &str) {
 #[test]
 fn test_audio_mp3_vers_wav() {
     setup();
-    let input = format!("{TEST_AUDIO}/MP3.mp3");
+    let input = format!("{TEST_AUDIO}/mp3.mp3");
     let output = format!("{OUT}/audio_mp3_to_wav.wav");
     cleanup(&output);
         run_ffmpeg(|| crate::modules::audio::convertir(Path::new(&input), &output, 1), "audio mp3→wav");
@@ -65,7 +65,7 @@ fn test_audio_mp3_vers_wav() {
 #[test]
 fn test_audio_wav_vers_flac() {
     setup();
-    let input = format!("{TEST_AUDIO}/WAV.wav");
+    let input = format!("{TEST_AUDIO}/wav.wav");
     let output = format!("{OUT}/audio_wav_to_flac.flac");
     cleanup(&output);
         run_ffmpeg(|| crate::modules::audio::convertir(Path::new(&input), &output, 1), "audio wav→flac");
@@ -76,7 +76,7 @@ fn test_audio_wav_vers_flac() {
 #[test]
 fn test_audio_ogg_vers_mp3() {
     setup();
-    let input = format!("{TEST_AUDIO}/OGG.ogg");
+    let input = format!("{TEST_AUDIO}/ogg.ogg");
     let output = format!("{OUT}/audio_ogg_to_mp3.mp3");
     cleanup(&output);
         run_ffmpeg(|| crate::modules::audio::convertir(Path::new(&input), &output, 1), "audio ogg→mp3");
@@ -87,7 +87,7 @@ fn test_audio_ogg_vers_mp3() {
 #[test]
 fn test_audio_aac_vers_mp3() {
     setup();
-    let input = format!("{TEST_AUDIO}/AAC.aac");
+    let input = format!("{TEST_AUDIO}/aac.aac");
     let output = format!("{OUT}/audio_aac_to_mp3.mp3");
     cleanup(&output);
         run_ffmpeg(|| crate::modules::audio::convertir(Path::new(&input), &output, 1), "audio aac→mp3");
@@ -98,7 +98,7 @@ fn test_audio_aac_vers_mp3() {
 #[test]
 fn test_audio_flac_vers_mp3() {
     setup();
-    let input = format!("{TEST_AUDIO}/FLAC.flac");
+    let input = format!("{TEST_AUDIO}/flac.flac");
     let output = format!("{OUT}/audio_flac_to_mp3.mp3");
     cleanup(&output);
         run_ffmpeg(|| crate::modules::audio::convertir(Path::new(&input), &output, 1), "audio flac→mp3");
@@ -109,7 +109,7 @@ fn test_audio_flac_vers_mp3() {
 #[test]
 fn test_audio_wav_vers_mp3() {
     setup();
-    let input = format!("{TEST_AUDIO}/WAV.wav");
+    let input = format!("{TEST_AUDIO}/wav.wav");
     let output = format!("{OUT}/audio_wav_to_mp3.mp3");
     cleanup(&output);
         run_ffmpeg(|| crate::modules::audio::convertir(Path::new(&input), &output, 1), "audio wav→mp3");
@@ -120,7 +120,7 @@ fn test_audio_wav_vers_mp3() {
 #[test]
 fn test_audio_mp3_vers_ogg() {
     setup();
-    let input = format!("{TEST_AUDIO}/MP3.mp3");
+    let input = format!("{TEST_AUDIO}/mp3.mp3");
     let output = format!("{OUT}/audio_mp3_to_ogg.ogg");
     cleanup(&output);
         run_ffmpeg(|| crate::modules::audio::convertir(Path::new(&input), &output, 1), "audio mp3→ogg");
@@ -131,7 +131,7 @@ fn test_audio_mp3_vers_ogg() {
 #[test]
 fn test_audio_mp3_vers_aac() {
     setup();
-    let input = format!("{TEST_AUDIO}/MP3.mp3");
+    let input = format!("{TEST_AUDIO}/mp3.mp3");
     let output = format!("{OUT}/audio_mp3_to_aac.aac");
     cleanup(&output);
         run_ffmpeg(|| crate::modules::audio::convertir(Path::new(&input), &output, 1), "audio mp3→aac");
@@ -142,7 +142,7 @@ fn test_audio_mp3_vers_aac() {
 #[test]
 fn test_audio_detecter_extension_ogg() {
     setup();
-    let ext = crate::modules::audio::detecter_extension(Path::new(&format!("{TEST_AUDIO}/OGG.ogg")));
+    let ext = crate::modules::audio::detecter_extension(Path::new(&format!("{TEST_AUDIO}/ogg.ogg")));
     println!("  codec OGG: '{}'", ext);
     assert!(!ext.is_empty(), "detecter_extension vide pour OGG");
 }
@@ -150,7 +150,7 @@ fn test_audio_detecter_extension_ogg() {
 #[test]
 fn test_audio_detecter_extension_mp3() {
     setup();
-    let ext = crate::modules::audio::detecter_extension(Path::new(&format!("{TEST_AUDIO}/MP3.mp3")));
+    let ext = crate::modules::audio::detecter_extension(Path::new(&format!("{TEST_AUDIO}/mp3.mp3")));
     println!("  codec MP3: '{}'", ext);
     assert!(!ext.is_empty(), "detecter_extension vide pour MP3");
 }
@@ -158,7 +158,7 @@ fn test_audio_detecter_extension_mp3() {
 #[test]
 fn test_audio_detecter_extension_flac() {
     setup();
-    let ext = crate::modules::audio::detecter_extension(Path::new(&format!("{TEST_AUDIO}/FLAC.flac")));
+    let ext = crate::modules::audio::detecter_extension(Path::new(&format!("{TEST_AUDIO}/flac.flac")));
     println!("  codec FLAC: '{}'", ext);
     assert!(!ext.is_empty(), "detecter_extension vide pour FLAC");
 }
@@ -179,7 +179,7 @@ fn test_pic_compresser_jpg() {
     setup();
     let output = format!("{OUT}/pic_jpg_c.jpg");
     cleanup(&output);
-    assert!(crate::modules::pic::compresser(Path::new(&format!("{TEST_PIC}/JPG.jpg")), &output, 2));
+    assert!(crate::modules::pic::compresser(Path::new(&format!("{TEST_PIC}/jpg.jpg")), &output, 2));
     assert_output(&output, "compresser JPG");
     cleanup(&output);
 }
@@ -189,7 +189,7 @@ fn test_pic_compresser_png() {
     setup();
     let output = format!("{OUT}/pic_png_c.png");
     cleanup(&output);
-    assert!(crate::modules::pic::compresser(Path::new(&format!("{TEST_PIC}/PNG.png")), &output, 2));
+    assert!(crate::modules::pic::compresser(Path::new(&format!("{TEST_PIC}/png.png")), &output, 2));
     assert_output(&output, "compresser PNG");
     cleanup(&output);
 }
@@ -199,7 +199,7 @@ fn test_pic_compresser_webp() {
     setup();
     let output = format!("{OUT}/pic_webp_c.png");
     cleanup(&output);
-    assert!(crate::modules::pic::compresser(Path::new(&format!("{TEST_PIC}/WEBP.webp")), &output, 2));
+    assert!(crate::modules::pic::compresser(Path::new(&format!("{TEST_PIC}/webp.webp")), &output, 2));
     assert_output(&output, "compresser WEBP");
     cleanup(&output);
 }
@@ -209,7 +209,7 @@ fn test_pic_compresser_gif() {
     setup();
     let output = format!("{OUT}/pic_gif_c.png");
     cleanup(&output);
-    assert!(crate::modules::pic::compresser(Path::new(&format!("{TEST_PIC}/GIF.gif")), &output, 2));
+    assert!(crate::modules::pic::compresser(Path::new(&format!("{TEST_PIC}/gif.gif")), &output, 2));
     assert_output(&output, "compresser GIF");
     cleanup(&output);
 }
@@ -219,7 +219,7 @@ fn test_pic_compresser_svg() {
     setup();
     let output = format!("{OUT}/pic_svg_c.png");
     cleanup(&output);
-    assert!(crate::modules::pic::compresser(Path::new(&format!("{TEST_PIC}/SVG.svg")), &output, 1));
+    assert!(crate::modules::pic::compresser(Path::new(&format!("{TEST_PIC}/svg.svg")), &output, 1));
     assert_output(&output, "compresser SVG");
     cleanup(&output);
 }
@@ -229,7 +229,7 @@ fn test_pic_compresser_psd() {
     setup();
     let output = format!("{OUT}/pic_psd_c.png");
     cleanup(&output);
-    assert!(crate::modules::pic::compresser(Path::new(&format!("{TEST_PIC}/PSD.psd")), &output, 1));
+    assert!(crate::modules::pic::compresser(Path::new(&format!("{TEST_PIC}/psd.psd")), &output, 1));
     assert_output(&output, "compresser PSD");
     cleanup(&output);
 }
@@ -239,7 +239,7 @@ fn test_pic_compresser_ico() {
     setup();
     let output = format!("{OUT}/pic_ico_c.png");
     cleanup(&output);
-    assert!(crate::modules::pic::compresser(Path::new(&format!("{TEST_PIC}/ICO.ico")), &output, 2));
+    assert!(crate::modules::pic::compresser(Path::new(&format!("{TEST_PIC}/ico.ico")), &output, 2));
     assert_output(&output, "compresser ICO");
     cleanup(&output);
 }
@@ -249,7 +249,7 @@ fn test_pic_compresser_tiff() {
     setup();
     let output = format!("{OUT}/pic_tiff_c.png");
     cleanup(&output);
-    assert!(crate::modules::pic::compresser(Path::new(&format!("{TEST_PIC}/Tiff.tiff")), &output, 2));
+    assert!(crate::modules::pic::compresser(Path::new(&format!("{TEST_PIC}/tiff.tiff")), &output, 2));
     assert_output(&output, "compresser TIFF");
     cleanup(&output);
 }
@@ -262,7 +262,7 @@ fn test_pic_pivoter_90() {
     setup();
     let output = format!("{OUT}/pic_rot90.jpg");
     cleanup(&output);
-    assert!(crate::modules::pic::pivoter(Path::new(&format!("{TEST_PIC}/JPG.jpg")), &output, 90));
+    assert!(crate::modules::pic::pivoter(Path::new(&format!("{TEST_PIC}/jpg.jpg")), &output, 90));
     assert_output(&output, "pivoter 90°");
     cleanup(&output);
 }
@@ -272,7 +272,7 @@ fn test_pic_pivoter_180() {
     setup();
     let output = format!("{OUT}/pic_rot180.jpg");
     cleanup(&output);
-    assert!(crate::modules::pic::pivoter(Path::new(&format!("{TEST_PIC}/JPG.jpg")), &output, 180));
+    assert!(crate::modules::pic::pivoter(Path::new(&format!("{TEST_PIC}/jpg.jpg")), &output, 180));
     assert_output(&output, "pivoter 180°");
     cleanup(&output);
 }
@@ -282,7 +282,7 @@ fn test_pic_pivoter_270() {
     setup();
     let output = format!("{OUT}/pic_rot270.jpg");
     cleanup(&output);
-    assert!(crate::modules::pic::pivoter(Path::new(&format!("{TEST_PIC}/JPG.jpg")), &output, 270));
+    assert!(crate::modules::pic::pivoter(Path::new(&format!("{TEST_PIC}/jpg.jpg")), &output, 270));
     assert_output(&output, "pivoter 270°");
     cleanup(&output);
 }
@@ -295,7 +295,7 @@ fn test_pic_recadrer() {
     setup();
     let output = format!("{OUT}/pic_crop.jpg");
     cleanup(&output);
-    assert!(crate::modules::pic::recadrer(Path::new(&format!("{TEST_PIC}/JPG.jpg")), &output, 10, 10, 50, 50));
+    assert!(crate::modules::pic::recadrer(Path::new(&format!("{TEST_PIC}/jpg.jpg")), &output, 10, 10, 50, 50));
     assert_output(&output, "recadrer");
     cleanup(&output);
 }
@@ -305,7 +305,7 @@ fn test_pic_redimensionner_pixels() {
     setup();
     let output = format!("{OUT}/pic_resize_px.jpg");
     cleanup(&output);
-    assert!(crate::modules::pic::redimensionner_pixels(Path::new(&format!("{TEST_PIC}/JPG.jpg")), &output, 200, 150));
+    assert!(crate::modules::pic::redimensionner_pixels(Path::new(&format!("{TEST_PIC}/jpg.jpg")), &output, 200, 150));
     assert_output(&output, "resize 200x150");
     cleanup(&output);
 }
@@ -315,7 +315,7 @@ fn test_pic_redimensionner_poids() {
     setup();
     let output = format!("{OUT}/pic_resize_kb.jpg");
     cleanup(&output);
-    assert!(crate::modules::pic::redimensionner_poids(Path::new(&format!("{TEST_PIC}/JPG.jpg")), &output, 50));
+    assert!(crate::modules::pic::redimensionner_poids(Path::new(&format!("{TEST_PIC}/jpg.jpg")), &output, 50));
     assert_output(&output, "resize max 50Ko");
     cleanup(&output);
 }
@@ -328,7 +328,7 @@ fn test_pic_convertir_jpg_vers_png() {
     setup();
     let output = format!("{OUT}/pic_jpg2png.png");
     cleanup(&output);
-    assert!(crate::modules::pic::convertir(Path::new(&format!("{TEST_PIC}/JPG.jpg")), &output));
+    assert!(crate::modules::pic::convertir(Path::new(&format!("{TEST_PIC}/jpg.jpg")), &output));
     assert_output(&output, "JPG→PNG");
     cleanup(&output);
 }
@@ -338,7 +338,7 @@ fn test_pic_convertir_png_vers_jpg() {
     setup();
     let output = format!("{OUT}/pic_png2jpg.jpg");
     cleanup(&output);
-    assert!(crate::modules::pic::convertir(Path::new(&format!("{TEST_PIC}/PNG.png")), &output));
+    assert!(crate::modules::pic::convertir(Path::new(&format!("{TEST_PIC}/png.png")), &output));
     assert_output(&output, "PNG→JPG");
     cleanup(&output);
 }
@@ -348,7 +348,7 @@ fn test_pic_convertir_svg_vers_png() {
     setup();
     let output = format!("{OUT}/pic_svg2png.png");
     cleanup(&output);
-    assert!(crate::modules::pic::convertir(Path::new(&format!("{TEST_PIC}/SVG.svg")), &output));
+    assert!(crate::modules::pic::convertir(Path::new(&format!("{TEST_PIC}/svg.svg")), &output));
     assert_output(&output, "SVG→PNG");
     cleanup(&output);
 }
@@ -358,7 +358,7 @@ fn test_pic_convertir_jpg_vers_webp() {
     setup();
     let output = format!("{OUT}/pic_jpg2webp.webp");
     cleanup(&output);
-    assert!(crate::modules::pic::convertir(Path::new(&format!("{TEST_PIC}/JPG.jpg")), &output));
+    assert!(crate::modules::pic::convertir(Path::new(&format!("{TEST_PIC}/jpg.jpg")), &output));
     assert_output(&output, "JPG→WEBP");
     cleanup(&output);
 }
@@ -368,7 +368,7 @@ fn test_pic_convertir_png_vers_webp() {
     setup();
     let output = format!("{OUT}/pic_png2webp.webp");
     cleanup(&output);
-    assert!(crate::modules::pic::convertir(Path::new(&format!("{TEST_PIC}/PNG.png")), &output));
+    assert!(crate::modules::pic::convertir(Path::new(&format!("{TEST_PIC}/png.png")), &output));
     assert_output(&output, "PNG→WEBP");
     cleanup(&output);
 }
@@ -378,7 +378,7 @@ fn test_pic_convertir_webp_vers_png() {
     setup();
     let output = format!("{OUT}/pic_webp2png.png");
     cleanup(&output);
-    assert!(crate::modules::pic::convertir(Path::new(&format!("{TEST_PIC}/WEBP.webp")), &output));
+    assert!(crate::modules::pic::convertir(Path::new(&format!("{TEST_PIC}/webp.webp")), &output));
     assert_output(&output, "WEBP→PNG");
     cleanup(&output);
 }
@@ -388,7 +388,7 @@ fn test_pic_convertir_gif_vers_png() {
     setup();
     let output = format!("{OUT}/pic_gif2png.png");
     cleanup(&output);
-    assert!(crate::modules::pic::convertir(Path::new(&format!("{TEST_PIC}/GIF.gif")), &output));
+    assert!(crate::modules::pic::convertir(Path::new(&format!("{TEST_PIC}/gif.gif")), &output));
     assert_output(&output, "GIF→PNG");
     cleanup(&output);
 }
@@ -398,7 +398,7 @@ fn test_pic_convertir_tiff_vers_jpg() {
     setup();
     let output = format!("{OUT}/pic_tiff2jpg.jpg");
     cleanup(&output);
-    assert!(crate::modules::pic::convertir(Path::new(&format!("{TEST_PIC}/Tiff.tiff")), &output));
+    assert!(crate::modules::pic::convertir(Path::new(&format!("{TEST_PIC}/tiff.tiff")), &output));
     assert_output(&output, "TIFF→JPG");
     cleanup(&output);
 }
@@ -409,7 +409,7 @@ fn test_pic_convertir_jpg_vers_jxl() {
     setup();
     let output = format!("{OUT}/pic_jpg2jxl.jxl");
     cleanup(&output);
-    assert!(crate::modules::pic::convertir(Path::new(&format!("{TEST_PIC}/JPG.jpg")), &output));
+    assert!(crate::modules::pic::convertir(Path::new(&format!("{TEST_PIC}/jpg.jpg")), &output));
     assert_output(&output, "JPG→JXL");
     cleanup(&output);
 }
@@ -419,7 +419,7 @@ fn test_pic_convertir_png_vers_jxl() {
     setup();
     let output = format!("{OUT}/pic_png2jxl.jxl");
     cleanup(&output);
-    assert!(crate::modules::pic::convertir(Path::new(&format!("{TEST_PIC}/PNG.png")), &output));
+    assert!(crate::modules::pic::convertir(Path::new(&format!("{TEST_PIC}/png.png")), &output));
     assert_output(&output, "PNG→JXL");
     cleanup(&output);
 }
@@ -429,7 +429,7 @@ fn test_pic_convertir_jxl_vers_jpg() {
     setup();
     let output = format!("{OUT}/pic_jxl2jpg.jpg");
     cleanup(&output);
-    assert!(crate::modules::pic::convertir(Path::new(&format!("{TEST_PIC}/JXL.jxl")), &output));
+    assert!(crate::modules::pic::convertir(Path::new(&format!("{TEST_PIC}/jxl.jxl")), &output));
     assert_output(&output, "JXL→JPG");
     cleanup(&output);
 }
@@ -439,7 +439,7 @@ fn test_pic_convertir_jxl_vers_png() {
     setup();
     let output = format!("{OUT}/pic_jxl2png.png");
     cleanup(&output);
-    assert!(crate::modules::pic::convertir(Path::new(&format!("{TEST_PIC}/JXL.jxl")), &output));
+    assert!(crate::modules::pic::convertir(Path::new(&format!("{TEST_PIC}/jxl.jxl")), &output));
     assert_output(&output, "JXL→PNG");
     cleanup(&output);
 }
@@ -450,7 +450,7 @@ fn test_pic_convertir_jxl_vers_png() {
 #[test]
 fn test_pic_lire_exif() {
     setup();
-    let tags = crate::modules::pic::lire_exif(Path::new(&format!("{TEST_PIC}/JPG.jpg")));
+    let tags = crate::modules::pic::lire_exif(Path::new(&format!("{TEST_PIC}/jpg.jpg")));
     println!("  EXIF JPG: {} entrées", tags.len());
 }
 
@@ -459,7 +459,7 @@ fn test_pic_supprimer_exif() {
     setup();
     let output = format!("{OUT}/pic_no_exif.jpg");
     cleanup(&output);
-    assert!(crate::modules::pic::supprimer_exif(Path::new(&format!("{TEST_PIC}/JPG.jpg")), &output));
+    assert!(crate::modules::pic::supprimer_exif(Path::new(&format!("{TEST_PIC}/jpg.jpg")), &output));
     assert_output(&output, "supprimer EXIF");
     cleanup(&output);
 }
@@ -472,7 +472,7 @@ fn test_doc_convertir_md_vers_pdf() {
     setup();
     let output = format!("{OUT}/doc_md2pdf.pdf");
     cleanup(&output);
-    assert!(crate::modules::doc::convertir(Path::new(&format!("{TEST_DOC}/MD.md")), &output), "MD→PDF échoué");
+    assert!(crate::modules::doc::convertir(Path::new(&format!("{TEST_DOC}/md.md")), &output), "MD→PDF échoué");
     assert_output(&output, "MD→PDF");
     cleanup(&output);
 }
@@ -482,7 +482,7 @@ fn test_doc_convertir_md_vers_html() {
     setup();
     let output = format!("{OUT}/doc_md2html.html");
     cleanup(&output);
-    assert!(crate::modules::doc::convertir(Path::new(&format!("{TEST_DOC}/MD.md")), &output), "MD→HTML échoué");
+    assert!(crate::modules::doc::convertir(Path::new(&format!("{TEST_DOC}/md.md")), &output), "MD→HTML échoué");
     assert_output(&output, "MD→HTML");
     cleanup(&output);
 }
@@ -492,7 +492,7 @@ fn test_doc_convertir_md_vers_docx() {
     setup();
     let output = format!("{OUT}/doc_md2docx.docx");
     cleanup(&output);
-    assert!(crate::modules::doc::convertir(Path::new(&format!("{TEST_DOC}/MD.md")), &output), "MD→DOCX échoué");
+    assert!(crate::modules::doc::convertir(Path::new(&format!("{TEST_DOC}/md.md")), &output), "MD→DOCX échoué");
     assert_output(&output, "MD→DOCX");
     cleanup(&output);
 }
@@ -502,7 +502,7 @@ fn test_doc_convertir_docx_vers_pdf() {
     setup();
     let output = format!("{OUT}/doc_docx2pdf.pdf");
     cleanup(&output);
-    assert!(crate::modules::doc::convertir(Path::new(&format!("{TEST_DOC}/DOCX.docx")), &output), "DOCX→PDF échoué");
+    assert!(crate::modules::doc::convertir(Path::new(&format!("{TEST_DOC}/docx.docx")), &output), "DOCX→PDF échoué");
     assert_output(&output, "DOCX→PDF");
     cleanup(&output);
 }
@@ -512,7 +512,7 @@ fn test_doc_convertir_docx_vers_html() {
     setup();
     let output = format!("{OUT}/doc_docx2html.html");
     cleanup(&output);
-    assert!(crate::modules::doc::convertir(Path::new(&format!("{TEST_DOC}/DOCX.docx")), &output), "DOCX→HTML échoué");
+    assert!(crate::modules::doc::convertir(Path::new(&format!("{TEST_DOC}/docx.docx")), &output), "DOCX→HTML échoué");
     assert_output(&output, "DOCX→HTML");
     cleanup(&output);
 }
@@ -522,7 +522,7 @@ fn test_doc_convertir_html_vers_pdf() {
     setup();
     let output = format!("{OUT}/doc_html2pdf.pdf");
     cleanup(&output);
-    assert!(crate::modules::doc::convertir(Path::new(&format!("{TEST_DOC}/HTML.html")), &output), "HTML→PDF échoué");
+    assert!(crate::modules::doc::convertir(Path::new(&format!("{TEST_DOC}/html.html")), &output), "HTML→PDF échoué");
     assert_output(&output, "HTML→PDF");
     cleanup(&output);
 }
@@ -532,7 +532,7 @@ fn test_doc_convertir_html_vers_md() {
     setup();
     let output = format!("{OUT}/doc_html2md.md");
     cleanup(&output);
-    assert!(crate::modules::doc::convertir(Path::new(&format!("{TEST_DOC}/HTML.html")), &output), "HTML→MD échoué");
+    assert!(crate::modules::doc::convertir(Path::new(&format!("{TEST_DOC}/html.html")), &output), "HTML→MD échoué");
     assert_output(&output, "HTML→MD");
     cleanup(&output);
 }
@@ -542,7 +542,7 @@ fn test_doc_convertir_txt_vers_pdf() {
     setup();
     let output = format!("{OUT}/doc_txt2pdf.pdf");
     cleanup(&output);
-    assert!(crate::modules::doc::convertir(Path::new(&format!("{TEST_DOC}/TXT.txt")), &output), "TXT→PDF échoué");
+    assert!(crate::modules::doc::convertir(Path::new(&format!("{TEST_DOC}/txt.txt")), &output), "TXT→PDF échoué");
     assert_output(&output, "TXT→PDF");
     cleanup(&output);
 }
@@ -552,7 +552,7 @@ fn test_doc_convertir_txt_vers_html() {
     setup();
     let output = format!("{OUT}/doc_txt2html.html");
     cleanup(&output);
-    assert!(crate::modules::doc::convertir(Path::new(&format!("{TEST_DOC}/TXT.txt")), &output), "TXT→HTML échoué");
+    assert!(crate::modules::doc::convertir(Path::new(&format!("{TEST_DOC}/txt.txt")), &output), "TXT→HTML échoué");
     assert_output(&output, "TXT→HTML");
     cleanup(&output);
 }
@@ -562,7 +562,7 @@ fn test_doc_convertir_odt_vers_pdf() {
     setup();
     let output = format!("{OUT}/doc_odt2pdf.pdf");
     cleanup(&output);
-    assert!(crate::modules::doc::convertir(Path::new(&format!("{TEST_DOC}/ODT.odt")), &output), "ODT→PDF échoué");
+    assert!(crate::modules::doc::convertir(Path::new(&format!("{TEST_DOC}/odt.odt")), &output), "ODT→PDF échoué");
     assert_output(&output, "ODT→PDF");
     cleanup(&output);
 }
@@ -572,7 +572,7 @@ fn test_doc_convertir_odt_vers_html() {
     setup();
     let output = format!("{OUT}/doc_odt2html.html");
     cleanup(&output);
-    assert!(crate::modules::doc::convertir(Path::new(&format!("{TEST_DOC}/ODT.odt")), &output), "ODT→HTML échoué");
+    assert!(crate::modules::doc::convertir(Path::new(&format!("{TEST_DOC}/odt.odt")), &output), "ODT→HTML échoué");
     assert_output(&output, "ODT→HTML");
     cleanup(&output);
 }
@@ -585,7 +585,7 @@ fn test_doc_pdf_split() {
     setup();
     let output_dir = format!("{OUT}/pdf_split_pages");
     let _ = fs::create_dir_all(&output_dir);
-    let result = crate::modules::doc::pdf_split(Path::new(&format!("{TEST_FMT}/PDF.pdf")), &output_dir);
+    let result = crate::modules::doc::pdf_split(Path::new(&format!("{TEST_FMT}/pdf.pdf")), &output_dir);
     assert!(result.is_ok(), "pdf_split échoué : {:?}", result);
     let _ = fs::remove_dir_all(&output_dir);
 }
@@ -593,7 +593,7 @@ fn test_doc_pdf_split() {
 #[test]
 fn test_doc_pdf_merge() {
     setup();
-    let input = format!("{TEST_FMT}/PDF.pdf");
+    let input = format!("{TEST_FMT}/pdf.pdf");
     let output = format!("{OUT}/doc_pdf_merged.pdf");
     cleanup(&output);
     let p = Path::new(&input);
@@ -608,7 +608,7 @@ fn test_doc_pdf_rotate() {
     setup();
     let output = format!("{OUT}/doc_pdf_rot90.pdf");
     cleanup(&output);
-    let result = crate::modules::doc::pdf_rotate(Path::new(&format!("{TEST_FMT}/PDF.pdf")), &output, 90, None);
+    let result = crate::modules::doc::pdf_rotate(Path::new(&format!("{TEST_FMT}/pdf.pdf")), &output, 90, None);
     assert!(result.is_ok(), "pdf_rotate 90 échoué : {:?}", result);
     assert_output(&output, "pdf rotate 90°");
     cleanup(&output);
@@ -619,7 +619,7 @@ fn test_doc_pdf_rotate_180() {
     setup();
     let output = format!("{OUT}/doc_pdf_rot180.pdf");
     cleanup(&output);
-    let result = crate::modules::doc::pdf_rotate(Path::new(&format!("{TEST_FMT}/PDF.pdf")), &output, 180, None);
+    let result = crate::modules::doc::pdf_rotate(Path::new(&format!("{TEST_FMT}/pdf.pdf")), &output, 180, None);
     assert!(result.is_ok(), "pdf_rotate 180 échoué : {:?}", result);
     assert_output(&output, "pdf rotate 180°");
     cleanup(&output);
@@ -631,7 +631,7 @@ fn test_doc_pdf_rotate_pages_specifiques() {
     let output = format!("{OUT}/doc_pdf_rot_p1.pdf");
     cleanup(&output);
     let pages = vec![1u32];
-    let result = crate::modules::doc::pdf_rotate(Path::new(&format!("{TEST_FMT}/PDF.pdf")), &output, 90, Some(&pages));
+    let result = crate::modules::doc::pdf_rotate(Path::new(&format!("{TEST_FMT}/pdf.pdf")), &output, 90, Some(&pages));
     assert!(result.is_ok(), "pdf_rotate page 1 échoué : {:?}", result);
     assert_output(&output, "pdf rotate page 1");
     cleanup(&output);
@@ -642,7 +642,7 @@ fn test_doc_pdf_compress() {
     setup();
     let output = format!("{OUT}/doc_pdf_comp.pdf");
     cleanup(&output);
-    let result = crate::modules::doc::pdf_compresser(Path::new(&format!("{TEST_FMT}/PDF.pdf")), &output);
+    let result = crate::modules::doc::pdf_compresser(Path::new(&format!("{TEST_FMT}/pdf.pdf")), &output);
     assert!(result.is_ok(), "pdf_compresser échoué : {:?}", result);
     assert_output(&output, "pdf compress");
     cleanup(&output);
@@ -653,7 +653,7 @@ fn test_doc_pdf_crop() {
     setup();
     let output = format!("{OUT}/doc_pdf_crop.pdf");
     cleanup(&output);
-    let result = crate::modules::doc::pdf_crop(Path::new(&format!("{TEST_FMT}/PDF.pdf")), &output, 10.0, 10.0, 80.0, 80.0, None);
+    let result = crate::modules::doc::pdf_crop(Path::new(&format!("{TEST_FMT}/pdf.pdf")), &output, 10.0, 10.0, 80.0, 80.0, None);
     assert!(result.is_ok(), "pdf_crop échoué : {:?}", result);
     assert_output(&output, "pdf crop");
     cleanup(&output);
@@ -664,7 +664,7 @@ fn test_doc_pdf_organiser() {
     setup();
     let output = format!("{OUT}/doc_pdf_org.pdf");
     cleanup(&output);
-    let result = crate::modules::doc::pdf_organiser(Path::new(&format!("{TEST_FMT}/PDF.pdf")), &output, &[1]);
+    let result = crate::modules::doc::pdf_organiser(Path::new(&format!("{TEST_FMT}/pdf.pdf")), &output, &[1]);
     assert!(result.is_ok(), "pdf_organiser échoué : {:?}", result);
     assert_output(&output, "pdf organiser");
     cleanup(&output);
@@ -674,7 +674,7 @@ fn test_doc_pdf_organiser() {
 fn test_doc_pdf_supprimer_pages() {
     setup();
     // Merger pour avoir multi-pages
-    let input = format!("{TEST_FMT}/PDF.pdf");
+    let input = format!("{TEST_FMT}/pdf.pdf");
     let merged = format!("{OUT}/doc_pdf_for_del.pdf");
     cleanup(&merged);
     let p = Path::new(&input);
@@ -695,7 +695,7 @@ fn test_doc_pdf_numeroter() {
     let output = format!("{OUT}/doc_pdf_num.pdf");
     cleanup(&output);
     let result = crate::modules::doc::pdf_numeroter(
-        Path::new(&format!("{TEST_FMT}/PDF.pdf")), &output, 1,
+        Path::new(&format!("{TEST_FMT}/pdf.pdf")), &output, 1,
         crate::modules::doc::PositionNumero::BasCentre, 10.0
     );
     assert!(result.is_ok(), "pdf_numeroter échoué : {:?}", result);
@@ -708,7 +708,7 @@ fn test_doc_pdf_watermark() {
     setup();
     let output = format!("{OUT}/doc_pdf_wm.pdf");
     cleanup(&output);
-    let result = crate::modules::doc::pdf_watermark(Path::new(&format!("{TEST_FMT}/PDF.pdf")), &output, "TEST", 40.0, 0.3, None);
+    let result = crate::modules::doc::pdf_watermark(Path::new(&format!("{TEST_FMT}/pdf.pdf")), &output, "TEST", 40.0, 0.3, None);
     assert!(result.is_ok(), "pdf_watermark échoué : {:?}", result);
     assert_output(&output, "pdf watermark");
     cleanup(&output);
@@ -719,7 +719,7 @@ fn test_doc_pdf_repair() {
     setup();
     let output = format!("{OUT}/doc_pdf_rep.pdf");
     cleanup(&output);
-    let result = crate::modules::doc::pdf_reparer(Path::new(&format!("{TEST_FMT}/PDF.pdf")), &output);
+    let result = crate::modules::doc::pdf_reparer(Path::new(&format!("{TEST_FMT}/pdf.pdf")), &output);
     assert!(result.is_ok(), "pdf_reparer échoué : {:?}", result);
     assert_output(&output, "pdf repair");
     cleanup(&output);
@@ -733,7 +733,7 @@ fn test_doc_pdf_protect_unlock() {
     cleanup(&protected);
     cleanup(&unlocked);
 
-    let result = crate::modules::doc::pdf_proteger(Path::new(&format!("{TEST_FMT}/PDF.pdf")), &protected, "owner123", "user123", true, false);
+    let result = crate::modules::doc::pdf_proteger(Path::new(&format!("{TEST_FMT}/pdf.pdf")), &protected, "owner123", "user123", true, false);
     assert!(result.is_ok(), "pdf_proteger échoué : {:?}", result);
     assert_output(&protected, "pdf protect");
 
@@ -753,7 +753,7 @@ fn test_archive_compresser_zip() {
     setup();
     let output = format!("{OUT}/arc_test.zip");
     cleanup(&output);
-    assert!(crate::modules::archive::compresser(Path::new(&format!("{TEST_PIC}/JPG.jpg")), &output, "zip", 6));
+    assert!(crate::modules::archive::compresser(Path::new(&format!("{TEST_PIC}/jpg.jpg")), &output, "zip", 6));
     assert_output(&output, "archive zip");
     cleanup(&output);
 }
@@ -763,7 +763,7 @@ fn test_archive_compresser_7z() {
     setup();
     let output = format!("{OUT}/arc_test.7z");
     cleanup(&output);
-    assert!(crate::modules::archive::compresser(Path::new(&format!("{TEST_PIC}/JPG.jpg")), &output, "7z", 6));
+    assert!(crate::modules::archive::compresser(Path::new(&format!("{TEST_PIC}/jpg.jpg")), &output, "7z", 6));
     assert_output(&output, "archive 7z");
     cleanup(&output);
 }
@@ -773,7 +773,7 @@ fn test_archive_compresser_tar() {
     setup();
     let output = format!("{OUT}/arc_test.tar.gz");
     cleanup(&output);
-    assert!(crate::modules::archive::compresser(Path::new(&format!("{TEST_PIC}/JPG.jpg")), &output, "tar", 6));
+    assert!(crate::modules::archive::compresser(Path::new(&format!("{TEST_PIC}/jpg.jpg")), &output, "tar", 6));
     assert_output(&output, "archive tar");
     cleanup(&output);
 }
@@ -785,7 +785,7 @@ fn test_archive_extraire_zip() {
     let dir = format!("{OUT}/arc_ext_zip");
     cleanup(&zip);
     let _ = fs::remove_dir_all(&dir);
-    assert!(crate::modules::archive::compresser(Path::new(&format!("{TEST_PIC}/JPG.jpg")), &zip, "zip", 6));
+    assert!(crate::modules::archive::compresser(Path::new(&format!("{TEST_PIC}/jpg.jpg")), &zip, "zip", 6));
     let _ = fs::create_dir_all(&dir);
     assert!(crate::modules::archive::extraire(Path::new(&zip), &dir), "extraction zip échouée");
     cleanup(&zip);
@@ -799,7 +799,7 @@ fn test_archive_extraire_7z() {
     let dir = format!("{OUT}/arc_ext_7z");
     cleanup(&sz);
     let _ = fs::remove_dir_all(&dir);
-    assert!(crate::modules::archive::compresser(Path::new(&format!("{TEST_PIC}/JPG.jpg")), &sz, "7z", 6));
+    assert!(crate::modules::archive::compresser(Path::new(&format!("{TEST_PIC}/jpg.jpg")), &sz, "7z", 6));
     let _ = fs::create_dir_all(&dir);
     assert!(crate::modules::archive::extraire(Path::new(&sz), &dir), "extraction 7z échouée");
     cleanup(&sz);
@@ -813,7 +813,7 @@ fn test_archive_extraire_tar() {
     let dir = format!("{OUT}/arc_ext_tar");
     cleanup(&tar);
     let _ = fs::remove_dir_all(&dir);
-    assert!(crate::modules::archive::compresser(Path::new(&format!("{TEST_PIC}/JPG.jpg")), &tar, "tar", 6));
+    assert!(crate::modules::archive::compresser(Path::new(&format!("{TEST_PIC}/jpg.jpg")), &tar, "tar", 6));
     let _ = fs::create_dir_all(&dir);
     assert!(crate::modules::archive::extraire(Path::new(&tar), &dir), "extraction tar échouée");
     cleanup(&tar);
@@ -826,7 +826,7 @@ fn test_archive_extraire_tar() {
 #[test]
 fn test_video_mkv_vers_mp4() {
     setup();
-    let input = std::path::PathBuf::from(format!("{TEST_VIDEO}/MKV.mkv"));
+    let input = std::path::PathBuf::from(format!("{TEST_VIDEO}/mkv.mkv"));
     let output = format!("{OUT}/vid_mkv2mp4.mp4");
     cleanup(&output);
         run_ffmpeg(|| crate::modules::video::traiter_video(&input, &output, false, false, 1), "mkv→mp4");
@@ -837,7 +837,7 @@ fn test_video_mkv_vers_mp4() {
 #[test]
 fn test_video_mp4_vers_mkv() {
     setup();
-    let input = std::path::PathBuf::from(format!("{TEST_VIDEO}/MP4.mp4"));
+    let input = std::path::PathBuf::from(format!("{TEST_VIDEO}/mp4.mp4"));
     let output = format!("{OUT}/vid_mp42mkv.mkv");
     cleanup(&output);
         run_ffmpeg(|| crate::modules::video::traiter_video(&input, &output, false, false, 1), "mp4→mkv");
@@ -848,7 +848,7 @@ fn test_video_mp4_vers_mkv() {
 #[test]
 fn test_video_webm_vers_mp4() {
     setup();
-    let input = std::path::PathBuf::from(format!("{TEST_VIDEO}/WEBM.webm"));
+    let input = std::path::PathBuf::from(format!("{TEST_VIDEO}/webm.webm"));
     let output = format!("{OUT}/vid_webm2mp4.mp4");
     cleanup(&output);
         run_ffmpeg(|| crate::modules::video::traiter_video(&input, &output, false, false, 1), "webm→mp4");
@@ -859,7 +859,7 @@ fn test_video_webm_vers_mp4() {
 #[test]
 fn test_video_copie_flux() {
     setup();
-    let input = std::path::PathBuf::from(format!("{TEST_VIDEO}/MKV.mkv"));
+    let input = std::path::PathBuf::from(format!("{TEST_VIDEO}/mkv.mkv"));
     let output = format!("{OUT}/vid_copy.mp4");
     cleanup(&output);
         run_ffmpeg(|| crate::modules::video::traiter_video(&input, &output, true, false, 1), "copie flux");
@@ -872,7 +872,7 @@ fn test_video_copie_flux() {
 #[test]
 fn test_audio_extraire_depuis_mkv() {
     setup();
-    let input = format!("{TEST_VIDEO}/MKV.mkv");
+    let input = format!("{TEST_VIDEO}/mkv.mkv");
     let output = format!("{OUT}/audio_extrait.mkv");
     cleanup(&output);
         run_ffmpeg(|| crate::modules::audio::extraire(Path::new(&input), &output), "audio extraire mkv");
@@ -883,7 +883,7 @@ fn test_audio_extraire_depuis_mkv() {
 #[test]
 fn test_audio_extraire_depuis_mp4() {
     setup();
-    let input = format!("{TEST_VIDEO}/MP4.mp4");
+    let input = format!("{TEST_VIDEO}/mp4.mp4");
     let output = format!("{OUT}/audio_extrait_mp4.mkv");
     cleanup(&output);
         run_ffmpeg(|| crate::modules::audio::extraire(Path::new(&input), &output), "audio extraire mp4");
@@ -897,21 +897,21 @@ fn test_audio_extraire_depuis_mp4() {
 #[test]
 fn test_doc_detecter_format_entree_md() {
     setup();
-    let fmt = crate::modules::doc::detecter_format_entree(Path::new(&format!("{TEST_DOC}/MD.md")));
+    let fmt = crate::modules::doc::detecter_format_entree(Path::new(&format!("{TEST_DOC}/md.md")));
     println!("  format entree MD: {:?}", fmt);
 }
 
 #[test]
 fn test_doc_detecter_format_entree_docx() {
     setup();
-    let fmt = crate::modules::doc::detecter_format_entree(Path::new(&format!("{TEST_DOC}/DOCX.docx")));
+    let fmt = crate::modules::doc::detecter_format_entree(Path::new(&format!("{TEST_DOC}/docx.docx")));
     println!("  format entree DOCX: {:?}", fmt);
 }
 
 #[test]
 fn test_doc_detecter_format_entree_html() {
     setup();
-    let fmt = crate::modules::doc::detecter_format_entree(Path::new(&format!("{TEST_DOC}/HTML.html")));
+    let fmt = crate::modules::doc::detecter_format_entree(Path::new(&format!("{TEST_DOC}/html.html")));
     println!("  format entree HTML: {:?}", fmt);
 }
 
