@@ -1090,3 +1090,16 @@ fn test_rename_no_change() {
     assert_eq!(previews[0].1, "unchanged.mp4");
     println!("  rename no change: OK");
 }
+// ═══════════════════════════════════════════════════════════════
+//  VIDEO — mkv vers webm
+// ═══════════════════════════════════════════════════════════════
+#[test]
+fn test_video_mkv_vers_webm() {
+    setup();
+    let input = std::path::PathBuf::from(format!("{TEST_VIDEO}/mkv.mkv"));
+    let output = format!("{OUT}/vid_mkv2webm.webm");
+    cleanup(&output);
+    run_ffmpeg(|| crate::modules::video::traiter_video(&input, &output, false, false, 1), "mkv→webm");
+    assert_output(&output, "mkv→webm");
+    cleanup(&output);
+}

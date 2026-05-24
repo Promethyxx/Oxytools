@@ -6,8 +6,6 @@ pub use logging::{log_info, log_warn, log_error};
 pub mod modules;
 #[cfg(test)]
 #[path = "test.rs"]
-#[cfg(test)]
-#[path = "testmkvwebm.rs"]
 mod test;
 use eframe::egui;
 use std::path::{Path, PathBuf};

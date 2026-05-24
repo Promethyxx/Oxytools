@@ -97,7 +97,7 @@ pub fn compresser(input: &Path, output: &str, qualite: u32) -> bool {
 
 /// Ouvre une image en détectant le format par contenu (ignore l'extension)
 fn ouvrir_par_contenu(input: &Path) -> Option<image::DynamicImage> {
-    use image::io::Reader as ImageReader;
+    use image::ImageReader;
     let reader = match ImageReader::open(input) {
         Ok(r) => r,
         Err(e) => {
