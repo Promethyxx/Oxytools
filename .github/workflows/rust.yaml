@@ -54,19 +54,19 @@ jobs:
         include:
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            label: windows-x64
+            label: Win_x64
             bin_dir: bin
             asset_tag: Assets_Windows_x64
 
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            label: linux-x64
+            label: Lin_x64
             bin_dir: bin-linux-x64
             asset_tag: Assets_Linux_x64
 
           - os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
-            label: linux-arm64
+            label: Lin_arm64
             bin_dir: bin-linux-arm
             asset_tag: Assets_Mac_ARM
 
@@ -121,34 +121,34 @@ jobs:
 
     - name: Prepare Binary (Windows)
       if: runner.os == 'Windows'
-      run: Copy-Item target/${{ matrix.target }}/dist/Oxytools.exe oxytools-${{ matrix.label }}.exe
+      run: Copy-Item target/${{ matrix.target }}/dist/Oxytools.exe Oxytools_${{ matrix.label }}.exe
       shell: pwsh
 
     - name: Prepare Binary (Linux)
       if: runner.os == 'Linux'
       run: |
-        cp target/${{ matrix.target }}/dist/Oxytools oxytools-${{ matrix.label }}
-        chmod +x oxytools-${{ matrix.label }}
+        cp target/${{ matrix.target }}/dist/Oxytools Oxytools_${{ matrix.label }}
+        chmod +x Oxytools_${{ matrix.label }}
 
     - name: Build Office
       run: cargo build --profile dist --no-default-features --target ${{ matrix.target }}
 
     - name: Prepare Office Binary (Windows)
       if: runner.os == 'Windows'
-      run: Copy-Item target/${{ matrix.target }}/dist/Oxytools.exe oxytools-office-${{ matrix.label }}.exe
+      run: Copy-Item target/${{ matrix.target }}/dist/Oxytools.exe Oxytools_Office_${{ matrix.label }}.exe
       shell: pwsh
 
     - name: Prepare Office Binary (Linux)
       if: runner.os == 'Linux'
       run: |
-        cp target/${{ matrix.target }}/dist/Oxytools oxytools-office-${{ matrix.label }}
-        chmod +x oxytools-office-${{ matrix.label }}
+        cp target/${{ matrix.target }}/dist/Oxytools Oxytools_Office_${{ matrix.label }}
+        chmod +x Oxytools_Office_${{ matrix.label }}
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: binaries-${{ matrix.label }}
-        path: oxytools-*
+        path: Oxytools_*
 
   release:
     needs: build
@@ -170,12 +170,7 @@ jobs:
         merge-multiple: true
 
     - name: List files
-      run: ls -lh oxytools-*
-
-    - name: Generate SHA256
-      run: |
-        sha256sum oxytools-* > SHA256SUMS.txt
-        cat SHA256SUMS.txt
+      run: ls -lh Oxytools_*
 
     - name: Deploy to GitHub Release
       uses: softprops/action-gh-release@v2
@@ -183,18 +178,13 @@ jobs:
         tag_name: v${{ steps.version.outputs.version }}
         name: Oxytools v${{ steps.version.outputs.version }}
         body: |
-          ### Oxytools v${{ steps.version.outputs.version }}
-
-          | Platform | Full | Office |
-          |----------|------|--------|
-          | Windows x64 | `oxytools-windows-x64.exe` | `oxytools-office-windows-x64.exe` |
-          | Linux x64 | `oxytools-linux-x64` | `oxytools-office-linux-x64` |
-          | Linux ARM64 | `oxytools-linux-arm64` | `oxytools-office-linux-arm64` |
-
-          ### SHA256 Checksums
-          See `SHA256SUMS.txt` asset for all hashes.
-        files: |
-          oxytools-*
-          SHA256SUMS.txt
+          ## Platforms
+          || Oxytools | Oxytools_Office |
+          |---|:---:|:---:|
+          | Linux ARM64 | ✅ | ✅ |
+          | Linux x64 | ✅ | ✅ |
+          | Mac ARM64 | 🛠️ | 🛠️ |
+          | Windows x64 | ✅ | ✅ |
+        files: Oxytools_*
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
