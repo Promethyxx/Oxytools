@@ -639,7 +639,7 @@ impl OxytoolsApp {
                 let effective_fmt = if module == ModuleType::Doc && doc_action != "Convert" {
                     "pdf".to_string()
                 } else {
-                    fmt.clone()
+                    fmt.to_lowercase()
                 };
                 let output = input.parent().unwrap().join(format!(
                     "{}_oxytools.{}",
@@ -1507,7 +1507,7 @@ impl eframe::App for OxytoolsApp {
                             ui.horizontal(|ui| {
                                 ui.label(self.lang.format_label);
                                 egui::ComboBox::from_id_salt("ifmt").selected_text(&self.format_choisi).show_ui(ui, |ui| {
-                                    for f in ["EXR","GIF","ICO","JPG","JXL","PNG","PSD","SVG","TIFF","WebP"] {
+                                    for f in ["exr","gif","ico","jpg","jxl","png","tiff","webp"] {
                                         ui.selectable_value(&mut self.format_choisi, f.into(), f);
                                     }
                                 });
@@ -1579,7 +1579,7 @@ impl eframe::App for OxytoolsApp {
                             ui.horizontal(|ui| {
                                 ui.label(self.lang.format_label);
                                 egui::ComboBox::from_id_salt("ifmt_resize").selected_text(&self.format_choisi).show_ui(ui, |ui| {
-                                    for f in ["EXR","GIF","ICO","JPG","JXL","PNG","PSD","SVG","TIFF","WebP"] {
+                                    for f in ["exr","gif","ico","jpg","jxl","png","tiff","webp"] {
                                         ui.selectable_value(&mut self.format_choisi, f.into(), f);
                                     }
                                 });

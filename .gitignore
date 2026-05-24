@@ -24,3 +24,4 @@ target/
 config.toml
 flatpak-cargo-generator.py
 cargo-sources.json
+test_output.txt

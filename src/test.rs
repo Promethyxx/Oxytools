@@ -10,7 +10,6 @@ use std::sync::{Once, Mutex};
 const TEST_AUDIO: &str = "tests/audio";
 const TEST_DOC:   &str = "tests/doc";
 const TEST_PIC:   &str = "tests/pic";
-const TEST_FMT:   &str = "tests/formats";
 const TEST_VIDEO: &str = "tests/video";
 const OUT:        &str = "tests/_output";
 
@@ -585,7 +584,7 @@ fn test_doc_pdf_split() {
     setup();
     let output_dir = format!("{OUT}/pdf_split_pages");
     let _ = fs::create_dir_all(&output_dir);
-    let result = crate::modules::doc::pdf_split(Path::new(&format!("{TEST_FMT}/pdf.pdf")), &output_dir);
+    let result = crate::modules::doc::pdf_split(Path::new(&format!("{TEST_DOC}/pdf.pdf")), &output_dir);
     assert!(result.is_ok(), "pdf_split échoué : {:?}", result);
     let _ = fs::remove_dir_all(&output_dir);
 }
@@ -593,7 +592,7 @@ fn test_doc_pdf_split() {
 #[test]
 fn test_doc_pdf_merge() {
     setup();
-    let input = format!("{TEST_FMT}/pdf.pdf");
+    let input = format!("{TEST_DOC}/pdf.pdf");
     let output = format!("{OUT}/doc_pdf_merged.pdf");
     cleanup(&output);
     let p = Path::new(&input);
@@ -608,7 +607,7 @@ fn test_doc_pdf_rotate() {
     setup();
     let output = format!("{OUT}/doc_pdf_rot90.pdf");
     cleanup(&output);
-    let result = crate::modules::doc::pdf_rotate(Path::new(&format!("{TEST_FMT}/pdf.pdf")), &output, 90, None);
+    let result = crate::modules::doc::pdf_rotate(Path::new(&format!("{TEST_DOC}/pdf.pdf")), &output, 90, None);
     assert!(result.is_ok(), "pdf_rotate 90 échoué : {:?}", result);
     assert_output(&output, "pdf rotate 90°");
     cleanup(&output);
@@ -619,7 +618,7 @@ fn test_doc_pdf_rotate_180() {
     setup();
     let output = format!("{OUT}/doc_pdf_rot180.pdf");
     cleanup(&output);
-    let result = crate::modules::doc::pdf_rotate(Path::new(&format!("{TEST_FMT}/pdf.pdf")), &output, 180, None);
+    let result = crate::modules::doc::pdf_rotate(Path::new(&format!("{TEST_DOC}/pdf.pdf")), &output, 180, None);
     assert!(result.is_ok(), "pdf_rotate 180 échoué : {:?}", result);
     assert_output(&output, "pdf rotate 180°");
     cleanup(&output);
@@ -631,7 +630,7 @@ fn test_doc_pdf_rotate_pages_specifiques() {
     let output = format!("{OUT}/doc_pdf_rot_p1.pdf");
     cleanup(&output);
     let pages = vec![1u32];
-    let result = crate::modules::doc::pdf_rotate(Path::new(&format!("{TEST_FMT}/pdf.pdf")), &output, 90, Some(&pages));
+    let result = crate::modules::doc::pdf_rotate(Path::new(&format!("{TEST_DOC}/pdf.pdf")), &output, 90, Some(&pages));
     assert!(result.is_ok(), "pdf_rotate page 1 échoué : {:?}", result);
     assert_output(&output, "pdf rotate page 1");
     cleanup(&output);
@@ -642,7 +641,7 @@ fn test_doc_pdf_compress() {
     setup();
     let output = format!("{OUT}/doc_pdf_comp.pdf");
     cleanup(&output);
-    let result = crate::modules::doc::pdf_compresser(Path::new(&format!("{TEST_FMT}/pdf.pdf")), &output);
+    let result = crate::modules::doc::pdf_compresser(Path::new(&format!("{TEST_DOC}/pdf.pdf")), &output);
     assert!(result.is_ok(), "pdf_compresser échoué : {:?}", result);
     assert_output(&output, "pdf compress");
     cleanup(&output);
@@ -653,7 +652,7 @@ fn test_doc_pdf_crop() {
     setup();
     let output = format!("{OUT}/doc_pdf_crop.pdf");
     cleanup(&output);
-    let result = crate::modules::doc::pdf_crop(Path::new(&format!("{TEST_FMT}/pdf.pdf")), &output, 10.0, 10.0, 80.0, 80.0, None);
+    let result = crate::modules::doc::pdf_crop(Path::new(&format!("{TEST_DOC}/pdf.pdf")), &output, 10.0, 10.0, 80.0, 80.0, None);
     assert!(result.is_ok(), "pdf_crop échoué : {:?}", result);
     assert_output(&output, "pdf crop");
     cleanup(&output);
@@ -664,7 +663,7 @@ fn test_doc_pdf_organiser() {
     setup();
     let output = format!("{OUT}/doc_pdf_org.pdf");
     cleanup(&output);
-    let result = crate::modules::doc::pdf_organiser(Path::new(&format!("{TEST_FMT}/pdf.pdf")), &output, &[1]);
+    let result = crate::modules::doc::pdf_organiser(Path::new(&format!("{TEST_DOC}/pdf.pdf")), &output, &[1]);
     assert!(result.is_ok(), "pdf_organiser échoué : {:?}", result);
     assert_output(&output, "pdf organiser");
     cleanup(&output);
@@ -674,7 +673,7 @@ fn test_doc_pdf_organiser() {
 fn test_doc_pdf_supprimer_pages() {
     setup();
     // Merger pour avoir multi-pages
-    let input = format!("{TEST_FMT}/pdf.pdf");
+    let input = format!("{TEST_DOC}/pdf.pdf");
     let merged = format!("{OUT}/doc_pdf_for_del.pdf");
     cleanup(&merged);
     let p = Path::new(&input);
@@ -695,7 +694,7 @@ fn test_doc_pdf_numeroter() {
     let output = format!("{OUT}/doc_pdf_num.pdf");
     cleanup(&output);
     let result = crate::modules::doc::pdf_numeroter(
-        Path::new(&format!("{TEST_FMT}/pdf.pdf")), &output, 1,
+        Path::new(&format!("{TEST_DOC}/pdf.pdf")), &output, 1,
         crate::modules::doc::PositionNumero::BasCentre, 10.0
     );
     assert!(result.is_ok(), "pdf_numeroter échoué : {:?}", result);
@@ -708,7 +707,7 @@ fn test_doc_pdf_watermark() {
     setup();
     let output = format!("{OUT}/doc_pdf_wm.pdf");
     cleanup(&output);
-    let result = crate::modules::doc::pdf_watermark(Path::new(&format!("{TEST_FMT}/pdf.pdf")), &output, "TEST", 40.0, 0.3, None);
+    let result = crate::modules::doc::pdf_watermark(Path::new(&format!("{TEST_DOC}/pdf.pdf")), &output, "TEST", 40.0, 0.3, None);
     assert!(result.is_ok(), "pdf_watermark échoué : {:?}", result);
     assert_output(&output, "pdf watermark");
     cleanup(&output);
@@ -719,7 +718,7 @@ fn test_doc_pdf_repair() {
     setup();
     let output = format!("{OUT}/doc_pdf_rep.pdf");
     cleanup(&output);
-    let result = crate::modules::doc::pdf_reparer(Path::new(&format!("{TEST_FMT}/pdf.pdf")), &output);
+    let result = crate::modules::doc::pdf_reparer(Path::new(&format!("{TEST_DOC}/pdf.pdf")), &output);
     assert!(result.is_ok(), "pdf_reparer échoué : {:?}", result);
     assert_output(&output, "pdf repair");
     cleanup(&output);
@@ -733,7 +732,7 @@ fn test_doc_pdf_protect_unlock() {
     cleanup(&protected);
     cleanup(&unlocked);
 
-    let result = crate::modules::doc::pdf_proteger(Path::new(&format!("{TEST_FMT}/pdf.pdf")), &protected, "owner123", "user123", true, false);
+    let result = crate::modules::doc::pdf_proteger(Path::new(&format!("{TEST_DOC}/pdf.pdf")), &protected, "owner123", "user123", true, false);
     assert!(result.is_ok(), "pdf_proteger échoué : {:?}", result);
     assert_output(&protected, "pdf protect");
 

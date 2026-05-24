@@ -66,36 +66,74 @@ pub fn compresser(input: &Path, output: &str, qualite: u32) -> bool {
         }
     }
 
-    // Format standard supporté par image crate
-    match image::open(input) {
-        Ok(img) => {
-            // Si la sortie est JXL, encoder via zune-jpegxl
-            if output.to_lowercase().ends_with(".jxl") {
-                return encoder_jxl(&img, output);
-            }
-            // Si la sortie est ICO, passer par le convertisseur dédié
-            if output.to_lowercase().ends_with(".ico") {
-                return convertir_ico_sizes(&img, output, &[256]);
-            }
-            // Si la sortie est JPEG, appliquer la qualité
-            if output.to_lowercase().ends_with(".jpg") || output.to_lowercase().ends_with(".jpeg") {
-                return sauvegarder_jpeg(&img, output, qualite);
-            }
-            // Si la sortie est WebP, appliquer la qualité
-            if output.to_lowercase().ends_with(".webp") {
-                return sauvegarder_webp(&img, output, qualite);
-            }
-            // Formats lossless (PNG, TIFF, etc.) : sauvegarde directe
-            let ok = img.save(output).is_ok();
-            if !ok {
-                crate::log_error(&format!("pic::compresser échec save | {:?} -> {}", input, output));
-            }
-            ok
-        },
+    // Format standard — détection par contenu (ignore l'extension source)
+    let img = match ouvrir_par_contenu(input) {
+        Some(i) => i,
+        None => return false,
+    };
+    let out_lower = output.to_lowercase();
+    if out_lower.ends_with(".jxl") {
+        return encoder_jxl(&img, output);
+    }
+    if out_lower.ends_with(".ico") {
+        return convertir_ico_sizes(&img, output, &[256]);
+    }
+    if out_lower.ends_with(".jpg") || out_lower.ends_with(".jpeg") {
+        return sauvegarder_jpeg(&img, output, qualite);
+    }
+    if out_lower.ends_with(".webp") {
+        return sauvegarder_webp(&img, output, qualite);
+    }
+    let fmt = detecter_format_image(output);
+    let ok = match fmt {
+        Some(f) => img.save_with_format(output, f).is_ok(),
+        None => img.save(output).is_ok(),
+    };
+    if !ok {
+        crate::log_error(&format!("pic::compresser échec save | {:?} -> {}", input, output));
+    }
+    ok
+}
+
+/// Ouvre une image en détectant le format par contenu (ignore l'extension)
+fn ouvrir_par_contenu(input: &Path) -> Option<image::DynamicImage> {
+    use image::io::Reader as ImageReader;
+    let reader = match ImageReader::open(input) {
+        Ok(r) => r,
         Err(e) => {
-            crate::log_error(&format!("pic::compresser impossible d'ouvrir {:?} : {}", input, e));
-            false
+            crate::log_error(&format!("pic::ouvrir_par_contenu impossible d'ouvrir {:?} : {}", input, e));
+            return None;
         }
+    };
+    let reader = match reader.with_guessed_format() {
+        Ok(r) => r,
+        Err(e) => {
+            crate::log_error(&format!("pic::ouvrir_par_contenu détection format échouée {:?} : {}", input, e));
+            return None;
+        }
+    };
+    match reader.decode() {
+        Ok(img) => Some(img),
+        Err(e) => {
+            crate::log_error(&format!("pic::ouvrir_par_contenu décodage échoué {:?} : {}", input, e));
+            None
+        }
+    }
+}
+
+/// Détecte le format image de sortie depuis l'extension du chemin output
+fn detecter_format_image(output: &str) -> Option<image::ImageFormat> {
+    let ext = Path::new(output).extension()?.to_str()?.to_lowercase();
+    match ext.as_str() {
+        "png"  => Some(image::ImageFormat::Png),
+        "jpg" | "jpeg" => Some(image::ImageFormat::Jpeg),
+        "webp" => Some(image::ImageFormat::WebP),
+        "gif"  => Some(image::ImageFormat::Gif),
+        "tiff" | "tif" => Some(image::ImageFormat::Tiff),
+        "ico"  => Some(image::ImageFormat::Ico),
+        "bmp"  => Some(image::ImageFormat::Bmp),
+        "exr"  => Some(image::ImageFormat::OpenExr),
+        _      => None,
     }
 }
 
@@ -265,7 +303,6 @@ pub fn generer_ico_multi(input: &Path, output: &str, sizes: &[u32]) -> bool {
 
 /// Conversion de format (ex: PNG -> JPG, WEBP -> PNG)
 pub fn convertir(input: &Path, output: &str) -> bool {
-    // Détection du format d'entrée
     if let Some(ext) = input.extension().and_then(|e| e.to_str()) {
         match ext.to_lowercase().as_str() {
             "svg" => return convertir_svg(input, output),
@@ -279,21 +316,32 @@ pub fn convertir(input: &Path, output: &str) -> bool {
         }
     }
 
-    // Format standard
-    match image::open(input) {
-        Ok(img) => {
-            // Si la sortie est JXL, encoder via zune-jpegxl
-            if output.to_lowercase().ends_with(".jxl") {
-                return encoder_jxl(&img, output);
-            }
-            // Si la sortie est ICO, passer par le convertisseur dédié
-            if output.to_lowercase().ends_with(".ico") {
-                return convertir_ico_sizes(&img, output, &[256]);
-            }
-            img.save(output).is_ok()
-        },
-        Err(_) => false,
+    let img = match ouvrir_par_contenu(input) {
+        Some(i) => i,
+        None => return false,
+    };
+    let out_lower = output.to_lowercase();
+    if out_lower.ends_with(".jxl") {
+        return encoder_jxl(&img, output);
     }
+    if out_lower.ends_with(".ico") {
+        return convertir_ico_sizes(&img, output, &[256]);
+    }
+    if out_lower.ends_with(".jpg") || out_lower.ends_with(".jpeg") {
+        return sauvegarder_jpeg(&img, output, 10);
+    }
+    if out_lower.ends_with(".webp") {
+        return sauvegarder_webp(&img, output, 10);
+    }
+    let fmt = detecter_format_image(output);
+    let ok = match fmt {
+        Some(f) => img.save_with_format(output, f).is_ok(),
+        None => img.save(output).is_ok(),
+    };
+    if !ok {
+        crate::log_error(&format!("pic::convertir échec save | {:?} -> {}", input, output));
+    }
+    ok
 }
 
 /// Lecture des métadonnées EXIF (GPS, Appareil, Date)
