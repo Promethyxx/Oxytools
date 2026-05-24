@@ -1,58 +1,37 @@
-# Oxytools & Oxytools_Desk
+# Oxytools & Oxytools_Office
 
 ![Oxytools Logo](https://raw.githubusercontent.com/Promethyxx/Oxytools/main/assets/Oxytools_dark.png)
 
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE.txt)
 [![Rust](https://img.shields.io/badge/rust-2024%20edition-orange.svg)](https://www.rust-lang.org/)
 
-## What is Oxytools?
+# Oxytools
 
-Oxytools is a portable desktop toolkit that centralizes a collection of everyday multimedia scripts into a single GUI application.
+Oxytools is a Rust portable GUI toolkit that brings together a collection - such as conversion, renaming, tagging, and scraping - with bundled binaries (ffmpeg, ffprobe, mkvpropedit).
 
-Built with Rust and [egui](https://github.com/emilide/egui).
+Oxytools_Office is a restricted version of Oxytools with less modules and does not include an API or network connectivity. It is designed for professional use.
 
-Think of it as a Swiss army knife for file processing: conversion, renaming, tagging, scraping.
-All in one place, with bundled binaries (ffmpeg, ffprobe, mkvpropedit) so there's nothing extra to install.
+---
+## Languages supported
+- English
+- French
+---
+## Modules and key differences
 
-Available in English and French.
-
-## What is Oxytools_Desk?
-
-Oxytools_Desk was born from a real need.
-
-In a professional environment where tools like Adobe Acrobat Pro aren't available,
-the only option is often to upload sensitive documents to third-party websites (iLovePDF, iLoveIMG) — which never feels right.
-
-Oxytools_Desk brings those capabilities locally: document conversion, image processing, archiving, renaming.
-All offline, with no external binaries, no API calls, and no data leaving your machine.
-
-It's built for professional use where privacy and autonomy matter.
-
-## Modules
-
-| Module | Oxytools | Oxytools_Desk |
+| Differences | Oxytools | Oxytools_Office |
 |--------|:-----:|:----------:|
-| Archives (7Z, ZIP, TAR) | ✅ | ✅ |
-| Audio (MP3, FLAC, AAC, OGG) | ✅ | ❌ |
-| Documents (DOCX, PDF, MD, ODT, HTML, LaTeX) | ✅ | ✅ |
-| File renamer (find/replace, insert, numbering, case, extensions) | ✅ | ✅ |
-| Pictures (15+ formats: AVIF, JXL, RAW, SVG, PSD, WebP, EXR…) | ✅ | ✅ |
-| Scraper (TMDB, Fanart) | ✅ | ❌ |
+| Archives (7Z, TAR, ZIP) | ✅ | ✅ |
+| Audio (AAC, FLAC, MP3, OGG) | ✅ | ❌ |
+| Documents (DOCX, HTML, MD, LaTeX, ODT, PDF...) | ✅ | ✅ |
+| File renamer (case, find, insert, numbering, replace...) | ✅ | ✅ |
+| Pictures (JPG, JXL, PNG, WebP…) | ✅ | ✅ |
+| Scraper (Fanart, TMDB) | ✅ | ❌ |
 | Tagger (MKV tagging) | ✅ | ❌ |
-| Tools | ✅ | ✅ | ✅ |
+| Tools (directory and file listing)| ✅ | ✅ | ✅ |
 | Video (mkv, mp4, webm) | ✅ | ❌ |
-
-## Key differences
-
-| | Key differences | Oxytools | Oxytools_Desk |
-|---|:---:|:---:|:---:|
-| Purpose | | Swiss army knife for multimedia | Offline document & image processing |
-| Interface | | GUI | GUI |
-| Bundled binaries |  ffmpeg, ffprobe, mkvpropedit | ✅ | ❌ |
-| API keys required | FanArt, TMDB (for scraping only) | ✅ | ❌ |
-| Internet access | for scraping only | ✅ | ❌ |
-| Portable | | ✅ | ✅ |
-
+| Bundled binaries (ffmpeg, ffprobe, mkvpropedit) | ✅ | ❌ |
+| Internet access | ✅ | ❌ |
+---
 ## Platforms
 
 | | Linux ARM64 | Linux x64 | Mac ARM64 | Windows x64 |
@@ -61,48 +40,44 @@ It's built for professional use where privacy and autonomy matter.
 | Oxytools_Desk | ✅ | ✅ | ✅ | ✅ |
 
 The source code is Mac ARM ready.
-I don't have any, so I need to compile this with Github CI, which cost a lot of ratio compare to other platforms.
-i will post sometimes.
+I don't have any Mac, so I need to compile this with Github CI, which cost a lot of ratio.
 
+---
+## Building from source
+You need those binaries to build
+FFmpeg, FFprobe : https://ffmpeg.org — LGPLv2.1+
+mkvpropedit (MKVToolNix) : https://mkvtoolnix.download — GPLv2.
+You can also find them in assest in the releases.
+
+### Linux Arm
+- Oxytools
+   - cargo build --profile dist --target=aarch64-unknown-linux-gnu
+- Oxytools_Office
+   - cargo build --profile dist --no-default-features --features bundled --target=aarch64-unknown-linux-gnu
+
+### Linux x64, Windows x64
+- Oxytools
+   - cargo build --profile dist
+- Oxytools_Office
+   - cargo build --profile dist --no-default-features --features bundled
+---
 ## Quick Start
 
 1. Download the latest release from [Releases](../../releases)
-2. Run the executable — no installation needed
+2. Run the executable - no installation needed
 3. Drop your files or browse to select them
 4. Choose your output format
 5. Click "Execute"
 
-## Building from source
-
-```bash
-# Full build (Oxytools GUI)
-cargo build --release
-
-# Desk variant (GUI only, no bundled binaries)
-cargo build --release --no-default-features --features bundled
-
-# Optimized distribution build
-cargo build --profile dist
-```
 ---
-# Contributing
-You can find the contributing rules at :
-https://github.com/Promethyxx/Oxyon/blob/main/contributing.md
-
-# Manifest
-You can find my manifest at :
-https://github.com/Promethyxx/Oxyon/blob/main/manifest.md
-
-# Roadmap
-You can find the roadmap at :
-https://github.com/Promethyxx/Oxyon
-
 ## License
 
 This project is licensed under the GNU General Public License v3.0 — see Licenses.md for details.
 
-Binaries required by Oxytools
-FFmpeg : https://ffmpeg.org — LGPLv2.1+
-mkvpropedit (MKVToolNix) : https://mkvtoolnix.download — GPLv2.
+---
+## Roadmap
+https://github.com/Promethyxx/Oxyon
+
+
 
 
