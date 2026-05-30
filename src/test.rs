@@ -1,6 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-//  OXYON — Tests automatisés exhaustifs
-//  Lance : cargo test
+//  OXYTOOLS — Tests
 // ═══════════════════════════════════════════════════════════════
 
 use std::path::Path;
@@ -14,7 +13,7 @@ const TEST_VIDEO: &str = "tests/video";
 const OUT:        &str = "tests/_output";
 
 static INIT: Once = Once::new();
-/// Mutex global pour sérialiser les opérations ffmpeg (évite les crashs concurrents)
+/// Global mutex to serialize FFmpeg operations (prevents concurrent crashes)
 static FFMPEG_LOCK: Mutex<()> = Mutex::new(());
 
 fn setup() {
@@ -24,7 +23,7 @@ fn setup() {
     let _ = fs::create_dir_all(OUT);
 }
 
-/// Verrouille le mutex ffmpeg, exécute le spawn PUIS attend la fin (séquentiel garanti)
+/// Locks the ffmpeg mutex, executes the spawn, and THEN waits for it to finish (sequential execution guaranteed)
 fn run_ffmpeg<F>(spawn_fn: F, context: &str)
 where F: FnOnce() -> Result<std::process::Child, std::io::Error>
 {
@@ -48,7 +47,7 @@ fn cleanup(path: &str) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  AUDIO — conversion entre formats
+//  AUDIO — conversion
 // ═══════════════════════════════════════════════════════════════
 #[test]
 fn test_audio_mp3_vers_wav() {
@@ -171,7 +170,7 @@ fn test_audio_formats_compatibles() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  IMAGE — compresser tous formats
+//  PIC — compress
 // ═══════════════════════════════════════════════════════════════
 #[test]
 fn test_pic_compresser_jpg() {
@@ -254,7 +253,7 @@ fn test_pic_compresser_tiff() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  IMAGE — pivoter
+//  PIC — rotate
 // ═══════════════════════════════════════════════════════════════
 #[test]
 fn test_pic_pivoter_90() {
@@ -287,7 +286,7 @@ fn test_pic_pivoter_270() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  IMAGE — recadrer, redimensionner
+//  PIC — crop, resize
 // ═══════════════════════════════════════════════════════════════
 #[test]
 fn test_pic_recadrer() {
@@ -320,7 +319,7 @@ fn test_pic_redimensionner_poids() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  IMAGE — conversions entre formats
+//  PIC — conversions
 // ═══════════════════════════════════════════════════════════════
 #[test]
 fn test_pic_convertir_jpg_vers_png() {
@@ -444,7 +443,7 @@ fn test_pic_convertir_jxl_vers_png() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  IMAGE — EXIF
+//  PIC — EXIF
 // ═══════════════════════════════════════════════════════════════
 #[test]
 fn test_pic_lire_exif() {
@@ -464,7 +463,7 @@ fn test_pic_supprimer_exif() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  DOC — conversion pandoc
+//  DOC — conversion
 // ═══════════════════════════════════════════════════════════════
 #[test]
 fn test_doc_convertir_md_vers_pdf() {
@@ -577,7 +576,7 @@ fn test_doc_convertir_odt_vers_html() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  DOC — opérations PDF
+//  DOC — PDF operations
 // ═══════════════════════════════════════════════════════════════
 #[test]
 fn test_doc_pdf_split() {
@@ -672,7 +671,6 @@ fn test_doc_pdf_organiser() {
 #[test]
 fn test_doc_pdf_supprimer_pages() {
     setup();
-    // Merger pour avoir multi-pages
     let input = format!("{TEST_DOC}/pdf.pdf");
     let merged = format!("{OUT}/doc_pdf_for_del.pdf");
     cleanup(&merged);
@@ -866,7 +864,7 @@ fn test_video_copie_flux() {
     cleanup(&output);
 }
 // ═══════════════════════════════════════════════════════════════
-//  AUDIO — extraction depuis vidéo
+//  AUDIO — extraction from video
 // ═══════════════════════════════════════════════════════════════
 #[test]
 fn test_audio_extraire_depuis_mkv() {
@@ -891,7 +889,7 @@ fn test_audio_extraire_depuis_mp4() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  DOC — détection de formats
+//  DOC — format detection
 // ═══════════════════════════════════════════════════════════════
 #[test]
 fn test_doc_detecter_format_entree_md() {
@@ -1091,7 +1089,7 @@ fn test_rename_no_change() {
     println!("  rename no change: OK");
 }
 // ═══════════════════════════════════════════════════════════════
-//  VIDEO — mkv vers webm
+//  VIDEO — mkv > webm
 // ═══════════════════════════════════════════════════════════════
 #[test]
 fn test_video_mkv_vers_webm() {
