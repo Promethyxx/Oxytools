@@ -144,6 +144,8 @@ struct OxytoolsApp {
         completed_jobs: Arc<Mutex<usize>>,
         total_jobs: Arc<Mutex<usize>>,
         job_queue: Arc<Mutex<Vec<PathBuf>>>,
+        conv_progress: Arc<Mutex<f32>>,
+        active_pids: Arc<Mutex<Vec<u32>>>,
         tools_cfg: modules::tools::ToolsConfig,
         tools_new_name: String,
         tools_new_path: String,
@@ -250,6 +252,8 @@ impl Default for OxytoolsApp {
                 completed_jobs: Arc::new(Mutex::new(0)),
                 total_jobs: Arc::new(Mutex::new(0)),
                 job_queue: Arc::new(Mutex::new(Vec::new())),
+                conv_progress: Arc::new(Mutex::new(-1.0f32)),
+                active_pids: Arc::new(Mutex::new(Vec::new())),
                 tools_cfg: modules::tools::ToolsConfig::default(),
                 tools_new_name: String::new(),
                 tools_new_path: String::new(),
@@ -569,6 +573,8 @@ impl OxytoolsApp {
         let completed = Arc::clone(&self.completed_jobs);
         let total = Arc::clone(&self.total_jobs);
         let status_arc = Arc::clone(&self.status);
+        let conv_progress = Arc::clone(&self.conv_progress);
+        let active_pids = Arc::clone(&self.active_pids);
         let lang = self.lang;
         let module = self.module_actif;
         let fmt = self.format_choisi.clone();
@@ -739,12 +745,9 @@ impl OxytoolsApp {
                                 ));
                                 let extract_str = extract_out.to_str().unwrap().to_string();
                                 match modules::audio::extraire(&input, &extract_str) {
-                                    Ok(mut child) => {
-                                        match child.wait() {
-                                            Ok(status) if status.success() => Ok(()),
-                                            Ok(status) => Err(format!("audio extraction process exited with code={:?}", status.code())),
-                                            Err(e) => Err(format!("erreur wait() extraction audio: {}", e)),
-                                        }
+                                    Ok(child) => {
+                                        let dur = get_duration_secs(&input);
+                                        wait_ffmpeg_with_progress(child, dur, &conv_progress, &active_pids)
                                     },
                                     Err(e) => Err(format!("impossible de lancer ffmpeg extraction: {}", e)),
                                 }
@@ -752,12 +755,9 @@ impl OxytoolsApp {
                             _ => {
                                 log_info(&format!("Audio: conversion | {:?}", input));
                                 match modules::audio::convertir(&input, &out_str, audio_qualite) {
-                                    Ok(mut child) => {
-                                        match child.wait() {
-                                            Ok(status) if status.success() => Ok(()),
-                                            Ok(status) => Err(format!("audio process exited with code={:?}", status.code())),
-                                            Err(e) => Err(format!("erreur wait() audio: {}", e)),
-                                        }
+                                    Ok(child) => {
+                                        let dur = get_duration_secs(&input);
+                                        wait_ffmpeg_with_progress(child, dur, &conv_progress, &active_pids)
                                     },
                                     Err(e) => Err(format!("impossible de lancer ffmpeg audio: {}", e)),
                                 }
@@ -768,12 +768,9 @@ impl OxytoolsApp {
                     ModuleType::Video => {
                         log_info(&format!("Video: copie_flux={} speed={} | {:?}", copie, video_speed, input));
                         match modules::video::traiter_video(&input, &out_str, copie, false, video_speed) {
-                            Ok(mut child) => {
-                                match child.wait() {
-                                    Ok(status) if status.success() => Ok(()),
-                                    Ok(status) => Err(format!("video process exited with code={:?}", status.code())),
-                                    Err(e) => Err(format!("wait() error video: {}", e)),
-                                }
+                            Ok(child) => {
+                                let dur = get_duration_secs(&input);
+                                wait_ffmpeg_with_progress(child, dur, &conv_progress, &active_pids)
                             },
                             Err(e) => Err(format!("failed to start ffmpeg video: {}", e)),
                         }
@@ -1071,7 +1068,117 @@ impl OxytoolsApp {
         });
     }
 }
+/// Lit la durée d'un fichier media via ffprobe. Retourne les secondes ou None.
+fn get_duration_secs(path: &std::path::Path) -> Option<f64> {
+    let out = crate::modules::binaries::silent_cmd(crate::modules::binaries::get_ffprobe())
+        .args(["-v", "quiet", "-print_format", "json", "-show_entries",
+               "format=duration", path.to_str()?])
+        .output().ok()?;
+    let json = String::from_utf8_lossy(&out.stdout);
+    // "duration": "3725.123456"
+    let key = "\"duration\":";
+    let pos = json.find(key)?;
+    let rest = json[pos + key.len()..].trim();
+    let val = rest.trim_matches(|c| c == '"' || c == ' ' || c == '\n');
+    val.split('"').next()?.trim().parse::<f64>().ok()
+}
+
+/// Parse "HH:MM:SS.ss" ou "MM:SS.ss" en secondes.
+fn parse_time_to_secs(t: &str) -> Option<f64> {
+    let parts: Vec<&str> = t.split(':').collect();
+    match parts.as_slice() {
+        [h, m, s] => {
+            let secs = h.parse::<f64>().ok()? * 3600.0
+                + m.parse::<f64>().ok()? * 60.0
+                + s.parse::<f64>().ok()?;
+            Some(secs)
+        }
+        [m, s] => Some(m.parse::<f64>().ok()? * 60.0 + s.parse::<f64>().ok()?),
+        _ => None,
+    }
+}
+
+/// Lance un Child ffmpeg et lit son stderr en temps réel pour mettre à jour conv_progress.
+/// Bloque jusqu'à la fin du process. Retourne Ok/Err.
+fn wait_ffmpeg_with_progress(
+    mut child: std::process::Child,
+    duration_secs: Option<f64>,
+    conv_progress: &Arc<Mutex<f32>>,
+    active_pids: &Arc<Mutex<Vec<u32>>>,
+) -> Result<(), String> {
+    use std::io::Read;
+
+    // Enregistrer le PID pour pouvoir killer depuis on_exit
+    let pid = child.id();
+    active_pids.lock().unwrap().push(pid);
+
+    let stderr = child.stderr.take();
+    let (tx, rx) = std::sync::mpsc::channel::<String>();
+
+    if let Some(mut stderr) = stderr {
+        std::thread::spawn(move || {
+            let mut buf = [0u8; 512];
+            let mut accum = String::new();
+            loop {
+                match stderr.read(&mut buf) {
+                    Ok(0) | Err(_) => break,
+                    Ok(n) => {
+                        accum.push_str(&String::from_utf8_lossy(&buf[..n]));
+                        // ffmpeg sépare ses lignes de progress par \r
+                        while let Some(pos) = accum.find('\r') {
+                            let line = accum[..pos].to_string();
+                            accum = accum[pos + 1..].to_string();
+                            let _ = tx.send(line);
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    *conv_progress.lock().unwrap() = 0.0;
+
+    loop {
+        for line in rx.try_iter() {
+            if let Some(pos) = line.find("time=") {
+                let time_str = line[pos + 5..].split_whitespace().next().unwrap_or("");
+                if let (Some(elapsed), Some(total)) = (parse_time_to_secs(time_str), duration_secs) {
+                    if total > 0.0 {
+                        *conv_progress.lock().unwrap() = (elapsed / total).min(1.0) as f32;
+                    }
+                }
+            }
+        }
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                *conv_progress.lock().unwrap() = -1.0;
+                active_pids.lock().unwrap().retain(|&p| p != pid);
+                return if status.success() { Ok(()) }
+                       else { Err(format!("ffmpeg exited with code {:?}", status.code())) };
+            }
+            Ok(None) => std::thread::sleep(std::time::Duration::from_millis(100)),
+            Err(e) => {
+                *conv_progress.lock().unwrap() = -1.0;
+                active_pids.lock().unwrap().retain(|&p| p != pid);
+                return Err(format!("wait error: {}", e));
+            }
+        }
+    }
+}
+
 impl eframe::App for OxytoolsApp {
+    fn on_exit(&mut self) {
+        // Kill tous les process ffmpeg en cours à la fermeture
+        let pids = self.active_pids.lock().unwrap().clone();
+        for pid in pids {
+            #[cfg(unix)]
+            { let _ = std::process::Command::new("kill").arg(pid.to_string()).status(); }
+            #[cfg(windows)]
+            { let _ = std::process::Command::new("taskkill").args(["/PID", &pid.to_string(), "/F"]).status(); }
+        }
+        self.active_pids.lock().unwrap().clear();
+    }
+
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
         let ctx = &ctx;
@@ -2597,7 +2704,14 @@ impl eframe::App for OxytoolsApp {
             ui.vertical_centered(|ui| {
                 let completed = *self.completed_jobs.lock().unwrap();
                 let total = *self.total_jobs.lock().unwrap();
-                if total > 0 && completed < total {
+                let ff_progress = *self.conv_progress.lock().unwrap();
+
+                if ff_progress >= 0.0 {
+                    // Conversion ffmpeg en cours — barre de progression du fichier courant
+                    let pct = (ff_progress * 100.0).round() as u32;
+                    ui.heading(format!("⚙️ {} {}%", completed + 1, pct));
+                    ui.add(egui::ProgressBar::new(ff_progress).animate(false));
+                } else if total > 0 && completed < total {
                     let active = *self.active_jobs.lock().unwrap();
                     let pct = (completed as f32 / total as f32 * 100.0).round() as u32;
                     ui.heading(crate::lang::fmt3(self.lang.processing_pct, &completed.to_string(), &total.to_string(), &pct.to_string()));
@@ -2607,6 +2721,9 @@ impl eframe::App for OxytoolsApp {
                     ui.heading(self.lang.done_processed.replace("{}", &total.to_string()));
                 } else {
                     ui.heading(&*self.status.lock().unwrap());
+                }
+                if ff_progress >= 0.0 {
+                    ctx.request_repaint_after(std::time::Duration::from_millis(100));
                 }
             });
             if !self.current_files.is_empty() { if ui.button(self.lang.clear_all).clicked() { self.current_files.clear(); } }
