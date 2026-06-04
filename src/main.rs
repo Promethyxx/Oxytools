@@ -68,6 +68,8 @@ struct OxytoolsApp {
         rename_last_list_path: Option<PathBuf>,
         tmdb_api_key: String,
         fanart_api_key: String,
+        keys_env_path: Option<PathBuf>,
+        scrap_status: String,
         save_doc_format: bool,
         save_image_format: bool,
         save_archive_format: bool,
@@ -172,6 +174,8 @@ impl Default for OxytoolsApp {
                 current_theme: "Dark".into(),
                 tmdb_api_key: String::new(),
                 fanart_api_key: String::new(),
+                keys_env_path: None,
+                scrap_status: String::new(),
                 save_doc_format: false,
                 save_image_format: false,
                 save_archive_format: false,
@@ -384,7 +388,16 @@ impl OxytoolsApp {
                 }
             }
         }
-        dotenvy::from_path(Self::config_dir().join(".env")).ok();
+        // Charger le path custom de .env si enregistré dans config.toml
+        let custom_env_path: Option<PathBuf> = {
+            std::fs::read_to_string(Self::config_dir().join("config.toml"))
+                .ok()
+                .and_then(|c| c.parse::<toml::Table>().ok())
+                .and_then(|t| t.get("scrapper")?.as_table()?.get("keys_path")?.as_str().map(PathBuf::from))
+        };
+        let env_path = custom_env_path.clone().unwrap_or_else(|| Self::config_dir().join(".env"));
+        if let Some(ref p) = custom_env_path { self.keys_env_path = Some(p.clone()); }
+        dotenvy::from_path(&env_path).ok();
         if let Ok(k) = std::env::var("TMDB_API_KEY") { self.tmdb_api_key = k; }
         if let Ok(k) = std::env::var("FANART_API_KEY") { self.fanart_api_key = k; }
     }
@@ -405,6 +418,15 @@ impl OxytoolsApp {
         let app = parsed.entry("app").or_insert(toml::Value::Table(toml::Table::new()));
         if let Some(app_table) = app.as_table_mut() {
             app_table.insert("lang".to_string(), toml::Value::String(self.lang_id.to_string()));
+        }
+        // Persister le chemin custom du fichier .env de clés
+        let scrapper = parsed.entry("scrapper").or_insert(toml::Value::Table(toml::Table::new()));
+        if let Some(scrap_table) = scrapper.as_table_mut() {
+            if let Some(ref p) = self.keys_env_path {
+                scrap_table.insert("keys_path".to_string(), toml::Value::String(p.to_string_lossy().into_owned()));
+            } else {
+                scrap_table.remove("keys_path");
+            }
         }
         if self.save_doc_format && !self.format_choisi.is_empty() && self.module_actif == ModuleType::Doc {
             let doc = parsed.entry("doc").or_insert(toml::Value::Table(toml::Table::new()));
@@ -1731,6 +1753,7 @@ impl eframe::App for OxytoolsApp {
                 },
                 #[cfg(feature = "api")]
                 ModuleType::Scrapper => {
+                    // ── Champs clés ──────────────────────────────────────────
                     ui.horizontal(|ui| {
                         ui.label(self.lang.scrap_tmdb_key);
                         ui.add(egui::TextEdit::singleline(&mut self.tmdb_api_key).password(true));
@@ -1739,41 +1762,150 @@ impl eframe::App for OxytoolsApp {
                         ui.label(self.lang.scrap_fanart_key);
                         ui.add(egui::TextEdit::singleline(&mut self.fanart_api_key).password(true));
                     });
-                    if ui.button(self.lang.scrap_save_keys).clicked() {
-                        let content = format!(
-                            "TMDB_API_KEY={}\nFANART_API_KEY={}\n",
-                            self.tmdb_api_key, self.fanart_api_key
-                        );
-                        let _ = std::fs::write(Self::config_dir().join(".env"), content);
-                    }
-                    ui.separator();
+
+                    // ── Chemin cible du .env ─────────────────────────────────
+                    let default_env = Self::config_dir().join(".env");
+                    let save_target = self.keys_env_path.clone().unwrap_or_else(|| default_env.clone());
                     ui.horizontal(|ui| {
-                        let search = |is_series: bool, res_arc: Arc<Mutex<Vec<ScrapeEntry>>>, stem: String, ctx_c: egui::Context| {
+                        ui.label(self.lang.scrap_keys_path);
+                        ui.label(
+                            egui::RichText::new(save_target.to_string_lossy())
+                                .weak()
+                                .italics()
+                        );
+                        if ui.small_button(self.lang.scrap_browse_keys).clicked() {
+                            if let Some(p) = rfd::FileDialog::new()
+                                .add_filter("env", &["env"])
+                                .set_file_name(".env")
+                                .save_file()
+                            {
+                                self.keys_env_path = Some(p);
+                                self.save_config();
+                            }
+                        }
+                    });
+
+                    // ── Save / Load ──────────────────────────────────────────
+                    ui.horizontal(|ui| {
+                        if ui.button(self.lang.scrap_save_keys).clicked() {
+                            let target = self.keys_env_path.clone().unwrap_or_else(|| default_env.clone());
+                            let do_write = if target.exists() {
+                                rfd::MessageDialog::new()
+                                    .set_title("Oxytools")
+                                    .set_description(&format!(
+                                        "{} — {}",
+                                        target.to_string_lossy(),
+                                        if self.lang_id == "fr" {
+                                            "Ce fichier existe déjà. Écraser ?"
+                                        } else {
+                                            "This file already exists. Overwrite?"
+                                        }
+                                    ))
+                                    .set_buttons(rfd::MessageButtons::YesNo)
+                                    .show() == rfd::MessageDialogResult::Yes
+                            } else {
+                                true
+                            };
+                            if do_write {
+                                let content = format!(
+                                    "TMDB_API_KEY={}\nFANART_API_KEY={}\n",
+                                    self.tmdb_api_key, self.fanart_api_key
+                                );
+                                match std::fs::write(&target, content) {
+                                    Ok(_) => self.scrap_status = format!("✅ {}", target.to_string_lossy()),
+                                    Err(e) => self.scrap_status = format!("⚠️ {}", e),
+                                }
+                            }
+                        }
+
+                        if ui.button(self.lang.scrap_load_keys).clicked() {
+                            if let Some(p) = rfd::FileDialog::new()
+                                .add_filter("env", &["env", "txt"])
+                                .pick_file()
+                            {
+                                if let Ok(content) = std::fs::read_to_string(&p) {
+                                    for line in content.lines() {
+                                        let line = line.trim().trim_matches('\r');
+                                        if line.starts_with('#') || !line.contains('=') { continue; }
+                                        let (raw_key, raw_val) = line.split_once('=').unwrap();
+                                        let key = raw_key.trim().trim_matches('\r').replace([' ', '_'], "").to_lowercase();
+                                        let val = raw_val.trim().trim_matches('\r').trim_matches('"').trim_matches('\'').trim().to_string();
+                                        if key.contains("tmdb") {
+                                            self.tmdb_api_key = val;
+                                        } else if key.contains("fanart") {
+                                            self.fanart_api_key = val;
+                                        }
+                                    }
+                                    self.scrap_status = format!("📂 {}", p.to_string_lossy());
+                                } else {
+                                    self.scrap_status = format!("⚠️ {}", p.to_string_lossy());
+                                }
+                            }
+                        }
+                    });
+
+                    // ── Status save/load ─────────────────────────────────────
+                    if !self.scrap_status.is_empty() {
+                        ui.label(egui::RichText::new(&self.scrap_status).weak().small());
+                    }
+
+                    ui.separator();
+
+                    // ── Recherche ────────────────────────────────────────────
+                    ui.horizontal(|ui| {
+                        let status_arc = Arc::clone(&self.status);
+                        let lang = self.lang;
+                        let tmdb_key = self.tmdb_api_key.clone();
+                        let search = |is_series: bool, res_arc: Arc<Mutex<Vec<ScrapeEntry>>>, stem: String, ctx_c: egui::Context, status_c: Arc<Mutex<String>>, tk: String| {
                             res_arc.lock().unwrap().clear();
                             std::thread::spawn(move || {
-                                if let Ok(results) = modules::scrap::search_tmdb(&stem, is_series) {
-                                    for r in results {
-                                        let tex = r.poster_path.as_ref()
-                                        .and_then(|p| modules::scrap::download_image_bytes(p))
-                                        .and_then(|b| image::load_from_memory(&b).ok())
-                                        .map(|img| {
-                                            let ci = egui::ColorImage::from_rgba_unmultiplied(
-                                                [img.width() as usize, img.height() as usize],
-                                                img.to_rgba8().as_flat_samples().as_slice()
-                                            );
-                                            ctx_c.load_texture(format!("p_{}", r.id), ci, Default::default())
-                                        });
-                                        res_arc.lock().unwrap().push(ScrapeEntry { data: r, texture: tex });
+                                match modules::scrap::search_tmdb(&stem, is_series, &tk) {
+                                    Ok(results) if results.is_empty() => {
+                                        *status_c.lock().unwrap() = lang.scrap_no_results.into();
+                                        ctx_c.request_repaint();
+                                    }
+                                    Ok(results) => {
+                                        for r in results {
+                                            let tex = r.poster_path.as_ref()
+                                                .and_then(|p| modules::scrap::download_image_bytes(p))
+                                                .and_then(|b| image::load_from_memory(&b).ok())
+                                                .map(|img| {
+                                                    let ci = egui::ColorImage::from_rgba_unmultiplied(
+                                                        [img.width() as usize, img.height() as usize],
+                                                        img.to_rgba8().as_flat_samples().as_slice()
+                                                    );
+                                                    ctx_c.load_texture(format!("p_{}", r.id), ci, Default::default())
+                                                });
+                                            res_arc.lock().unwrap().push(ScrapeEntry { data: r, texture: tex });
+                                            ctx_c.request_repaint();
+                                        }
+                                    }
+                                    Err(e) => {
+                                        *status_c.lock().unwrap() = format!("⚠️ {}", e);
                                         ctx_c.request_repaint();
                                     }
                                 }
                             });
                         };
                         if ui.button(self.lang.scrap_movie).clicked() {
-                            search(false, Arc::clone(&self.results_ui), self.current_stem.clone(), ctx.clone());
+                            if tmdb_key.is_empty() {
+                                *self.status.lock().unwrap() = self.lang.scrap_error_no_key.into();
+                            } else {
+                                search(false, Arc::clone(&self.results_ui), self.current_stem.clone(), ctx.clone(), Arc::clone(&status_arc), tmdb_key.clone());
+                            }
                         }
                         if ui.button(self.lang.scrap_series).clicked() {
-                            search(true, Arc::clone(&self.results_ui), self.current_stem.clone(), ctx.clone());
+                            if tmdb_key.is_empty() {
+                                *self.status.lock().unwrap() = self.lang.scrap_error_no_key.into();
+                            } else {
+                                // Extraire le titre série depuis les fichiers déposés
+                                let query = if let Some((title, _)) = modules::scrap::detect_series(&self.current_files) {
+                                    title
+                                } else {
+                                    self.current_stem.clone()
+                                };
+                                search(true, Arc::clone(&self.results_ui), query, ctx.clone(), Arc::clone(&status_arc), tmdb_key.clone());
+                            }
                         }
                     });
                     let entries = self.results_ui.lock().unwrap().clone();
@@ -1782,7 +1914,21 @@ impl eframe::App for OxytoolsApp {
                             if let Some(t) = &entry.texture { ui.image((t.id(), egui::vec2(50.0, 75.0))); }
                             ui.label(&entry.data.title);
                             if !self.current_files.is_empty() {
-                                if ui.button(self.lang.scrap_choose).clicked() { modules::scrap::save_metadata(self.current_files[0].clone(), entry.data.clone()); }
+                                if ui.button(self.lang.scrap_choose).clicked() {
+                                    let fanart = self.fanart_api_key.clone();
+                                    if entry.data.is_series {
+                                        // Dossier racine = parent du premier fichier (ou le dossier lui-même)
+                                        let series_dir = if self.current_files[0].is_dir() {
+                                            self.current_files[0].clone()
+                                        } else {
+                                            self.current_files[0].parent().unwrap_or(&self.current_files[0]).to_path_buf()
+                                        };
+                                        let detected = modules::scrap::collect_season_numbers(&self.current_files);
+                                        modules::scrap::save_series_metadata(series_dir, entry.data.clone(), &detected, &fanart);
+                                    } else {
+                                        modules::scrap::save_metadata(self.current_files[0].clone(), entry.data.clone(), &fanart);
+                                    }
+                                }
                             }
                         });
                     }
@@ -1805,6 +1951,8 @@ impl eframe::App for OxytoolsApp {
                             if ui.button(self.lang.tag_inject_nfo).clicked() {
                                 let (mut ok, mut err) = (0usize, 0usize);
                                 for path in &self.current_files {
+                                    // resolve_nfo est interne à tag.rs — on passe le nfo générique,
+                                    // appliquer_tags le résout lui-même
                                     match modules::tag::appliquer_tags(path, &path.with_extension("nfo")) {
                                         Ok(_) => ok += 1,
                                         Err(e) => { crate::log_error(&format!("appliquer_tags {:?}: {}", path, e)); err += 1; }
@@ -1825,13 +1973,9 @@ impl eframe::App for OxytoolsApp {
                             if ui.button(self.lang.tag_inject_nfo_and_poster).clicked() {
                                 let (mut ok, mut err) = (0usize, 0usize);
                                 for path in &self.current_files {
-                                    let nfo = path.with_extension("nfo");
-                                    let r1 = modules::tag::ajouter_images_mkv(path);
-                                    let r2 = modules::tag::appliquer_tags(path, &nfo);
-                                    match (r1, r2) {
-                                        (Ok(_), Ok(_)) => ok += 1,
-                                        (Err(e), _) => { crate::log_error(&format!("ajouter_images {:?}: {}", path, e)); err += 1; }
-                                        (_, Err(e)) => { crate::log_error(&format!("appliquer_tags {:?}: {}", path, e)); err += 1; }
+                                    match modules::tag::injecter_nfo_et_poster(path) {
+                                        Ok(_) => ok += 1,
+                                        Err(e) => { crate::log_error(&format!("injecter_nfo_et_poster {:?}: {}", path, e)); err += 1; }
                                     }
                                 }
                                 *self.status.lock().unwrap() = format!("✅ {ok} NFO+poster | ⚠️ {err}");

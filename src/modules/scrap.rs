@@ -4,6 +4,7 @@ use regex::Regex;
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::PathBuf;
 
@@ -45,6 +46,17 @@ pub struct ScrapeResult {
     pub trailer_key: Option<String>,
     pub languages: Vec<String>,
     pub is_series: bool,
+    pub seasons: Vec<Season>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Default)]
+pub struct Season {
+    pub number: u32,
+    pub name: String,
+    pub overview: String,
+    pub poster_path: Option<String>,
+    pub air_date: String,
+    pub episode_count: u32,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -82,7 +94,109 @@ pub fn download_image_bytes(poster_path: &str) -> Option<Vec<u8>> {
     None
 }
 
-pub fn save_metadata(input_path: PathBuf, data: ScrapeResult) {
+/// Parse le nom d'un fichier et retourne (titre_nettoyé, numéro_de_saison)
+/// Supporte S01E01, s01e01, 01x01, 1x01
+/// Retourne None si aucun pattern série détecté.
+pub fn extract_series_info(filename: &str) -> Option<(String, u32)> {
+    let re = Regex::new(
+        r"(?i)^(.+?)[\s.\-_]+(?:S(\d{1,2})E\d{1,2}|(\d{1,2})x\d{1,2})"
+    ).unwrap();
+    if let Some(caps) = re.captures(filename) {
+        let raw_title = caps.get(1)?.as_str();
+        let season_num: u32 = if let Some(s) = caps.get(2) {
+            s.as_str().parse().unwrap_or(1)
+        } else if let Some(s) = caps.get(3) {
+            s.as_str().parse().unwrap_or(1)
+        } else {
+            1
+        };
+        // Nettoyer le titre : remplacer . _ - par espaces, trim
+        let title = raw_title
+            .replace('.', " ")
+            .replace('_', " ")
+            .replace('-', " ")
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ");
+        Some((title, season_num))
+    } else {
+        None
+    }
+}
+
+/// Collecte les numéros de saison uniques présents dans une liste de fichiers.
+/// Si `paths` contient un dossier, le scanne récursivement.
+pub fn collect_season_numbers(paths: &[PathBuf]) -> BTreeSet<u32> {
+    let mut seasons = BTreeSet::new();
+    for path in paths {
+        if path.is_dir() {
+            if let Ok(entries) = fs::read_dir(path) {
+                let subpaths: Vec<PathBuf> = entries
+                    .filter_map(|e| e.ok().map(|e| e.path()))
+                    .collect();
+                seasons.extend(collect_season_numbers(&subpaths));
+            }
+        } else {
+            let stem = path.file_stem().unwrap_or_default().to_string_lossy();
+            if let Some((_, n)) = extract_series_info(&stem) {
+                seasons.insert(n);
+            }
+        }
+    }
+    seasons
+}
+
+/// Scanne récursivement un dossier et retourne tous les fichiers.
+fn walk_dir(dir: &PathBuf) -> Vec<PathBuf> {
+    let mut result = Vec::new();
+    if let Ok(entries) = fs::read_dir(dir) {
+        for entry in entries.filter_map(|e| e.ok()) {
+            let path = entry.path();
+            if path.is_dir() {
+                result.extend(walk_dir(&path));
+            } else {
+                result.push(path);
+            }
+        }
+    }
+    result
+}
+
+/// Détecte si une liste de fichiers/dossiers correspond à une série.
+/// Retourne (titre_nettoyé, saisons_présentes) ou None si pas de pattern série.
+pub fn detect_series(paths: &[PathBuf]) -> Option<(String, BTreeSet<u32>)> {
+    // Aplatir : dossiers → tous leurs fichiers récursivement
+    let mut all_files: Vec<PathBuf> = Vec::new();
+    for path in paths {
+        if path.is_dir() {
+            all_files.extend(walk_dir(path));
+        } else {
+            all_files.push(path.clone());
+        }
+    }
+
+    // Chercher le premier fichier qui matche et collecter toutes les saisons
+    let mut title_found: Option<String> = None;
+    let mut seasons = BTreeSet::new();
+    for file in &all_files {
+        let stem = file.file_stem().unwrap_or_default().to_string_lossy();
+        if let Some((title, season_num)) = extract_series_info(&stem) {
+            if title_found.is_none() {
+                title_found = Some(title);
+            }
+            seasons.insert(season_num);
+        }
+    }
+
+    if let Some(title) = title_found {
+        if !seasons.is_empty() {
+            return Some((title, seasons));
+        }
+    }
+    None
+}
+
+pub fn save_metadata(input_path: PathBuf, data: ScrapeResult, fanart_key: &str) {
     let _ = dotenvy::dotenv();
     let now = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let year = data.release_date.split('-').next().unwrap_or("").to_string();
@@ -103,7 +217,7 @@ pub fn save_metadata(input_path: PathBuf, data: ScrapeResult) {
     // Ratings — arrondi à 1 décimale
     let tmdb_rating = (data.vote_average * 10.0).round() / 10.0;
     xml.push_str("  <ratings>\n    <rating default=\"false\" max=\"10\" name=\"themoviedb\">\n");
-    xml.push_str(&format!("      <value>{}</value>\n", tmdb_rating));
+    xml.push_str(&format!("      <value>{:.1}</value>\n", tmdb_rating));
     xml.push_str(&format!("      <votes>{}</votes>\n", data.vote_count));
     xml.push_str("    </rating>\n  </ratings>\n");
 
@@ -121,9 +235,8 @@ pub fn save_metadata(input_path: PathBuf, data: ScrapeResult) {
         ));
     }
 
-    // Clearlogo (référence locale, sera téléchargé séparément)
-    // On ajoute la référence seulement si fanart.tv a un clearlogo
-    // (sera rempli par le thread de téléchargement)
+    // Clearlogo local (téléchargé via fanart.tv)
+    xml.push_str(&format!("  <thumb aspect=\"clearlogo\">{}-clearlogo.png</thumb>\n", base_name));
 
     // Fanart
     if let Some(backdrop) = &data.backdrop_path {
@@ -195,7 +308,7 @@ pub fn save_metadata(input_path: PathBuf, data: ScrapeResult) {
     // Actors — tous, pas limité à 15
     for actor in &data.actors {
         xml.push_str("  <actor>\n");
-        xml.push_str(&format!("    <n>{}</n>\n", escape_xml(&actor.name)));
+        xml.push_str(&format!("    <name>{}</name>\n", escape_xml(&actor.name)));
         xml.push_str(&format!("    <role>{}</role>\n", escape_xml(&actor.role)));
         if let Some(t) = &actor.thumb {
             xml.push_str(&format!("    <thumb>{}</thumb>\n", t));
@@ -207,7 +320,7 @@ pub fn save_metadata(input_path: PathBuf, data: ScrapeResult) {
     // Producers
     for p in &data.producers {
         xml.push_str(&format!("  <producer tmdbid=\"{}\">\n", p.tmdbid));
-        xml.push_str(&format!("    <n>{}</n>\n", escape_xml(&p.name)));
+        xml.push_str(&format!("    <name>{}</name>\n", escape_xml(&p.name)));
         xml.push_str(&format!("    <role>{}</role>\n", escape_xml(&p.role)));
         if let Some(t) = &p.thumb {
             xml.push_str(&format!("    <thumb>{}</thumb>\n", t));
@@ -262,9 +375,13 @@ pub fn save_metadata(input_path: PathBuf, data: ScrapeResult) {
     }
 
     // Clearlogo via Fanart.tv
-    let fanart_api_key = match std::env::var("FANART_API_KEY") {
-        Ok(k) => k,
-        Err(_) => return,
+    let fanart_api_key = if fanart_key.is_empty() {
+        match std::env::var("FANART_API_KEY") {
+            Ok(k) => k,
+            Err(_) => return,
+        }
+    } else {
+        fanart_key.to_string()
     };
 
     let tmdb_id = data.id;
@@ -311,22 +428,272 @@ pub fn save_metadata(input_path: PathBuf, data: ScrapeResult) {
     });
 }
 
-pub fn search_tmdb(query: &str, is_series: bool) -> Result<Vec<ScrapeResult>, String> {
-    let _ = dotenvy::dotenv();
-    let api_key = std::env::var("TMDB_API_KEY").map_err(|_| "TMDB_API_KEY manquante".to_string())?;
+/// Sauvegarde tvshow.nfo + un seasonXX.nfo par saison détectée + les images.
+/// `series_dir`      : dossier racine de la série
+/// `detected_seasons`: numéros de saison détectés dans les fichiers déposés
+pub fn save_series_metadata(
+    series_dir: PathBuf,
+    data: ScrapeResult,
+    detected_seasons: &BTreeSet<u32>,
+    fanart_key: &str,
+) {
+    let now = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let year = data.release_date.split('-').next().unwrap_or("").to_string();
+    let base_name = series_dir.file_name().unwrap_or_default().to_string_lossy().to_string();
+    let tmdb_rating = (data.vote_average * 10.0).round() / 10.0;
+
+    // ── Macro-like : construit le bloc commun header+ids+body dans un String ──
+    macro_rules! push_common {
+        ($xml:ident) => {
+            $xml.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n");
+            $xml.push_str(&format!("<!--created on {} by oxytools for KODI-->\n", now));
+            $xml.push_str("<tvshow>\n");
+            $xml.push_str(&format!("  <title>{}</title>\n", escape_xml(&data.title)));
+            $xml.push_str(&format!("  <originaltitle>{}</originaltitle>\n", escape_xml(&data.original_title)));
+            $xml.push_str("  <sorttitle/>\n");
+            $xml.push_str(&format!("  <year>{}</year>\n", year));
+            $xml.push_str("  <ratings>\n    <rating default=\"false\" max=\"10\" name=\"themoviedb\">\n");
+            $xml.push_str(&format!("      <value>{:.1}</value>\n", tmdb_rating));
+            $xml.push_str(&format!("      <votes>{}</votes>\n", data.vote_count));
+            $xml.push_str("    </rating>\n  </ratings>\n");
+            $xml.push_str("  <userrating>0</userrating>\n  <top250>0</top250>\n  <set/>\n");
+            $xml.push_str(&format!("  <plot>{}</plot>\n", escape_xml(&data.overview)));
+            $xml.push_str(&format!("  <outline>{}</outline>\n", escape_xml(&data.overview)));
+            $xml.push_str(&format!("  <tagline>{}</tagline>\n", escape_xml(&data.tagline)));
+            $xml.push_str(&format!("  <runtime>{}</runtime>\n", data.runtime));
+        };
+    }
+
+    macro_rules! push_ids {
+        ($xml:ident) => {
+            if let Some(ref imdb) = data.imdb_id {
+                $xml.push_str(&format!("  <id>{}</id>\n", escape_xml(imdb)));
+            }
+            $xml.push_str(&format!("  <tmdbid>{}</tmdbid>\n", data.id));
+            $xml.push_str(&format!("  <uniqueid default=\"false\" type=\"tmdb\">{}</uniqueid>\n", data.id));
+            if let Some(ref imdb) = data.imdb_id {
+                $xml.push_str(&format!("  <uniqueid default=\"true\" type=\"imdb\">{}</uniqueid>\n", escape_xml(imdb)));
+            }
+            if let Some(tvdb) = data.tvdb_id {
+                $xml.push_str(&format!("  <uniqueid default=\"false\" type=\"tvdb\">{}</uniqueid>\n", tvdb));
+            }
+            if let Some(ref wiki) = data.wikidata_id {
+                $xml.push_str(&format!("  <uniqueid default=\"false\" type=\"wikidata\">{}</uniqueid>\n", escape_xml(wiki)));
+            }
+        };
+    }
+
+    macro_rules! push_body {
+        ($xml:ident) => {
+            if let Some(ref cert) = data.certification {
+                if cert != "N/A" {
+                    $xml.push_str(&format!("  <mpaa>{}</mpaa>\n", escape_xml(cert)));
+                    $xml.push_str(&format!("  <certification>{}</certification>\n", escape_xml(cert)));
+                }
+            }
+            if !data.country.is_empty() {
+                $xml.push_str(&format!("  <country>{}</country>\n", escape_xml(&data.country)));
+            }
+            $xml.push_str("  <status/>\n  <code/>\n");
+            $xml.push_str(&format!("  <premiered>{}</premiered>\n", data.release_date));
+            $xml.push_str("  <watched>false</watched>\n  <playcount>0</playcount>\n");
+            for genre in &data.genres {
+                $xml.push_str(&format!("  <genre>{}</genre>\n", escape_xml(genre)));
+            }
+            for studio in &data.studios {
+                $xml.push_str(&format!("  <studio>{}</studio>\n", escape_xml(studio)));
+            }
+            for w in &data.writers {
+                $xml.push_str(&format!("  <credits tmdbid=\"{}\">{}</credits>\n", w.tmdbid, escape_xml(&w.name)));
+            }
+            if let Some(ref d) = data.director {
+                if let Some(did) = data.director_tmdbid {
+                    $xml.push_str(&format!("  <director tmdbid=\"{}\">{}</director>\n", did, escape_xml(d)));
+                } else {
+                    $xml.push_str(&format!("  <director>{}</director>\n", escape_xml(d)));
+                }
+            }
+            for t in &data.tags {
+                $xml.push_str(&format!("  <tag>{}</tag>\n", escape_xml(t)));
+            }
+            for actor in &data.actors {
+                $xml.push_str("  <actor>\n");
+                $xml.push_str(&format!("    <name>{}</name>\n", escape_xml(&actor.name)));
+                $xml.push_str(&format!("    <role>{}</role>\n", escape_xml(&actor.role)));
+                if let Some(ref t) = actor.thumb {
+                    $xml.push_str(&format!("    <thumb>{}</thumb>\n", t));
+                }
+                $xml.push_str(&format!("    <profile>{}</profile>\n", escape_xml(&actor.profile)));
+                $xml.push_str(&format!("    <tmdbid>{}</tmdbid>\n", actor.id));
+                $xml.push_str("  </actor>\n");
+            }
+            for p in &data.producers {
+                $xml.push_str(&format!("  <producer tmdbid=\"{}\">\n", p.tmdbid));
+                $xml.push_str(&format!("    <name>{}</name>\n", escape_xml(&p.name)));
+                $xml.push_str(&format!("    <role>{}</role>\n", escape_xml(&p.role)));
+                if let Some(ref t) = p.thumb {
+                    $xml.push_str(&format!("    <thumb>{}</thumb>\n", t));
+                }
+                $xml.push_str(&format!("    <profile>{}</profile>\n", escape_xml(&p.profile)));
+                $xml.push_str("  </producer>\n");
+            }
+            if let Some(ref key) = data.trailer_key {
+                $xml.push_str(&format!("  <trailer>plugin://plugin.video.youtube/play/?video_id={}</trailer>\n", key));
+            }
+            if !data.languages.is_empty() {
+                $xml.push_str(&format!("  <languages>{}</languages>\n", escape_xml(&data.languages.join(", "))));
+            }
+            $xml.push_str(&format!("  <dateadded>{}</dateadded>\n", now));
+            $xml.push_str("  <fileinfo>\n    <streamdetails>\n    </streamdetails>\n  </fileinfo>\n");
+            $xml.push_str("</tvshow>\n");
+        };
+    }
+
+    // ── tvshow.nfo ───────────────────────────────────────────────────────────
+    let mut xml = String::new();
+    push_common!(xml);
+    if let Some(ref poster) = data.poster_path {
+        xml.push_str(&format!("  <thumb aspect=\"poster\">https://image.tmdb.org/t/p/original{}</thumb>\n", poster));
+    }
+    for season in data.seasons.iter().filter(|s| s.number > 0 && detected_seasons.contains(&s.number)) {
+        if let Some(ref p) = season.poster_path {
+            xml.push_str(&format!(
+                "  <thumb aspect=\"poster\" type=\"season\" season=\"{}\">https://image.tmdb.org/t/p/original{}</thumb>\n",
+                season.number, p
+            ));
+        }
+    }
+    xml.push_str(&format!("  <thumb aspect=\"clearlogo\">{}-clearlogo.png</thumb>\n", base_name));
+    if let Some(ref backdrop) = data.backdrop_path {
+        xml.push_str("  <fanart>\n");
+        xml.push_str(&format!("    <thumb>https://image.tmdb.org/t/p/original{}</thumb>\n", backdrop));
+        xml.push_str("  </fanart>\n");
+    }
+    push_ids!(xml);
+    push_body!(xml);
+    let _ = fs::write(series_dir.join("tvshow.nfo"), &xml);
+
+    // ── seasonXX.nfo — un par saison détectée ────────────────────────────────
+    for &season_num in detected_seasons {
+        let season_data = data.seasons.iter().find(|s| s.number == season_num);
+        let mut sxml = String::new();
+        push_common!(sxml);
+        if let Some(s) = season_data {
+            if let Some(ref p) = s.poster_path {
+                sxml.push_str(&format!(
+                    "  <thumb aspect=\"poster\" type=\"season\" season=\"{}\">https://image.tmdb.org/t/p/original{}</thumb>\n",
+                    season_num, p
+                ));
+            }
+            if !s.overview.is_empty() {
+                sxml.push_str(&format!("  <seasondesc>{}</seasondesc>\n", escape_xml(&s.overview)));
+            }
+            sxml.push_str(&format!("  <season>{}</season>\n", season_num));
+            if !s.air_date.is_empty() {
+                sxml.push_str(&format!("  <premiered>{}</premiered>\n", s.air_date));
+            }
+            sxml.push_str(&format!("  <episodecount>{}</episodecount>\n", s.episode_count));
+        } else {
+            sxml.push_str(&format!("  <season>{}</season>\n", season_num));
+        }
+        push_ids!(sxml);
+        push_body!(sxml);
+        let _ = fs::write(series_dir.join(format!("season{:02}.nfo", season_num)), &sxml);
+    }
+
+    // ── Images en parallèle ──────────────────────────────────────────────────
+    let client = Client::new();
+
+    if let Some(ref path) = data.poster_path {
+        let url = format!("https://image.tmdb.org/t/p/original{}", path);
+        let out = series_dir.join("poster.jpg");
+        let c = client.clone();
+        std::thread::spawn(move || {
+            if let Ok(res) = c.get(url).send() {
+                if let Ok(bytes) = res.bytes() { let _ = fs::write(out, bytes); }
+            }
+        });
+    }
+    if let Some(ref path) = data.backdrop_path {
+        let url = format!("https://image.tmdb.org/t/p/original{}", path);
+        let out = series_dir.join("fanart.jpg");
+        let c = client.clone();
+        std::thread::spawn(move || {
+            if let Ok(res) = c.get(url).send() {
+                if let Ok(bytes) = res.bytes() { let _ = fs::write(out, bytes); }
+            }
+        });
+    }
+    for season in data.seasons.iter().filter(|s| s.number > 0 && detected_seasons.contains(&s.number)) {
+        if let Some(ref pp) = season.poster_path {
+            let url = format!("https://image.tmdb.org/t/p/original{}", pp);
+            let out = series_dir.join(format!("season{:02}-poster.jpg", season.number));
+            let c = client.clone();
+            std::thread::spawn(move || {
+                if let Ok(res) = c.get(url).send() {
+                    if let Ok(bytes) = res.bytes() { let _ = fs::write(out, bytes); }
+                }
+            });
+        }
+    }
+
+    // Clearlogo via Fanart.tv
+    let fanart_api_key = if fanart_key.is_empty() {
+        match std::env::var("FANART_API_KEY") {
+            Ok(k) => k,
+            Err(_) => return,
+        }
+    } else {
+        fanart_key.to_string()
+    };
+    let tmdb_id = data.id;
+    let tvdb_id = data.tvdb_id;
+    let logo_url = if let Some(tvdb) = tvdb_id {
+        format!("https://webservice.fanart.tv/v3/tv/{}?api_key={}", tvdb, fanart_api_key)
+    } else {
+        format!("https://webservice.fanart.tv/v3/tv/{}?api_key={}", tmdb_id, fanart_api_key)
+    };
+    let out_logo = series_dir.join(format!("{}-clearlogo.png", base_name));
+    std::thread::spawn(move || {
+        if let Ok(res) = client.get(&logo_url).send() {
+            if let Ok(json) = res.json::<Value>() {
+                let url = json["hdtvlogo"]
+                    .as_array()
+                    .or_else(|| json["clearlogo"].as_array())
+                    .and_then(|arr| arr.first())
+                    .and_then(|v| v["url"].as_str());
+                if let Some(u) = url {
+                    if let Ok(img) = Client::new().get(u).send() {
+                        if let Ok(bytes) = img.bytes() { let _ = fs::write(out_logo, bytes); }
+                    }
+                }
+            }
+        }
+    });
+}
+
+
+pub fn search_tmdb(query: &str, is_series: bool, tmdb_key: &str) -> Result<Vec<ScrapeResult>, String> {
+    let api_key = if tmdb_key.is_empty() {
+        std::env::var("TMDB_API_KEY").map_err(|_| "TMDB_API_KEY manquante".to_string())?
+    } else {
+        tmdb_key.to_string()
+    };
 
     let client = Client::builder()
         .user_agent("OXYON/2.1")
         .build()
         .map_err(|e| e.to_string())?;
 
-    let re_year = Regex::new(r"\b(19|20)\d{2}\b").unwrap();
+    // Ne strip l'année que si elle est précédée d'un séparateur (espace, point, tiret, parenthèse)
+    // pour ne pas écraser un titre comme "1917" ou "2001"
+    let re_year = Regex::new(r"[\s.\-_\(](19|20)\d{2}[\s.\-_\)]*$").unwrap();
     let clean_query = re_year
-        .replace_all(query, "")
+        .replace(query, "")
         .to_string()
-        .replace(".", " ")
-        .replace("_", " ")
-        .replace("-", " ");
+        .replace('.', " ")
+        .replace('_', " ")
+        .replace('-', " ");
 
     let url = if is_series {
         "https://api.themoviedb.org/3/search/tv"
@@ -509,6 +876,25 @@ pub fn search_tmdb(query: &str, is_series: bool) -> Result<Vec<ScrapeResult>, St
                         .unwrap_or_default()
                 };
 
+                // Saisons (séries uniquement)
+                let seasons = if is_series {
+                    d["seasons"].as_array()
+                        .map(|arr| arr.iter().filter_map(|s| {
+                            let number = s["season_number"].as_u64()? as u32;
+                            Some(Season {
+                                number,
+                                name: s["name"].as_str().unwrap_or("").to_string(),
+                                overview: s["overview"].as_str().unwrap_or("").to_string(),
+                                poster_path: s["poster_path"].as_str().map(|p| p.to_string()),
+                                air_date: s["air_date"].as_str().unwrap_or("").to_string(),
+                                episode_count: s["episode_count"].as_u64().unwrap_or(0) as u32,
+                            })
+                        }).collect())
+                        .unwrap_or_default()
+                } else {
+                    vec![]
+                };
+
                 list.push(ScrapeResult {
                     id,
                     title: d[if is_series { "name" } else { "title" }]
@@ -543,6 +929,7 @@ pub fn search_tmdb(query: &str, is_series: bool) -> Result<Vec<ScrapeResult>, St
                     trailer_key,
                     languages,
                     is_series,
+                    seasons,
                 });
             }
         }

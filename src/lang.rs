@@ -104,12 +104,18 @@ pub struct Lang {
     pub video_quality_slider: &'static str,
 
     // Scrapper
-    pub scrap_tmdb_key: &'static str,
-    pub scrap_fanart_key: &'static str,
+    pub scrap_tmdb_key: &'static str,       // movies only
+    pub scrap_fanart_key: &'static str,     // covers only
     pub scrap_save_keys: &'static str,
+    pub scrap_load_keys: &'static str,
+    pub scrap_keys_path: &'static str,
+    pub scrap_browse_keys: &'static str,
     pub scrap_movie: &'static str,
     pub scrap_series: &'static str,
     pub scrap_choose: &'static str,
+    pub scrap_error_no_key: &'static str,
+    pub scrap_error_fetch: &'static str,   // format: {}
+    pub scrap_no_results: &'static str,
 
     // Tag
     pub tag_mark_watched: &'static str,
@@ -255,12 +261,18 @@ pub const EN: Lang = Lang {
     video_stream_copy: "Stream copy",
     video_quality_slider: "Quality (1=fast, 8=quality)",
 
-    scrap_tmdb_key: "TMDB API Key:",
-    scrap_fanart_key: "Fanart API Key:",
+    scrap_tmdb_key: "TMDB API Key (movies only):",
+    scrap_fanart_key: "Fanart API Key (covers only):",
     scrap_save_keys: "💾 Save keys",
+    scrap_load_keys: "📂 Load keys",
+    scrap_keys_path: "Keys file:",
+    scrap_browse_keys: "Browse…",
     scrap_movie: "🎬 Movie",
     scrap_series: "📺 Series",
     scrap_choose: "Choose",
+    scrap_error_no_key: "⚠️ TMDB API key is missing",
+    scrap_error_fetch: "⚠️ Fetch error: {}",
+    scrap_no_results: "ℹ️ No results found",
 
     tag_mark_watched: "✅ Mark as WATCHED",
     tag_inject_nfo: "📥 Inject tags from NFO",
@@ -403,12 +415,18 @@ pub const FR: Lang = Lang {
     video_stream_copy: "Copie flux",
     video_quality_slider: "Qualité (1=rapide, 8=qualité)",
 
-    scrap_tmdb_key: "TMDB API Key :",
-    scrap_fanart_key: "Fanart API Key :",
+    scrap_tmdb_key: "TMDB API Key (films uniquement) :",
+    scrap_fanart_key: "Fanart API Key (covers uniquement) :",
     scrap_save_keys: "💾 Sauvegarder les clés",
+    scrap_load_keys: "📂 Charger les clés",
+    scrap_keys_path: "Fichier de clés :",
+    scrap_browse_keys: "Parcourir…",
     scrap_movie: "🎬 Film",
     scrap_series: "📺 Série",
     scrap_choose: "Choisir",
+    scrap_error_no_key: "⚠️ Clé API TMDB manquante",
+    scrap_error_fetch: "⚠️ Erreur réseau : {}",
+    scrap_no_results: "ℹ️ Aucun résultat trouvé",
 
     tag_mark_watched: "✅ Marquer VU",
     tag_inject_nfo: "📥 Injecter tags depuis NFO",

@@ -5,6 +5,7 @@ use std::path::Path;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 use crate::modules::binaries;
+use crate::modules::scrap::extract_series_info;
 /// Lit un fichier NFO et retourne un HashMap
 pub fn lire_nfo(nfo_path: &Path) -> Result<HashMap<String, String>, String> {
     let file = File::open(nfo_path).map_err(|e| e.to_string())?;
@@ -133,8 +134,12 @@ pub fn modifier_tag(mkv_path: &Path, tag: &str, valeur: &str) -> Result<(), Stri
     if status.success() { Ok(()) } else { Err("Erreur modification tag".into()) }
 }
 /// 3. Injection complète depuis NFO
+/// Pour une série, cherche seasonXX.nfo dans le dossier parent.
+/// Pour un film, cherche le NFO du même nom que le fichier.
 pub fn appliquer_tags(mkv_path: &Path, nfo_path: &Path) -> Result<(), String> {
-    let mut tags = lire_nfo(nfo_path)?;
+    // Résoudre le bon NFO selon film ou série
+    let resolved_nfo = resolve_nfo(mkv_path).unwrap_or_else(|| nfo_path.to_path_buf());
+    let mut tags = lire_nfo(&resolved_nfo)?;
     // On supprime le statut de lecture pour ne pas l'écraser
     tags.remove("playcount");
     tags.remove("watched");
@@ -147,7 +152,7 @@ pub fn appliquer_tags(mkv_path: &Path, nfo_path: &Path) -> Result<(), String> {
             tags.insert("COMMENT".to_string(), format!("{} / 10", rounded));
         }
     }
-    // Year → RELEASETIME (copie, year reste aussi)
+    // Year → RELEASETIME
     if let Some(year) = tags.get("year").cloned() {
         if !year.is_empty() {
             tags.insert("RELEASETIME".to_string(), year);
@@ -155,11 +160,11 @@ pub fn appliquer_tags(mkv_path: &Path, nfo_path: &Path) -> Result<(), String> {
     }
     // premiered → DATE_RELEASED (année seulement)
     if let Some(premiered) = tags.remove("premiered") {
-    if !premiered.is_empty() {
-        let annee = premiered.split('-').next().unwrap_or(&premiered).to_string();
-        tags.insert("DATE_RELEASED".to_string(), annee);
+        if !premiered.is_empty() {
+            let annee = premiered.split('-').next().unwrap_or(&premiered).to_string();
+            tags.insert("DATE_RELEASED".to_string(), annee);
+        }
     }
-}
     let xml_content = creer_xml_tags(&tags);
     let temp_xml = "temp_meta.xml";
     std::fs::write(temp_xml, xml_content).map_err(|e| e.to_string())?;
@@ -169,32 +174,74 @@ pub fn appliquer_tags(mkv_path: &Path, nfo_path: &Path) -> Result<(), String> {
     let _ = std::fs::remove_file(temp_xml);
     if status.success() { Ok(()) } else { Err("Erreur injection métadonnées".into()) }
 }
-/// 4. Injection Poster / Fanart / Logo
+
+/// Résout le chemin du NFO à utiliser pour un fichier donné :
+/// - Série  → dossier_parent/seasonXX.nfo
+/// - Film   → même dossier, même stem + .nfo
+fn resolve_nfo(mkv_path: &Path) -> Option<std::path::PathBuf> {
+    let parent = mkv_path.parent()?;
+    let stem = mkv_path.file_stem()?.to_string_lossy();
+    if let Some((_, season_num)) = extract_series_info(&stem) {
+        let nfo = parent.join(format!("season{:02}.nfo", season_num));
+        if nfo.exists() { return Some(nfo); }
+    }
+    // Fallback film
+    let nfo = mkv_path.with_extension("nfo");
+    if nfo.exists() { Some(nfo) } else { None }
+}
+
+/// Résout le chemin du poster à utiliser pour un fichier donné :
+/// - Série → dossier_parent/seasonXX-poster.jpg
+/// - Film  → dossier_parent/stem-poster.jpg ou poster.jpg
+fn resolve_poster(mkv_path: &Path) -> Option<std::path::PathBuf> {
+    let parent = mkv_path.parent()?;
+    let stem = mkv_path.file_stem()?.to_string_lossy();
+    if let Some((_, season_num)) = extract_series_info(&stem) {
+        let poster = parent.join(format!("season{:02}-poster.jpg", season_num));
+        if poster.exists() { return Some(poster); }
+    }
+    // Fallback film : stem-poster.jpg puis poster.jpg
+    let poster = parent.join(format!("{}-poster.jpg", stem));
+    if poster.exists() { return Some(poster); }
+    let poster = parent.join("poster.jpg");
+    if poster.exists() { return Some(poster); }
+    None
+}
+
+/// 4. Injection Poster uniquement (film ou série)
+/// Pour une série : injecte seasonXX-poster.jpg
+/// Pour un film   : injecte stem-poster.jpg / poster.jpg
+/// Pas de fanart ni clearlogo
 pub fn ajouter_images_mkv(mkv_path: &Path) -> Result<(), String> {
-    let parent = mkv_path.parent().ok_or("Dossier parent introuvable")?;
-    let stem_mkv = mkv_path.file_stem().unwrap().to_string_lossy().to_lowercase();
-    let mut command = binaries::silent_cmd(binaries::get_mkvpropedit());
-    command.arg(mkv_path);
-    let mut found = false;
-    for entry in std::fs::read_dir(parent).map_err(|e| e.to_string())? {
-        let path = entry.map_err(|e| e.to_string())?.path();
-        let name = path.file_name().unwrap().to_string_lossy().to_lowercase();
-        if name.contains(&stem_mkv) && (name.contains("poster") || name.contains("fanart") || name.contains("clearlogo")) {
-            let attachment_name = if name.contains("poster") { "cover" }
-                                 else if name.contains("fanart") { "fanart" }
-                                 else { "clearlogo" };
-            let mime = if name.ends_with(".png") { "image/png" } else { "image/jpeg" };
-            command.args(["--attachment-name", attachment_name, "--attachment-mime-type", mime, "--add-attachment", path.to_str().unwrap()]);
-            found = true;
-        }
+    let poster_path = match resolve_poster(mkv_path) {
+        Some(p) => p,
+        None => return Ok(()), // Pas de poster trouvé, rien à faire
+    };
+    let mime = if poster_path.extension().map_or(false, |e| e == "png") {
+        "image/png"
+    } else {
+        "image/jpeg"
+    };
+    let status = binaries::silent_cmd(binaries::get_mkvpropedit())
+        .arg(mkv_path)
+        .args(["--attachment-name", "cover",
+               "--attachment-mime-type", mime,
+               "--add-attachment", poster_path.to_str().unwrap()])
+        .status().map_err(|e| e.to_string())?;
+    if status.success() { Ok(()) } else { Err("Erreur injection poster".into()) }
+}
+
+/// 5a. Injection NFO + Poster (orchestrateur — remplace l'ancien tag_inject_nfo_and_poster)
+pub fn injecter_nfo_et_poster(mkv_path: &Path) -> Result<(), String> {
+    // NFO
+    if let Some(nfo) = resolve_nfo(mkv_path) {
+        appliquer_tags(mkv_path, &nfo)?;
     }
-    if found {
-        let status = command.status().map_err(|e| e.to_string())?;
-        if status.success() { return Ok(()); }
-    }
+    // Poster uniquement
+    ajouter_images_mkv(mkv_path)?;
     Ok(())
 }
-/// 5. Supprimer TOUS les tags et TOUTES les pièces jointes (Reset total)
+/// 5b. Supprimer TOUS les tags et TOUTES les pièces jointes (Reset total)
 pub fn supprimer_tous_tags(mkv_path: &Path) -> Result<(), String> {
     let xml_vide = "<?xml version=\"1.0\"?>\n<Tags>\n</Tags>";
     let temp_xml = "temp_reset.xml";

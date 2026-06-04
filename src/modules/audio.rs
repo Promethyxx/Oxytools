@@ -27,8 +27,8 @@ pub fn convertir(input: &Path, output: &str, qualite: u32) -> std::io::Result<st
             cmd.args(["-codec:a", "libopus", "-b:a", &format!("{}k", bitrate)]);
         },
         "aac" | "m4a" => {
-            let q = (5u32.saturating_sub(qualite / 2)).max(1);
-            cmd.args(["-codec:a", "aac", "-q:a", &q.to_string()]);
+             let bitrate = 256u32.saturating_sub(qualite * 24).max(64);
+             cmd.args(["-map", "0:a:0", "-codec:a", "aac", "-b:a", &format!("{}k", bitrate), "-f", "mp4"]);
         },
         "flac" => {
             cmd.args(["-codec:a", "flac", "-compression_level", &qualite.to_string()]);
