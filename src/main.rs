@@ -75,6 +75,7 @@ struct OxytoolsApp {
         scrap_fullscreen: Option<egui::TextureHandle>,
         scrap_popup_query: Option<String>,
         no_result_flag: Arc<Mutex<bool>>,
+        scrap_last_is_series: bool,
         save_doc_format: bool,
         save_image_format: bool,
         save_archive_format: bool,
@@ -188,6 +189,7 @@ impl Default for OxytoolsApp {
                 scrap_fullscreen: None,
                 scrap_popup_query: None,
                 no_result_flag: Arc::new(Mutex::new(false)),
+                scrap_last_is_series: false,
                 save_doc_format: false,
                 save_image_format: false,
                 save_archive_format: false,
@@ -2018,6 +2020,7 @@ impl eframe::App for OxytoolsApp {
                             if tmdb_key.is_empty() {
                                 *self.status.lock().unwrap() = self.lang.scrap_error_no_key.into();
                             } else {
+                                self.scrap_last_is_series = false;
                                 search(false, Arc::clone(&self.results_ui), self.current_stem.clone(), ctx.clone(), Arc::clone(&status_arc), tmdb_key.clone(), Arc::clone(&no_result_flag));
                             }
                         }
@@ -2025,6 +2028,7 @@ impl eframe::App for OxytoolsApp {
                             if tmdb_key.is_empty() {
                                 *self.status.lock().unwrap() = self.lang.scrap_error_no_key.into();
                             } else {
+                                self.scrap_last_is_series = true;
                                 let query = if let Some((title, _)) = modules::scrap::detect_series(&self.current_files) {
                                     title
                                 } else {
@@ -2041,7 +2045,7 @@ impl eframe::App for OxytoolsApp {
                         self.scrap_popup_query = Some(self.current_stem.clone());
                     }
 
-                    // ── Popup aucun résultat — champ de recherche alternatif (point 4) ──
+                    // ── Popup aucun résultat ─────────────────────────────────
                     if self.scrap_popup_query.is_some() {
                         let mut open = true;
                         egui::Window::new(self.lang.scrap_retry_hint)
@@ -2058,11 +2062,31 @@ impl eframe::App for OxytoolsApp {
                                     let lang2 = self.lang;
                                     let res2 = Arc::clone(&self.results_ui);
                                     let ctx2 = ctx.clone();
+                                    let is_series2 = self.scrap_last_is_series;
                                     if ui.button(self.lang.scrap_retry_search).clicked() {
                                         self.scrap_popup_query = None;
                                         res2.lock().unwrap().clear();
+
+                                        // Détecter si c'est un ID numérique ou une URL TMDB
+                                        let trimmed = query2.trim().to_string();
+                                        let tmdb_id: Option<i64> = trimmed.parse::<i64>().ok().or_else(|| {
+                                            // URL : themoviedb.org/tv/95224 ou /movie/12345
+                                            let re = regex::Regex::new(r"themoviedb\.org/(?:tv|movie)/(\d+)").unwrap();
+                                            re.captures(&trimmed).and_then(|c| c.get(1)).and_then(|m| m.as_str().parse().ok())
+                                        });
+                                        // Détecter is_series depuis l'URL si présent
+                                        let is_series_from_url = if trimmed.contains("themoviedb.org/tv/") { Some(true) }
+                                            else if trimmed.contains("themoviedb.org/movie/") { Some(false) }
+                                            else { None };
+                                        let resolved_is_series = is_series_from_url.unwrap_or(is_series2);
+
                                         std::thread::spawn(move || {
-                                            match modules::scrap::search_tmdb(&query2, false, &tmdb_key2) {
+                                            let result = if let Some(id) = tmdb_id {
+                                                modules::scrap::fetch_by_tmdb_id(id, resolved_is_series, &tmdb_key2)
+                                            } else {
+                                                modules::scrap::search_tmdb(&trimmed, resolved_is_series, &tmdb_key2)
+                                            };
+                                            match result {
                                                 Ok(results) if results.is_empty() => {
                                                     *status_arc2.lock().unwrap() = lang2.scrap_no_results.into();
                                                     ctx2.request_repaint();

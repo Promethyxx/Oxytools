@@ -687,6 +687,177 @@ pub fn save_series_metadata(
 }
 
 
+
+/// Parse un objet JSON de détail TMDB (film ou série) en ScrapeResult.
+fn parse_detail(d: &Value, id: i64, is_series: bool) -> Option<ScrapeResult> {
+    let imdb_id = d["external_ids"]["imdb_id"].as_str().map(|s| s.to_string());
+    let wikidata_id = d["external_ids"]["wikidata_id"].as_str().map(|s| s.to_string());
+    let tvdb_id = d["external_ids"]["tvdb_id"].as_i64();
+
+    let mut actors = Vec::new();
+    if let Some(cast) = d["credits"]["cast"].as_array() {
+        for a in cast.iter() {
+            actors.push(Actor {
+                name: a["name"].as_str().unwrap_or("").to_string(),
+                role: a["character"].as_str().unwrap_or("").to_string(),
+                thumb: a["profile_path"].as_str()
+                    .map(|s| format!("https://image.tmdb.org/t/p/h632{}", s)),
+                profile: format!("https://www.themoviedb.org/person/{}", a["id"].as_i64().unwrap_or(0)),
+                id: a["id"].as_i64().unwrap_or(0),
+            });
+        }
+    }
+
+    let (director, director_tmdbid) = if !is_series {
+        let dir = d["credits"]["crew"].as_array()
+            .and_then(|crew| crew.iter().find(|m| m["job"] == "Director"));
+        (
+            dir.and_then(|m| m["name"].as_str()).map(|s| s.to_string()),
+            dir.and_then(|m| m["id"].as_i64()),
+        )
+    } else {
+        let creator = d["created_by"].as_array().and_then(|c| c.first());
+        (
+            creator.and_then(|m| m["name"].as_str()).map(|s| s.to_string()),
+            creator.and_then(|m| m["id"].as_i64()),
+        )
+    };
+
+    let mut writers = Vec::new();
+    if let Some(crew) = d["credits"]["crew"].as_array() {
+        for c in crew {
+            let job = c["job"].as_str().unwrap_or("");
+            if job == "Screenplay" || job == "Writer" || job == "Story" {
+                let w = Writer { name: c["name"].as_str().unwrap_or("").to_string(), tmdbid: c["id"].as_i64().unwrap_or(0) };
+                if !writers.iter().any(|existing: &Writer| existing.tmdbid == w.tmdbid) {
+                    writers.push(w);
+                }
+            }
+        }
+    }
+
+    let mut producers = Vec::new();
+    if let Some(crew) = d["credits"]["crew"].as_array() {
+        for c in crew {
+            let job = c["job"].as_str().unwrap_or("");
+            if job == "Producer" || job == "Executive Producer" || job == "Co-Producer" || job == "Associate Producer" {
+                producers.push(Producer {
+                    name: c["name"].as_str().unwrap_or("").to_string(),
+                    role: job.to_string(),
+                    thumb: c["profile_path"].as_str().map(|s| format!("https://image.tmdb.org/t/p/h632{}", s)),
+                    profile: format!("https://www.themoviedb.org/person/{}", c["id"].as_i64().unwrap_or(0)),
+                    tmdbid: c["id"].as_i64().unwrap_or(0),
+                });
+            }
+        }
+    }
+
+    let runtime = if is_series {
+        d["episode_run_time"].as_array().and_then(|a| a.first()).and_then(|v| v.as_u64()).unwrap_or(45)
+    } else {
+        d["runtime"].as_u64().unwrap_or(0)
+    };
+
+    let country = d["production_countries"].as_array()
+        .map(|arr| arr.iter().filter_map(|c| c["iso_3166_1"].as_str()).collect::<Vec<_>>().join(", "))
+        .unwrap_or_default();
+
+    let certification = if is_series {
+        d["content_ratings"]["results"].as_array()
+            .and_then(|arr| arr.iter().find(|c| c["iso_3166_1"].as_str() == Some("FR")))
+            .and_then(|c| c["rating"].as_str()).map(|r| format!("FR:{}", r))
+    } else {
+        d["release_dates"]["results"].as_array()
+            .and_then(|arr| arr.iter().find(|c| c["iso_3166_1"].as_str() == Some("FR")))
+            .and_then(|c| c["release_dates"].as_array())
+            .and_then(|releases| releases.iter().find(|r| r["certification"].as_str().map_or(false, |s| !s.is_empty())))
+            .and_then(|r| r["certification"].as_str()).map(|r| format!("FR:{}", r))
+    };
+
+    let keywords_key = if is_series { "results" } else { "keywords" };
+    let tags = d["keywords"][keywords_key].as_array()
+        .map(|arr| arr.iter().filter_map(|kw| kw["name"].as_str().map(|s| s.to_string())).collect::<Vec<_>>())
+        .unwrap_or_default();
+
+    let trailer_key = d["videos"]["results"].as_array()
+        .and_then(|arr| arr.iter().find(|v| v["site"].as_str() == Some("YouTube") && v["type"].as_str() == Some("Trailer")))
+        .and_then(|v| v["key"].as_str()).map(|s| s.to_string());
+
+    let languages = d["spoken_languages"].as_array()
+        .map(|arr| arr.iter().filter_map(|l| l["english_name"].as_str().map(|s| s.to_string())).collect::<Vec<_>>())
+        .unwrap_or_default();
+
+    let studios = if is_series {
+        d["networks"].as_array()
+            .map(|arr| arr.iter().filter_map(|s| s["name"].as_str().map(|n| n.to_string())).collect::<Vec<_>>())
+            .unwrap_or_default()
+    } else {
+        d["production_companies"].as_array()
+            .map(|arr| arr.iter().filter_map(|s| s["name"].as_str().map(|n| n.to_string())).collect::<Vec<_>>())
+            .unwrap_or_default()
+    };
+
+    let seasons = if is_series {
+        d["seasons"].as_array()
+            .map(|arr| arr.iter().filter_map(|s| {
+                let number = s["season_number"].as_u64()? as u32;
+                Some(Season {
+                    number,
+                    name: s["name"].as_str().unwrap_or("").to_string(),
+                    overview: s["overview"].as_str().unwrap_or("").to_string(),
+                    poster_path: s["poster_path"].as_str().map(|p| p.to_string()),
+                    air_date: s["air_date"].as_str().unwrap_or("").to_string(),
+                    episode_count: s["episode_count"].as_u64().unwrap_or(0) as u32,
+                })
+            }).collect())
+            .unwrap_or_default()
+    } else { vec![] };
+
+    Some(ScrapeResult {
+        id,
+        title: d[if is_series { "name" } else { "title" }].as_str().unwrap_or("Inconnu").to_string(),
+        original_title: d[if is_series { "original_name" } else { "original_title" }].as_str().unwrap_or("").to_string(),
+        overview: d["overview"].as_str().unwrap_or("").to_string(),
+        poster_path: d["poster_path"].as_str().map(|s| s.to_string()),
+        backdrop_path: d["backdrop_path"].as_str().map(|s| s.to_string()),
+        release_date: d[if is_series { "first_air_date" } else { "release_date" }].as_str().unwrap_or("").to_string(),
+        vote_average: d["vote_average"].as_f64().unwrap_or(0.0),
+        vote_count: d["vote_count"].as_u64().unwrap_or(0),
+        runtime: runtime as u32,
+        tagline: d["tagline"].as_str().unwrap_or("").to_string(),
+        genres: d["genres"].as_array().unwrap_or(&vec![]).iter()
+            .map(|g| g["name"].as_str().unwrap_or("").to_string()).collect(),
+        studios, actors, director, director_tmdbid, writers, producers,
+        imdb_id, wikidata_id, tvdb_id, country, certification, tags, trailer_key, languages,
+        is_series, seasons,
+    })
+}
+
+/// Récupère une fiche TMDB directement par ID.
+/// Utilisé quand l'utilisateur entre un ID numérique ou une URL TMDB dans la recherche alternative.
+pub fn fetch_by_tmdb_id(id: i64, is_series: bool, tmdb_key: &str) -> Result<Vec<ScrapeResult>, String> {
+    let api_key = if tmdb_key.is_empty() {
+        std::env::var("TMDB_API_KEY").map_err(|_| "TMDB_API_KEY manquante".to_string())?
+    } else {
+        tmdb_key.to_string()
+    };
+    let client = Client::builder().user_agent("OXYON/2.1").build().map_err(|e| e.to_string())?;
+    let append = "credits,external_ids,keywords,videos,release_dates,content_ratings";
+    let url = format!(
+        "https://api.themoviedb.org/3/{}?api_key={}&language=fr-FR&append_to_response={}",
+        if is_series { format!("tv/{}", id) } else { format!("movie/{}", id) },
+        api_key, append
+    );
+    let d = client.get(&url).send().map_err(|e| e.to_string())?.json::<Value>().map_err(|e| e.to_string())?;
+    if d["success"] == false {
+        return Err(format!("ID {} introuvable", id));
+    }
+    match parse_detail(&d, id, is_series) {
+        Some(r) => Ok(vec![r]),
+        None => Ok(vec![]),
+    }
+}
+
 pub fn search_tmdb(query: &str, is_series: bool, tmdb_key: &str) -> Result<Vec<ScrapeResult>, String> {
     let api_key = if tmdb_key.is_empty() {
         std::env::var("TMDB_API_KEY").map_err(|_| "TMDB_API_KEY manquante".to_string())?
@@ -746,205 +917,9 @@ pub fn search_tmdb(query: &str, is_series: bool, tmdb_key: &str) -> Result<Vec<S
                 .send()
                 .and_then(|resp| resp.json::<Value>())
             {
-                // External IDs
-                let imdb_id = d["external_ids"]["imdb_id"].as_str().map(|s| s.to_string());
-                let wikidata_id = d["external_ids"]["wikidata_id"].as_str().map(|s| s.to_string());
-                let tvdb_id = d["external_ids"]["tvdb_id"].as_i64();
-
-                // Actors — tous, pas de limite
-                let mut actors = Vec::new();
-                if let Some(cast) = d["credits"]["cast"].as_array() {
-                    for a in cast.iter() {
-                        actors.push(Actor {
-                            name: a["name"].as_str().unwrap_or("").to_string(),
-                            role: a["character"].as_str().unwrap_or("").to_string(),
-                            thumb: a["profile_path"].as_str()
-                                .map(|s| format!("https://image.tmdb.org/t/p/h632{}", s)),
-                            profile: format!("https://www.themoviedb.org/person/{}", a["id"].as_i64().unwrap_or(0)),
-                            id: a["id"].as_i64().unwrap_or(0),
-                        });
-                    }
+                if let Some(result) = parse_detail(&d, id, is_series) {
+                    list.push(result);
                 }
-
-                // Director
-                let (director, director_tmdbid) = if !is_series {
-                    let dir = d["credits"]["crew"].as_array()
-                        .and_then(|crew| crew.iter().find(|m| m["job"] == "Director"));
-                    (
-                        dir.and_then(|m| m["name"].as_str()).map(|s| s.to_string()),
-                        dir.and_then(|m| m["id"].as_i64()),
-                    )
-                } else {
-                    let creator = d["created_by"].as_array().and_then(|c| c.first());
-                    (
-                        creator.and_then(|m| m["name"].as_str()).map(|s| s.to_string()),
-                        creator.and_then(|m| m["id"].as_i64()),
-                    )
-                };
-
-                // Writers
-                let mut writers = Vec::new();
-                if let Some(crew) = d["credits"]["crew"].as_array() {
-                    for c in crew {
-                        let job = c["job"].as_str().unwrap_or("");
-                        if job == "Screenplay" || job == "Writer" || job == "Story" {
-                            let w = Writer {
-                                name: c["name"].as_str().unwrap_or("").to_string(),
-                                tmdbid: c["id"].as_i64().unwrap_or(0),
-                            };
-                            if !writers.iter().any(|existing: &Writer| existing.tmdbid == w.tmdbid) {
-                                writers.push(w);
-                            }
-                        }
-                    }
-                }
-
-                // Producers
-                let mut producers = Vec::new();
-                if let Some(crew) = d["credits"]["crew"].as_array() {
-                    for c in crew {
-                        let job = c["job"].as_str().unwrap_or("");
-                        if job == "Producer" || job == "Executive Producer"
-                            || job == "Co-Producer" || job == "Associate Producer"
-                        {
-                            producers.push(Producer {
-                                name: c["name"].as_str().unwrap_or("").to_string(),
-                                role: job.to_string(),
-                                thumb: c["profile_path"].as_str()
-                                    .map(|s| format!("https://image.tmdb.org/t/p/h632{}", s)),
-                                profile: format!("https://www.themoviedb.org/person/{}", c["id"].as_i64().unwrap_or(0)),
-                                tmdbid: c["id"].as_i64().unwrap_or(0),
-                            });
-                        }
-                    }
-                }
-
-                // Runtime
-                let runtime = if is_series {
-                    d["episode_run_time"].as_array()
-                        .and_then(|a| a.first())
-                        .and_then(|v| v.as_u64())
-                        .unwrap_or(45)
-                } else {
-                    d["runtime"].as_u64().unwrap_or(0)
-                };
-
-                // Country
-                let country = d["production_countries"].as_array()
-                    .map(|arr| arr.iter()
-                        .filter_map(|c| c["iso_3166_1"].as_str())
-                        .collect::<Vec<_>>()
-                        .join(", "))
-                    .unwrap_or_default();
-
-                // Certification
-                let certification = if is_series {
-                    d["content_ratings"]["results"].as_array()
-                        .and_then(|arr| arr.iter().find(|c| c["iso_3166_1"].as_str() == Some("FR")))
-                        .and_then(|c| c["rating"].as_str())
-                        .map(|r| format!("FR:{}", r))
-                } else {
-                    d["release_dates"]["results"].as_array()
-                        .and_then(|arr| arr.iter().find(|c| c["iso_3166_1"].as_str() == Some("FR")))
-                        .and_then(|c| c["release_dates"].as_array())
-                        .and_then(|releases| releases.iter()
-                            .find(|r| r["certification"].as_str().map_or(false, |s| !s.is_empty())))
-                        .and_then(|r| r["certification"].as_str())
-                        .map(|r| format!("FR:{}", r))
-                };
-
-                // Tags (keywords)
-                let keywords_key = if is_series { "results" } else { "keywords" };
-                let tags = d["keywords"][keywords_key].as_array()
-                    .map(|arr| arr.iter()
-                        .filter_map(|kw| kw["name"].as_str().map(|s| s.to_string()))
-                        .collect::<Vec<_>>())
-                    .unwrap_or_default();
-
-                // Trailer YouTube
-                let trailer_key = d["videos"]["results"].as_array()
-                    .and_then(|arr| arr.iter()
-                        .find(|v| v["site"].as_str() == Some("YouTube") && v["type"].as_str() == Some("Trailer")))
-                    .and_then(|v| v["key"].as_str())
-                    .map(|s| s.to_string());
-
-                // Languages
-                let languages = d["spoken_languages"].as_array()
-                    .map(|arr| arr.iter()
-                        .filter_map(|l| l["english_name"].as_str().map(|s| s.to_string()))
-                        .collect::<Vec<_>>())
-                    .unwrap_or_default();
-
-                // Studios — networks pour séries, production_companies pour films
-                let studios = if is_series {
-                    d["networks"].as_array()
-                        .map(|arr| arr.iter()
-                            .filter_map(|s| s["name"].as_str().map(|n| n.to_string()))
-                            .collect::<Vec<_>>())
-                        .unwrap_or_default()
-                } else {
-                    d["production_companies"].as_array()
-                        .map(|arr| arr.iter()
-                            .filter_map(|s| s["name"].as_str().map(|n| n.to_string()))
-                            .collect::<Vec<_>>())
-                        .unwrap_or_default()
-                };
-
-                // Saisons (séries uniquement)
-                let seasons = if is_series {
-                    d["seasons"].as_array()
-                        .map(|arr| arr.iter().filter_map(|s| {
-                            let number = s["season_number"].as_u64()? as u32;
-                            Some(Season {
-                                number,
-                                name: s["name"].as_str().unwrap_or("").to_string(),
-                                overview: s["overview"].as_str().unwrap_or("").to_string(),
-                                poster_path: s["poster_path"].as_str().map(|p| p.to_string()),
-                                air_date: s["air_date"].as_str().unwrap_or("").to_string(),
-                                episode_count: s["episode_count"].as_u64().unwrap_or(0) as u32,
-                            })
-                        }).collect())
-                        .unwrap_or_default()
-                } else {
-                    vec![]
-                };
-
-                list.push(ScrapeResult {
-                    id,
-                    title: d[if is_series { "name" } else { "title" }]
-                        .as_str().unwrap_or("Inconnu").to_string(),
-                    original_title: d[if is_series { "original_name" } else { "original_title" }]
-                        .as_str().unwrap_or("").to_string(),
-                    overview: d["overview"].as_str().unwrap_or("").to_string(),
-                    poster_path: d["poster_path"].as_str().map(|s| s.to_string()),
-                    backdrop_path: d["backdrop_path"].as_str().map(|s| s.to_string()),
-                    release_date: d[if is_series { "first_air_date" } else { "release_date" }]
-                        .as_str().unwrap_or("").to_string(),
-                    vote_average: d["vote_average"].as_f64().unwrap_or(0.0),
-                    vote_count: d["vote_count"].as_u64().unwrap_or(0),
-                    runtime: runtime as u32,
-                    tagline: d["tagline"].as_str().unwrap_or("").to_string(),
-                    genres: d["genres"].as_array()
-                        .unwrap_or(&vec![]).iter()
-                        .map(|g| g["name"].as_str().unwrap_or("").to_string())
-                        .collect(),
-                    studios,
-                    actors,
-                    director,
-                    director_tmdbid,
-                    writers,
-                    producers,
-                    imdb_id,
-                    wikidata_id,
-                    tvdb_id,
-                    country,
-                    certification,
-                    tags,
-                    trailer_key,
-                    languages,
-                    is_series,
-                    seasons,
-                });
             }
         }
     }
