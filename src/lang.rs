@@ -116,6 +116,10 @@ pub struct Lang {
     pub scrap_error_no_key: &'static str,
     pub scrap_error_fetch: &'static str,   // format: {}
     pub scrap_no_results: &'static str,
+    pub scrap_fetch_fanart: &'static str,
+    pub scrap_fetch_clearlogo: &'static str,
+    pub scrap_retry_search: &'static str,
+    pub scrap_retry_hint: &'static str,
 
     // Tag
     pub tag_mark_watched: &'static str,
@@ -273,6 +277,10 @@ pub const EN: Lang = Lang {
     scrap_error_no_key: "⚠️ TMDB API key is missing",
     scrap_error_fetch: "⚠️ Fetch error: {}",
     scrap_no_results: "ℹ️ No results found",
+    scrap_fetch_fanart: "Download fanart",
+    scrap_fetch_clearlogo: "Download clearlogo",
+    scrap_retry_search: "🔍 Search again",
+    scrap_retry_hint: "No results — try a different title:",
 
     tag_mark_watched: "✅ Mark as WATCHED",
     tag_inject_nfo: "📥 Inject tags from NFO",
@@ -427,6 +435,10 @@ pub const FR: Lang = Lang {
     scrap_error_no_key: "⚠️ Clé API TMDB manquante",
     scrap_error_fetch: "⚠️ Erreur réseau : {}",
     scrap_no_results: "ℹ️ Aucun résultat trouvé",
+    scrap_fetch_fanart: "Télécharger le fanart",
+    scrap_fetch_clearlogo: "Télécharger le clearlogo",
+    scrap_retry_search: "🔍 Relancer la recherche",
+    scrap_retry_hint: "Aucun résultat — essayez un autre titre :",
 
     tag_mark_watched: "✅ Marquer VU",
     tag_inject_nfo: "📥 Injecter tags depuis NFO",

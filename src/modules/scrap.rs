@@ -196,7 +196,7 @@ pub fn detect_series(paths: &[PathBuf]) -> Option<(String, BTreeSet<u32>)> {
     None
 }
 
-pub fn save_metadata(input_path: PathBuf, data: ScrapeResult, fanart_key: &str) {
+pub fn save_metadata(input_path: PathBuf, data: ScrapeResult, fanart_key: &str, fetch_fanart: bool, fetch_clearlogo: bool) {
     let _ = dotenvy::dotenv();
     let now = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let year = data.release_date.split('-').next().unwrap_or("").to_string();
@@ -236,7 +236,7 @@ pub fn save_metadata(input_path: PathBuf, data: ScrapeResult, fanart_key: &str) 
     }
 
     // Clearlogo local (téléchargé via fanart.tv)
-    xml.push_str(&format!("  <thumb aspect=\"clearlogo\">{}-clearlogo.png</thumb>\n", base_name));
+    xml.push_str(&format!("  <thumb aspect=\"clearlogo\">{}_clearlogo.png</thumb>\n", base_name));
 
     // Fanart
     if let Some(backdrop) = &data.backdrop_path {
@@ -343,14 +343,16 @@ pub fn save_metadata(input_path: PathBuf, data: ScrapeResult, fanart_key: &str) 
     xml.push_str(&format!("  <original_filename>{}</original_filename>\n", escape_xml(&filename)));
     xml.push_str(&format!("</{}>\n", tag));
 
-    let _ = fs::write(input_path.with_extension("nfo"), xml);
-
-    // Téléchargement images en parallèle
+    // Tout dans Extras/
     let client = Client::new();
+    let posters_dir = parent_dir.join("Extras");
+    let _ = fs::create_dir_all(&posters_dir);
+
+    let _ = fs::write(posters_dir.join(format!("{}.nfo", base_name)), xml);
 
     if let Some(ref path) = data.poster_path {
         let poster_url = format!("https://image.tmdb.org/t/p/original{}", path);
-        let out_path = parent_dir.join(format!("{}-poster.jpg", base_name));
+        let out_path = posters_dir.join(format!("{}_poster.jpg", base_name));
         let client_clone = client.clone();
         std::thread::spawn(move || {
             if let Ok(res) = client_clone.get(poster_url).send() {
@@ -361,20 +363,22 @@ pub fn save_metadata(input_path: PathBuf, data: ScrapeResult, fanart_key: &str) 
         });
     }
 
-    if let Some(ref path) = data.backdrop_path {
-        let fanart_url = format!("https://image.tmdb.org/t/p/original{}", path);
-        let out_path = parent_dir.join(format!("{}-fanart.jpg", base_name));
-        let client_clone = client.clone();
-        std::thread::spawn(move || {
-            if let Ok(res) = client_clone.get(fanart_url).send() {
-                if let Ok(bytes) = res.bytes() {
-                    let _ = fs::write(out_path, bytes);
+    if fetch_fanart {
+        if let Some(ref path) = data.backdrop_path {
+            let fanart_url = format!("https://image.tmdb.org/t/p/original{}", path);
+            let out_path = posters_dir.join(format!("{}_fanart.jpg", base_name));
+            let client_clone = client.clone();
+            std::thread::spawn(move || {
+                if let Ok(res) = client_clone.get(fanart_url).send() {
+                    if let Ok(bytes) = res.bytes() {
+                        let _ = fs::write(out_path, bytes);
+                    }
                 }
-            }
-        });
+            });
+        }
     }
 
-    // Clearlogo via Fanart.tv
+    if !fetch_clearlogo { return; }
     let fanart_api_key = if fanart_key.is_empty() {
         match std::env::var("FANART_API_KEY") {
             Ok(k) => k,
@@ -397,7 +401,7 @@ pub fn save_metadata(input_path: PathBuf, data: ScrapeResult, fanart_key: &str) 
         format!("https://webservice.fanart.tv/v3/movies/{}?api_key={}", tmdb_id, fanart_api_key)
     };
 
-    let out_logo_path = parent_dir.join(format!("{}-clearlogo.png", base_name));
+    let out_logo_path = posters_dir.join(format!("{}_clearlogo.png", base_name));
     std::thread::spawn(move || {
         if let Ok(res) = client.get(&logo_url).send() {
             if let Ok(json) = res.json::<Value>() {
@@ -433,13 +437,16 @@ pub fn save_metadata(input_path: PathBuf, data: ScrapeResult, fanart_key: &str) 
 /// `detected_seasons`: numéros de saison détectés dans les fichiers déposés
 pub fn save_series_metadata(
     series_dir: PathBuf,
+    series_name: &str,
     data: ScrapeResult,
     detected_seasons: &BTreeSet<u32>,
     fanart_key: &str,
+    fetch_fanart: bool,
+    fetch_clearlogo: bool,
 ) {
     let now = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let year = data.release_date.split('-').next().unwrap_or("").to_string();
-    let base_name = series_dir.file_name().unwrap_or_default().to_string_lossy().to_string();
+    let base_name = series_name.to_string();
     let tmdb_rating = (data.vote_average * 10.0).round() / 10.0;
 
     // ── Macro-like : construit le bloc commun header+ids+body dans un String ──
@@ -549,6 +556,10 @@ pub fn save_series_metadata(
         };
     }
 
+    // ── Dossier Extras/ — créé en premier pour NFO et images ────────────────
+    let extras_dir = series_dir.join("Extras");
+    let _ = fs::create_dir_all(&extras_dir);
+
     // ── tvshow.nfo ───────────────────────────────────────────────────────────
     let mut xml = String::new();
     push_common!(xml);
@@ -563,7 +574,7 @@ pub fn save_series_metadata(
             ));
         }
     }
-    xml.push_str(&format!("  <thumb aspect=\"clearlogo\">{}-clearlogo.png</thumb>\n", base_name));
+    xml.push_str(&format!("  <thumb aspect=\"clearlogo\">{}_clearlogo.png</thumb>\n", base_name));
     if let Some(ref backdrop) = data.backdrop_path {
         xml.push_str("  <fanart>\n");
         xml.push_str(&format!("    <thumb>https://image.tmdb.org/t/p/original{}</thumb>\n", backdrop));
@@ -571,7 +582,7 @@ pub fn save_series_metadata(
     }
     push_ids!(xml);
     push_body!(xml);
-    let _ = fs::write(series_dir.join("tvshow.nfo"), &xml);
+    let _ = fs::write(extras_dir.join(format!("{}.nfo", base_name)), &xml);
 
     // ── seasonXX.nfo — un par saison détectée ────────────────────────────────
     for &season_num in detected_seasons {
@@ -598,15 +609,16 @@ pub fn save_series_metadata(
         }
         push_ids!(sxml);
         push_body!(sxml);
-        let _ = fs::write(series_dir.join(format!("season{:02}.nfo", season_num)), &sxml);
+        let _ = fs::write(extras_dir.join(format!("{}_season{:02}.nfo", base_name, season_num)), &sxml);
     }
 
-    // ── Images en parallèle ──────────────────────────────────────────────────
+    // ── Images en parallèle → dossier Extras/ ──────────────────────────────
     let client = Client::new();
+    // extras_dir déjà créé plus haut
 
     if let Some(ref path) = data.poster_path {
         let url = format!("https://image.tmdb.org/t/p/original{}", path);
-        let out = series_dir.join("poster.jpg");
+        let out = extras_dir.join(format!("{}_poster.jpg", base_name));
         let c = client.clone();
         std::thread::spawn(move || {
             if let Ok(res) = c.get(url).send() {
@@ -614,20 +626,22 @@ pub fn save_series_metadata(
             }
         });
     }
-    if let Some(ref path) = data.backdrop_path {
-        let url = format!("https://image.tmdb.org/t/p/original{}", path);
-        let out = series_dir.join("fanart.jpg");
-        let c = client.clone();
-        std::thread::spawn(move || {
-            if let Ok(res) = c.get(url).send() {
-                if let Ok(bytes) = res.bytes() { let _ = fs::write(out, bytes); }
-            }
-        });
+    if fetch_fanart {
+        if let Some(ref path) = data.backdrop_path {
+            let url = format!("https://image.tmdb.org/t/p/original{}", path);
+            let out = extras_dir.join(format!("{}_fanart.jpg", base_name));
+            let c = client.clone();
+            std::thread::spawn(move || {
+                if let Ok(res) = c.get(url).send() {
+                    if let Ok(bytes) = res.bytes() { let _ = fs::write(out, bytes); }
+                }
+            });
+        }
     }
     for season in data.seasons.iter().filter(|s| s.number > 0 && detected_seasons.contains(&s.number)) {
         if let Some(ref pp) = season.poster_path {
             let url = format!("https://image.tmdb.org/t/p/original{}", pp);
-            let out = series_dir.join(format!("season{:02}-poster.jpg", season.number));
+            let out = extras_dir.join(format!("{}_season{:02}_poster.jpg", base_name, season.number));
             let c = client.clone();
             std::thread::spawn(move || {
                 if let Ok(res) = c.get(url).send() {
@@ -637,7 +651,7 @@ pub fn save_series_metadata(
         }
     }
 
-    // Clearlogo via Fanart.tv
+    if !fetch_clearlogo { return; }
     let fanart_api_key = if fanart_key.is_empty() {
         match std::env::var("FANART_API_KEY") {
             Ok(k) => k,
@@ -653,7 +667,7 @@ pub fn save_series_metadata(
     } else {
         format!("https://webservice.fanart.tv/v3/tv/{}?api_key={}", tmdb_id, fanart_api_key)
     };
-    let out_logo = series_dir.join(format!("{}-clearlogo.png", base_name));
+    let out_logo = extras_dir.join(format!("{}_clearlogo.png", base_name));
     std::thread::spawn(move || {
         if let Ok(res) = client.get(&logo_url).send() {
             if let Ok(json) = res.json::<Value>() {

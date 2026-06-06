@@ -6,12 +6,13 @@ use quick_xml::Reader;
 use quick_xml::events::Event;
 use crate::modules::binaries;
 use crate::modules::scrap::extract_series_info;
-/// Lit un fichier NFO et retourne un HashMap
+/// Lit un fichier NFO et retourne un HashMap.
+/// Les tags dupliqués (genre, tag, studio...) sont joints par " / ".
 pub fn lire_nfo(nfo_path: &Path) -> Result<HashMap<String, String>, String> {
     let file = File::open(nfo_path).map_err(|e| e.to_string())?;
     let mut reader = Reader::from_reader(BufReader::new(file));
     let mut buf = Vec::new();
-    let mut data: HashMap<String, String> = HashMap::new();
+    let mut data: HashMap<String, Vec<String>> = HashMap::new();
     let mut current_tag = String::new();
     loop {
         match reader.read_event_into(&mut buf) {
@@ -21,7 +22,7 @@ pub fn lire_nfo(nfo_path: &Path) -> Result<HashMap<String, String>, String> {
             Ok(Event::Text(e)) => {
                 let text = e.decode().unwrap_or_default().trim().to_string();
                 if !current_tag.is_empty() && !text.is_empty() {
-                    data.insert(current_tag.clone(), text);
+                    data.entry(current_tag.clone()).or_default().push(text);
                 }
             }
             Ok(Event::End(_)) => {
@@ -33,7 +34,8 @@ pub fn lire_nfo(nfo_path: &Path) -> Result<HashMap<String, String>, String> {
         }
         buf.clear();
     }
-    Ok(data)
+    // Joindre les valeurs multiples avec " / "
+    Ok(data.into_iter().map(|(k, v)| (k, v.join(" / "))).collect())
 }
 /// Crée le fichier XML temporaire pour mkvpropedit
 fn creer_xml_tags(tags: &HashMap<String, String>) -> String {
@@ -175,36 +177,67 @@ pub fn appliquer_tags(mkv_path: &Path, nfo_path: &Path) -> Result<(), String> {
     if status.success() { Ok(()) } else { Err("Erreur injection métadonnées".into()) }
 }
 
-/// Résout le chemin du NFO à utiliser pour un fichier donné :
-/// - Série  → dossier_parent/seasonXX.nfo
-/// - Film   → même dossier, même stem + .nfo
+/// Résout le chemin du NFO à utiliser pour un fichier donné.
+/// Cherche d'abord dans le dossier parent, puis dans parent/Extras/.
+/// - Série  → {titre}_season01.nfo puis season01.nfo (compat)
+/// - Film   → stem.nfo
 fn resolve_nfo(mkv_path: &Path) -> Option<std::path::PathBuf> {
     let parent = mkv_path.parent()?;
     let stem = mkv_path.file_stem()?.to_string_lossy();
-    if let Some((_, season_num)) = extract_series_info(&stem) {
-        let nfo = parent.join(format!("season{:02}.nfo", season_num));
-        if nfo.exists() { return Some(nfo); }
+    let extras_dir = parent.join("Extras");
+
+    let find = |filename: &str| -> Option<std::path::PathBuf> {
+        let p = parent.join(filename);
+        if p.exists() { return Some(p); }
+        if extras_dir.exists() {
+            let p2 = extras_dir.join(filename);
+            if p2.exists() { return Some(p2); }
+        }
+        None
+    };
+
+    if let Some((series_title, season_num)) = extract_series_info(&stem) {
+        if let Some(p) = find(&format!("{}_season{:02}.nfo", series_title, season_num)) { return Some(p); }
+        if let Some(p) = find(&format!("season{:02}.nfo", season_num)) { return Some(p); }
     }
-    // Fallback film
-    let nfo = mkv_path.with_extension("nfo");
-    if nfo.exists() { Some(nfo) } else { None }
+    // Film
+    find(&format!("{}.nfo", stem))
 }
 
 /// Résout le chemin du poster à utiliser pour un fichier donné :
-/// - Série → dossier_parent/seasonXX-poster.jpg
-/// - Film  → dossier_parent/stem-poster.jpg ou poster.jpg
+/// Cherche d'abord dans le dossier parent, puis dans parent/Extras/ si il existe.
+/// - Série → {titre}_seasonXX_poster.jpg puis compat season01_poster / season01-poster
+/// - Film  → stem_poster.jpg, stem-poster.jpg, poster.jpg
 fn resolve_poster(mkv_path: &Path) -> Option<std::path::PathBuf> {
     let parent = mkv_path.parent()?;
     let stem = mkv_path.file_stem()?.to_string_lossy();
-    if let Some((_, season_num)) = extract_series_info(&stem) {
-        let poster = parent.join(format!("season{:02}-poster.jpg", season_num));
-        if poster.exists() { return Some(poster); }
+    let posters_dir = parent.join("Extras");
+
+    // Closure qui cherche un fichier d'abord dans parent, puis dans Extras/
+    let find = |filename: &str| -> Option<std::path::PathBuf> {
+        let p = parent.join(filename);
+        if p.exists() { return Some(p); }
+        if posters_dir.exists() {
+            let p2 = posters_dir.join(filename);
+            if p2.exists() { return Some(p2); }
+        }
+        None
+    };
+
+    if let Some((series_title, season_num)) = extract_series_info(&stem) {
+        // Priorité : {titre}_seasonXX_poster.jpg
+        if let Some(p) = find(&format!("{}_season{:02}_poster.jpg", series_title, season_num)) { return Some(p); }
+        // Compat : seasonXX_poster.jpg
+        if let Some(p) = find(&format!("season{:02}_poster.jpg", season_num)) { return Some(p); }
+        // Compat ancienne : seasonXX-poster.jpg
+        if let Some(p) = find(&format!("season{:02}-poster.jpg", season_num)) { return Some(p); }
+        return None;
     }
-    // Fallback film : stem-poster.jpg puis poster.jpg
-    let poster = parent.join(format!("{}-poster.jpg", stem));
-    if poster.exists() { return Some(poster); }
-    let poster = parent.join("poster.jpg");
-    if poster.exists() { return Some(poster); }
+
+    // Film
+    if let Some(p) = find(&format!("{}_poster.jpg", stem)) { return Some(p); }
+    if let Some(p) = find(&format!("{}-poster.jpg", stem)) { return Some(p); }
+    if let Some(p) = find("poster.jpg") { return Some(p); }
     None
 }
 

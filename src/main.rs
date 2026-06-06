@@ -70,6 +70,11 @@ struct OxytoolsApp {
         fanart_api_key: String,
         keys_env_path: Option<PathBuf>,
         scrap_status: String,
+        fetch_fanart: bool,
+        fetch_clearlogo: bool,
+        scrap_fullscreen: Option<egui::TextureHandle>,
+        scrap_popup_query: Option<String>,
+        no_result_flag: Arc<Mutex<bool>>,
         save_doc_format: bool,
         save_image_format: bool,
         save_archive_format: bool,
@@ -178,6 +183,11 @@ impl Default for OxytoolsApp {
                 fanart_api_key: String::new(),
                 keys_env_path: None,
                 scrap_status: String::new(),
+                fetch_fanart: false,
+                fetch_clearlogo: false,
+                scrap_fullscreen: None,
+                scrap_popup_query: None,
+                no_result_flag: Arc::new(Mutex::new(false)),
                 save_doc_format: false,
                 save_image_format: false,
                 save_archive_format: false,
@@ -1958,17 +1968,26 @@ impl eframe::App for OxytoolsApp {
 
                     ui.separator();
 
+                    // ── Options fanart/clearlogo (point 2) ───────────────────
+                    ui.horizontal(|ui| {
+                        ui.checkbox(&mut self.fetch_fanart, self.lang.scrap_fetch_fanart);
+                        ui.checkbox(&mut self.fetch_clearlogo, self.lang.scrap_fetch_clearlogo);
+                    });
+
+                    ui.separator();
+
                     // ── Recherche ────────────────────────────────────────────
                     ui.horizontal(|ui| {
                         let status_arc = Arc::clone(&self.status);
                         let lang = self.lang;
                         let tmdb_key = self.tmdb_api_key.clone();
-                        let search = |is_series: bool, res_arc: Arc<Mutex<Vec<ScrapeEntry>>>, stem: String, ctx_c: egui::Context, status_c: Arc<Mutex<String>>, tk: String| {
+                        let search = |is_series: bool, res_arc: Arc<Mutex<Vec<ScrapeEntry>>>, stem: String, ctx_c: egui::Context, status_c: Arc<Mutex<String>>, tk: String, nrf: Arc<Mutex<bool>>| {
                             res_arc.lock().unwrap().clear();
                             std::thread::spawn(move || {
                                 match modules::scrap::search_tmdb(&stem, is_series, &tk) {
                                     Ok(results) if results.is_empty() => {
                                         *status_c.lock().unwrap() = lang.scrap_no_results.into();
+                                        *nrf.lock().unwrap() = true;
                                         ctx_c.request_repaint();
                                     }
                                     Ok(results) => {
@@ -1994,50 +2013,159 @@ impl eframe::App for OxytoolsApp {
                                 }
                             });
                         };
+                        let no_result_flag = Arc::clone(&self.no_result_flag);
                         if ui.button(self.lang.scrap_movie).clicked() {
                             if tmdb_key.is_empty() {
                                 *self.status.lock().unwrap() = self.lang.scrap_error_no_key.into();
                             } else {
-                                search(false, Arc::clone(&self.results_ui), self.current_stem.clone(), ctx.clone(), Arc::clone(&status_arc), tmdb_key.clone());
+                                search(false, Arc::clone(&self.results_ui), self.current_stem.clone(), ctx.clone(), Arc::clone(&status_arc), tmdb_key.clone(), Arc::clone(&no_result_flag));
                             }
                         }
                         if ui.button(self.lang.scrap_series).clicked() {
                             if tmdb_key.is_empty() {
                                 *self.status.lock().unwrap() = self.lang.scrap_error_no_key.into();
                             } else {
-                                // Extraire le titre série depuis les fichiers déposés
                                 let query = if let Some((title, _)) = modules::scrap::detect_series(&self.current_files) {
                                     title
                                 } else {
                                     self.current_stem.clone()
                                 };
-                                search(true, Arc::clone(&self.results_ui), query, ctx.clone(), Arc::clone(&status_arc), tmdb_key.clone());
+                                search(true, Arc::clone(&self.results_ui), query, ctx.clone(), Arc::clone(&status_arc), tmdb_key.clone(), Arc::clone(&no_result_flag));
                             }
                         }
                     });
-                    let entries = self.results_ui.lock().unwrap().clone();
-                    for entry in entries {
-                        ui.horizontal(|ui| {
-                            if let Some(t) = &entry.texture { ui.image((t.id(), egui::vec2(50.0, 75.0))); }
-                            ui.label(&entry.data.title);
-                            if !self.current_files.is_empty() {
-                                if ui.button(self.lang.scrap_choose).clicked() {
-                                    let fanart = self.fanart_api_key.clone();
-                                    if entry.data.is_series {
-                                        // Dossier racine = parent du premier fichier (ou le dossier lui-même)
-                                        let series_dir = if self.current_files[0].is_dir() {
-                                            self.current_files[0].clone()
-                                        } else {
-                                            self.current_files[0].parent().unwrap_or(&self.current_files[0]).to_path_buf()
-                                        };
-                                        let detected = modules::scrap::collect_season_numbers(&self.current_files);
-                                        modules::scrap::save_series_metadata(series_dir, entry.data.clone(), &detected, &fanart);
-                                    } else {
-                                        modules::scrap::save_metadata(self.current_files[0].clone(), entry.data.clone(), &fanart);
+
+                    // Vérifier le flag no_result entre les frames et ouvrir la popup
+                    if *self.no_result_flag.lock().unwrap() {
+                        *self.no_result_flag.lock().unwrap() = false;
+                        self.scrap_popup_query = Some(self.current_stem.clone());
+                    }
+
+                    // ── Popup aucun résultat — champ de recherche alternatif (point 4) ──
+                    if self.scrap_popup_query.is_some() {
+                        let mut open = true;
+                        egui::Window::new(self.lang.scrap_retry_hint)
+                            .collapsible(false)
+                            .resizable(false)
+                            .open(&mut open)
+                            .show(ctx, |ui| {
+                                let q = self.scrap_popup_query.as_mut().unwrap();
+                                ui.text_edit_singleline(q);
+                                let query2 = q.clone();
+                                ui.horizontal(|ui| {
+                                    let status_arc2 = Arc::clone(&self.status);
+                                    let tmdb_key2 = self.tmdb_api_key.clone();
+                                    let lang2 = self.lang;
+                                    let res2 = Arc::clone(&self.results_ui);
+                                    let ctx2 = ctx.clone();
+                                    if ui.button(self.lang.scrap_retry_search).clicked() {
+                                        self.scrap_popup_query = None;
+                                        res2.lock().unwrap().clear();
+                                        std::thread::spawn(move || {
+                                            match modules::scrap::search_tmdb(&query2, false, &tmdb_key2) {
+                                                Ok(results) if results.is_empty() => {
+                                                    *status_arc2.lock().unwrap() = lang2.scrap_no_results.into();
+                                                    ctx2.request_repaint();
+                                                }
+                                                Ok(results) => {
+                                                    for r in results {
+                                                        let tex = r.poster_path.as_ref()
+                                                            .and_then(|p| modules::scrap::download_image_bytes(p))
+                                                            .and_then(|b| image::load_from_memory(&b).ok())
+                                                            .map(|img| {
+                                                                let ci = egui::ColorImage::from_rgba_unmultiplied(
+                                                                    [img.width() as usize, img.height() as usize],
+                                                                    img.to_rgba8().as_flat_samples().as_slice()
+                                                                );
+                                                                ctx2.load_texture(format!("p_{}", r.id), ci, Default::default())
+                                                            });
+                                                        res2.lock().unwrap().push(ScrapeEntry { data: r, texture: tex });
+                                                        ctx2.request_repaint();
+                                                    }
+                                                }
+                                                Err(e) => {
+                                                    *status_arc2.lock().unwrap() = format!("⚠️ {}", e);
+                                                    ctx2.request_repaint();
+                                                }
+                                            }
+                                        });
                                     }
+                                });
+                            });
+                        if !open { self.scrap_popup_query = None; }
+                    }
+
+                    // ── Résultats avec année + images plus grandes + plein écran (point 3) ──
+                    let entries = self.results_ui.lock().unwrap().clone();
+                    egui::ScrollArea::vertical().max_height(400.0).show(ui, |ui| {
+                        for entry in &entries {
+                            ui.horizontal(|ui| {
+                                // Image cliquable — taille 90x135
+                                if let Some(t) = &entry.texture {
+                                    let img = egui::Image::new((t.id(), egui::vec2(90.0, 135.0)))
+                                        .sense(egui::Sense::click());
+                                    let resp = ui.add(img);
+                                    if resp.clicked() {
+                                        self.scrap_fullscreen = Some(t.clone());
+                                    }
+                                    resp.on_hover_text("Cliquer pour agrandir");
+                                } else {
+                                    ui.allocate_space(egui::vec2(90.0, 135.0));
                                 }
-                            }
-                        });
+                                ui.vertical(|ui| {
+                                    // Titre + année (point 3)
+                                    let year = entry.data.release_date.split('-').next().unwrap_or("");
+                                    ui.strong(format!("{} ({})", entry.data.title, year));
+                                    ui.label(egui::RichText::new(&entry.data.overview).small().weak());
+                                    if !self.current_files.is_empty() {
+                                        if ui.button(self.lang.scrap_choose).clicked() {
+                                            let fanart = self.fanart_api_key.clone();
+                                            let ff = self.fetch_fanart;
+                                            let fc = self.fetch_clearlogo;
+                                            if entry.data.is_series {
+                                                let series_dir = if self.current_files[0].is_dir() {
+                                                    self.current_files[0].clone()
+                                                } else {
+                                                    self.current_files[0].parent().unwrap_or(&self.current_files[0]).to_path_buf()
+                                                };
+                                                // Nom de la série : si dossier → nom du dossier,
+                                                // si fichier → titre extrait par extract_series_info (sans S01E01),
+                                                // fallback stem complet
+                                                let series_name = if self.current_files[0].is_dir() {
+                                                    self.current_files[0].file_name().unwrap_or_default().to_string_lossy().to_string()
+                                                } else {
+                                                    let stem = self.current_files[0].file_stem().unwrap_or_default().to_string_lossy();
+                                                    modules::scrap::extract_series_info(&stem)
+                                                        .map(|(title, _)| title)
+                                                        .unwrap_or_else(|| stem.to_string())
+                                                };
+                                                let detected = modules::scrap::collect_season_numbers(&self.current_files);
+                                                modules::scrap::save_series_metadata(series_dir, &series_name, entry.data.clone(), &detected, &fanart, ff, fc);
+                                            } else {
+                                                modules::scrap::save_metadata(self.current_files[0].clone(), entry.data.clone(), &fanart, ff, fc);
+                                            }
+                                        }
+                                    }
+                                });
+                            });
+                            ui.separator();
+                        }
+                    });
+
+                    // ── Plein écran image (point 3) ──────────────────────────
+                    if self.scrap_fullscreen.is_some() {
+                        let mut open = true;
+                        egui::Window::new("🖼")
+                            .collapsible(false)
+                            .resizable(true)
+                            .open(&mut open)
+                            .show(ctx, |ui| {
+                                if let Some(t) = &self.scrap_fullscreen {
+                                    let avail = ui.available_size();
+                                    ui.image((t.id(), avail));
+                                }
+                            });
+                        if !open { self.scrap_fullscreen = None; }
                     }
                 },
                 #[cfg(feature = "api")]
