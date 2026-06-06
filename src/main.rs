@@ -54,6 +54,10 @@ struct OxytoolsApp {
         audio_formats_dispo: Vec<String>,
         #[cfg(feature = "api")]
         tag_edit_val: String,
+        use_custom_nfo: bool,
+        custom_nfo_path: Option<std::path::PathBuf>,
+        use_custom_poster: bool,
+        custom_poster_path: Option<std::path::PathBuf>,
         current_theme: String,
         lang: &'static crate::lang::Lang,
         lang_id: &'static str,
@@ -72,6 +76,7 @@ struct OxytoolsApp {
         scrap_status: String,
         fetch_fanart: bool,
         fetch_clearlogo: bool,
+        scrap_manual_search_enabled: bool,
         scrap_fullscreen: Option<egui::TextureHandle>,
         scrap_popup_query: Option<String>,
         no_result_flag: Arc<Mutex<bool>>,
@@ -179,6 +184,10 @@ impl Default for OxytoolsApp {
                 audio_formats_dispo: vec!["aac","flac","m4a","mp3","ogg","opus","wav"].into_iter().map(String::from).collect(),
                 #[cfg(feature = "api")]
                 tag_edit_val: String::new(),
+                use_custom_nfo: false,
+                custom_nfo_path: None,
+                use_custom_poster: false,
+                custom_poster_path: None,
                 current_theme: "Dark".into(),
                 tmdb_api_key: String::new(),
                 fanart_api_key: String::new(),
@@ -186,6 +195,7 @@ impl Default for OxytoolsApp {
                 scrap_status: String::new(),
                 fetch_fanart: false,
                 fetch_clearlogo: false,
+                scrap_manual_search_enabled: false,
                 scrap_fullscreen: None,
                 scrap_popup_query: None,
                 no_result_flag: Arc::new(Mutex::new(false)),
@@ -1080,6 +1090,32 @@ impl OxytoolsApp {
         });
     }
 }
+/// Résout une liste de chemins (fichiers ou dossiers) en liste de .mkv triés alphabétiquement.
+/// Les dossiers sont scannés récursivement.
+fn expand_to_mkv(paths: &[std::path::PathBuf]) -> Vec<std::path::PathBuf> {
+    let mut result = Vec::new();
+    for p in paths {
+        if p.is_dir() {
+            if let Ok(entries) = std::fs::read_dir(p) {
+                let mut sub: Vec<std::path::PathBuf> = entries
+                    .filter_map(|e| e.ok().map(|e| e.path()))
+                    .collect();
+                sub.sort();
+                for sp in &sub {
+                    if sp.is_dir() {
+                        result.extend(expand_to_mkv(&[sp.clone()]));
+                    } else if sp.extension().map_or(false, |e| e.eq_ignore_ascii_case("mkv")) {
+                        result.push(sp.clone());
+                    }
+                }
+            }
+        } else if p.extension().map_or(false, |e| e.eq_ignore_ascii_case("mkv")) {
+            result.push(p.clone());
+        }
+    }
+    result
+}
+
 /// Lit la durée d'un fichier media via ffprobe. Retourne les secondes ou None.
 fn get_duration_secs(path: &std::path::Path) -> Option<f64> {
     let out = crate::modules::binaries::silent_cmd(crate::modules::binaries::get_ffprobe())
@@ -1228,6 +1264,7 @@ impl eframe::App for OxytoolsApp {
                     }
                     None
                 }).collect();
+                self.current_files.sort();
                 if let Some(p) = self.current_files.first() {
                     self.current_stem = p.file_stem().unwrap_or_default().to_string_lossy().to_string();
                 }
@@ -1974,6 +2011,17 @@ impl eframe::App for OxytoolsApp {
                     ui.horizontal(|ui| {
                         ui.checkbox(&mut self.fetch_fanart, self.lang.scrap_fetch_fanart);
                         ui.checkbox(&mut self.fetch_clearlogo, self.lang.scrap_fetch_clearlogo);
+                        ui.separator();
+                        let was_enabled = self.scrap_manual_search_enabled;
+                        ui.checkbox(&mut self.scrap_manual_search_enabled, self.lang.scrap_manual_search);
+                        // Ouvrir la popup immédiatement si on coche la case
+                        if self.scrap_manual_search_enabled && !was_enabled {
+                            self.scrap_popup_query = Some(self.current_stem.clone());
+                        }
+                        // Refermer si on décoche
+                        if !self.scrap_manual_search_enabled && self.scrap_popup_query.is_some() {
+                            self.scrap_popup_query = None;
+                        }
                     });
 
                     ui.separator();
@@ -2116,7 +2164,10 @@ impl eframe::App for OxytoolsApp {
                                     }
                                 });
                             });
-                        if !open { self.scrap_popup_query = None; }
+                        if !open {
+                            self.scrap_popup_query = None;
+                            self.scrap_manual_search_enabled = false;
+                        }
                     }
 
                     // ── Résultats avec année + images plus grandes + plein écran (point 3) ──
@@ -2210,9 +2261,12 @@ impl eframe::App for OxytoolsApp {
                             if ui.button(self.lang.tag_inject_nfo).clicked() {
                                 let (mut ok, mut err) = (0usize, 0usize);
                                 for path in &self.current_files {
-                                    // resolve_nfo est interne à tag.rs — on passe le nfo générique,
-                                    // appliquer_tags le résout lui-même
-                                    match modules::tag::appliquer_tags(path, &path.with_extension("nfo")) {
+                                    let nfo = if self.use_custom_nfo {
+                                        self.custom_nfo_path.clone().unwrap_or_else(|| path.with_extension("nfo"))
+                                    } else {
+                                        path.with_extension("nfo")
+                                    };
+                                    match modules::tag::appliquer_tags(path, &nfo) {
                                         Ok(_) => ok += 1,
                                         Err(e) => { crate::log_error(&format!("appliquer_tags {:?}: {}", path, e)); err += 1; }
                                     }
@@ -2222,26 +2276,82 @@ impl eframe::App for OxytoolsApp {
                             if ui.button(self.lang.tag_add_poster).clicked() {
                                 let (mut ok, mut err) = (0usize, 0usize);
                                 for path in &self.current_files {
-                                    match modules::tag::ajouter_images_mkv(path) {
+                                    let result = if self.use_custom_poster {
+                                        if let Some(ref poster) = self.custom_poster_path {
+                                            modules::tag::injecter_poster_custom(path, poster)
+                                        } else {
+                                            modules::tag::ajouter_images_mkv(path)
+                                        }
+                                    } else {
+                                        modules::tag::ajouter_images_mkv(path)
+                                    };
+                                    match result {
                                         Ok(_) => ok += 1,
                                         Err(e) => { crate::log_error(&format!("ajouter_images {:?}: {}", path, e)); err += 1; }
                                     }
                                 }
                                 *self.status.lock().unwrap() = format!("✅ {ok} images | ⚠️ {err}");
                             }
-                            if ui.button(self.lang.tag_inject_nfo_and_poster).clicked() {
-                                let (mut ok, mut err) = (0usize, 0usize);
-                                for path in &self.current_files {
-                                    match modules::tag::injecter_nfo_et_poster(path) {
-                                        Ok(_) => ok += 1,
-                                        Err(e) => { crate::log_error(&format!("injecter_nfo_et_poster {:?}: {}", path, e)); err += 1; }
+
+                            // ── Inject NFO + Poster avec checkboxes custom ───
+                            ui.horizontal(|ui| {
+                                if ui.button(self.lang.tag_inject_nfo_and_poster).clicked() {
+                                    let (mut ok, mut err) = (0usize, 0usize);
+                                    for path in &self.current_files {
+                                        let nfo = if self.use_custom_nfo {
+                                            self.custom_nfo_path.clone().unwrap_or_else(|| path.with_extension("nfo"))
+                                        } else {
+                                            path.with_extension("nfo")
+                                        };
+                                        let r_nfo = modules::tag::appliquer_tags(path, &nfo);
+                                        let r_poster = if self.use_custom_poster {
+                                            if let Some(ref poster) = self.custom_poster_path {
+                                                modules::tag::injecter_poster_custom(path, poster)
+                                            } else {
+                                                modules::tag::ajouter_images_mkv(path)
+                                            }
+                                        } else {
+                                            modules::tag::ajouter_images_mkv(path)
+                                        };
+                                        match (r_nfo, r_poster) {
+                                            (Ok(_), Ok(_)) => ok += 1,
+                                            (Err(e), _) | (_, Err(e)) => { crate::log_error(&format!("{:?}: {}", path, e)); err += 1; }
+                                        }
+                                    }
+                                    *self.status.lock().unwrap() = format!("✅ {ok} NFO+poster | ⚠️ {err}");
+                                }
+                                // Checkbox NFO custom
+                                ui.checkbox(&mut self.use_custom_nfo, self.lang.tag_custom_nfo);
+                                if self.use_custom_nfo {
+                                    let label = self.custom_nfo_path.as_ref()
+                                        .map(|p| p.file_name().unwrap_or_default().to_string_lossy().to_string())
+                                        .unwrap_or_else(|| "…".into());
+                                    if ui.small_button(format!("📄 {}", label)).clicked() {
+                                        if let Some(p) = rfd::FileDialog::new().add_filter("NFO", &["nfo"]).pick_file() {
+                                            self.custom_nfo_path = Some(p);
+                                        }
                                     }
                                 }
-                                *self.status.lock().unwrap() = format!("✅ {ok} NFO+poster | ⚠️ {err}");
-                            }
+                                // Checkbox poster custom
+                                ui.checkbox(&mut self.use_custom_poster, self.lang.tag_custom_poster);
+                                if self.use_custom_poster {
+                                    let label = self.custom_poster_path.as_ref()
+                                        .map(|p| p.file_name().unwrap_or_default().to_string_lossy().to_string())
+                                        .unwrap_or_else(|| "…".into());
+                                    if ui.small_button(format!("🖼 {}", label)).clicked() {
+                                        if let Some(p) = rfd::FileDialog::new()
+                                            .add_filter("Image", &["jpg", "jpeg", "png"])
+                                            .pick_file()
+                                        {
+                                            self.custom_poster_path = Some(p);
+                                        }
+                                    }
+                                }
+                            });
                             if ui.button(self.lang.tag_reset_tags).clicked() {
                                 let (mut ok, mut err) = (0usize, 0usize);
-                                for path in &self.current_files {
+                                let mkv_files = expand_to_mkv(&self.current_files);
+                                for path in &mkv_files {
                                     match modules::tag::supprimer_tous_tags(path) {
                                         Ok(_) => ok += 1,
                                         Err(e) => { crate::log_error(&format!("supprimer_tags {:?}: {}", path, e)); err += 1; }

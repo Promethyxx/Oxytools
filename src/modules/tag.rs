@@ -264,7 +264,21 @@ pub fn ajouter_images_mkv(mkv_path: &Path) -> Result<(), String> {
     if status.success() { Ok(()) } else { Err("Erreur injection poster".into()) }
 }
 
-/// 5a. Injection NFO + Poster (orchestrateur — remplace l'ancien tag_inject_nfo_and_poster)
+/// 4b. Injection d'un poster choisi manuellement (override custom)
+pub fn injecter_poster_custom(mkv_path: &Path, poster_path: &Path) -> Result<(), String> {
+    let mime = if poster_path.extension().map_or(false, |e| e.eq_ignore_ascii_case("png")) {
+        "image/png"
+    } else {
+        "image/jpeg"
+    };
+    let status = binaries::silent_cmd(binaries::get_mkvpropedit())
+        .arg(mkv_path)
+        .args(["--attachment-name", "cover",
+               "--attachment-mime-type", mime,
+               "--add-attachment", poster_path.to_str().ok_or("chemin invalide")?])
+        .status().map_err(|e| e.to_string())?;
+    if status.success() { Ok(()) } else { Err("Erreur injection poster custom".into()) }
+}
 pub fn injecter_nfo_et_poster(mkv_path: &Path) -> Result<(), String> {
     // NFO
     if let Some(nfo) = resolve_nfo(mkv_path) {

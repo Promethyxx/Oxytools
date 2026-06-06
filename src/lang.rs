@@ -120,6 +120,7 @@ pub struct Lang {
     pub scrap_fetch_clearlogo: &'static str,
     pub scrap_retry_search: &'static str,
     pub scrap_retry_hint: &'static str,
+    pub scrap_manual_search: &'static str,
 
     // Tag
     pub tag_mark_watched: &'static str,
@@ -128,6 +129,9 @@ pub struct Lang {
     pub tag_inject_nfo_and_poster: &'static str,
     pub tag_reset_tags: &'static str,
     pub tag_edit_title: &'static str,
+    pub tag_custom_nfo: &'static str,
+    pub tag_custom_poster: &'static str,
+    pub tag_browse: &'static str,
 
     // Rename
     pub tab_rename: &'static str,
@@ -281,6 +285,7 @@ pub const EN: Lang = Lang {
     scrap_fetch_clearlogo: "Download clearlogo",
     scrap_retry_search: "🔍 Search again",
     scrap_retry_hint: "No results — try a different title:",
+    scrap_manual_search: "Manual search",
 
     tag_mark_watched: "✅ Mark as WATCHED",
     tag_inject_nfo: "📥 Inject tags from NFO",
@@ -288,6 +293,9 @@ pub const EN: Lang = Lang {
     tag_inject_nfo_and_poster: "📎 Inject NFO + Poster",
     tag_reset_tags: "🗑️ Reset Tags",
     tag_edit_title: "✏️ Edit Title",
+    tag_custom_nfo: "Custom NFO",
+    tag_custom_poster: "Custom poster",
+    tag_browse: "Browse…",
 
     tab_rename: "✏️ Rename",
     rename_find_replace: "🔍 Find & Replace",
@@ -439,13 +447,17 @@ pub const FR: Lang = Lang {
     scrap_fetch_clearlogo: "Télécharger le clearlogo",
     scrap_retry_search: "🔍 Relancer la recherche",
     scrap_retry_hint: "Aucun résultat — essayez un autre titre :",
+    scrap_manual_search: "Recherche manuelle",
 
     tag_mark_watched: "✅ Marquer VU",
     tag_inject_nfo: "📥 Injecter tags depuis NFO",
     tag_add_poster: "🖼️ Ajouter poster / fanart",
     tag_inject_nfo_and_poster: "📎 Injecter NFO + Poster",
-    tag_reset_tags: "🗑️ Reset Tags",
+    tag_reset_tags: "🗑️ Réinitialiser les tags",
     tag_edit_title: "✏️ Modifier Titre",
+    tag_custom_nfo: "NFO personnalisé",
+    tag_custom_poster: "Poster personnalisé",
+    tag_browse: "Parcourir…",
 
     tab_rename: "✏️ Renommer",
     rename_find_replace: "🔍 Chercher & Remplacer",
