@@ -18,7 +18,7 @@ html2md = "0.2"
 image = { version = "0.25", features = ["avif", "exr", "gif", "hdr", "ico", "jpeg", "png", "tiff", "webp"] }
 jxl-oxide = { version = "0.12", features = ["image"] }
 kamadak-exif = "0.6"
-lopdf = "0.40"
+lopdf = "0.41"
 open = "5"
 psd = "0.3"
 pulldown-cmark = "0.13"
