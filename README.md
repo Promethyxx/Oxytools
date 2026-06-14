@@ -77,6 +77,8 @@ This project is licensed under the GNU General Public License v3.0 — see Licen
 ---
 ## Roadmap
 ## 🔴 NOW
+ - ### Main
+    - Dispatch monolithic main
 ## 🟡 NEXT
  - ### Release:
     - Chocolatey
