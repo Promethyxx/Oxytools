@@ -114,7 +114,7 @@ pub struct Lang {
     pub scrap_series: &'static str,
     pub scrap_choose: &'static str,
     pub scrap_error_no_key: &'static str,
-    pub scrap_error_fetch: &'static str,   // format: {}
+    pub scrap_error_fetch: &'static str,
     pub scrap_no_results: &'static str,
     pub scrap_fetch_fanart: &'static str,
     pub scrap_fetch_clearlogo: &'static str,
@@ -173,6 +173,9 @@ pub struct Lang {
     pub settings_performance: &'static str,
     pub settings_max_jobs: &'static str,
     pub settings_jobs_hint: &'static str,
+    pub settings_config_dir: &'static str,
+    pub settings_config_dir_hint: &'static str,
+    pub settings_config_dir_reset: &'static str,
 }
 
 pub const EN: Lang = Lang {
@@ -335,6 +338,9 @@ pub const EN: Lang = Lang {
     settings_performance: "Performance",
     settings_max_jobs: "Max parallel jobs:",
     settings_jobs_hint: "💡 Higher = faster but more CPU load",
+    settings_config_dir: "Config folder:",
+    settings_config_dir_hint: "Restart required to apply",
+    settings_config_dir_reset: "Reset to default",
 };
 
 pub const FR: Lang = Lang {
@@ -497,6 +503,9 @@ pub const FR: Lang = Lang {
     settings_performance: "Performance",
     settings_max_jobs: "Jobs parallèles max :",
     settings_jobs_hint: "💡 Plus = plus rapide mais plus de charge CPU",
+    settings_config_dir: "Dossier config :",
+    settings_config_dir_hint: "Redémarrage requis pour appliquer",
+    settings_config_dir_reset: "Réinitialiser",
 };
 
 // ─── Helpers de formatage ───────────────────────────────────────────────────

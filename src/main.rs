@@ -59,6 +59,7 @@ struct OxytoolsApp {
         use_custom_poster: bool,
         custom_poster_path: Option<std::path::PathBuf>,
         current_theme: String,
+        custom_config_dir: Option<std::path::PathBuf>,
         lang: &'static crate::lang::Lang,
         lang_id: &'static str,
         rename_cfg: modules::rename::RenameConfig,
@@ -189,6 +190,7 @@ impl Default for OxytoolsApp {
                 use_custom_poster: false,
                 custom_poster_path: None,
                 current_theme: "Dark".into(),
+                custom_config_dir: None,
                 tmdb_api_key: String::new(),
                 fanart_api_key: String::new(),
                 keys_env_path: None,
@@ -296,16 +298,42 @@ impl Default for OxytoolsApp {
     }
 }
 impl OxytoolsApp {
-    fn config_dir() -> std::path::PathBuf {
+    /// Chemin du dossier config/exe — toujours à côté de l'exe, sert de bootstrap.
+    fn exe_config_dir() -> std::path::PathBuf {
         let dir = std::env::current_exe()
             .unwrap_or_default()
             .parent()
             .unwrap_or(std::path::Path::new("."))
+            .to_path_buf()
             .join("config");
         let _ = std::fs::create_dir_all(&dir);
         dir
     }
+
+    /// Dossier config effectif : custom si défini, sinon exe_config_dir.
+    fn config_dir(&self) -> std::path::PathBuf {
+        if let Some(ref p) = self.custom_config_dir {
+            let _ = std::fs::create_dir_all(p);
+            p.clone()
+        } else {
+            Self::exe_config_dir()
+        }
+    }
     fn load_config(&mut self) {
+        // Bootstrap : lire custom_config_dir depuis le config.toml à côté de l'exe
+        if self.custom_config_dir.is_none() {
+            let bootstrap = Self::exe_config_dir().join("config.toml");
+            if let Ok(c) = std::fs::read_to_string(&bootstrap) {
+                if let Ok(parsed) = c.parse::<toml::Table>() {
+                    if let Some(p) = parsed.get("app").and_then(|a| a.get("config_dir")).and_then(|v| v.as_str()) {
+                        let pb = std::path::PathBuf::from(p);
+                        if pb.exists() || std::fs::create_dir_all(&pb).is_ok() {
+                            self.custom_config_dir = Some(pb);
+                        }
+                    }
+                }
+            }
+        }
         match self.module_actif {
             ModuleType::Image => self.format_choisi = String::new(),
             ModuleType::Doc => self.format_choisi = String::new(),
@@ -318,7 +346,7 @@ impl OxytoolsApp {
             ModuleType::Archive => self.format_choisi = String::new(),
             _ => (),
         }
-        if let Ok(c) = std::fs::read_to_string(Self::config_dir().join("config.toml")) {
+        if let Ok(c) = std::fs::read_to_string(self.config_dir().join("config.toml")) {
             if let Ok(parsed) = c.parse::<toml::Table>() {
                 if let Some(theme) = parsed.get("display").and_then(|d| d.get("theme")).and_then(|t| t.as_str()) {
                     self.current_theme = theme.to_string();
@@ -398,7 +426,7 @@ impl OxytoolsApp {
             }
         }
         // ── Charger le dernier profil multi-replace ──────────────
-        if let Ok(c) = std::fs::read_to_string(Self::config_dir().join("config.toml")) {
+        if let Ok(c) = std::fs::read_to_string(self.config_dir().join("config.toml")) {
             if let Ok(parsed) = c.parse::<toml::Table>() {
                 if let Some(rn) = parsed.get("rename") {
                     if let Some(p) = rn.get("last_list_path").and_then(|v| v.as_str()) {
@@ -416,19 +444,19 @@ impl OxytoolsApp {
         }
         // Charger le path custom de .env si enregistré dans config.toml
         let custom_env_path: Option<PathBuf> = {
-            std::fs::read_to_string(Self::config_dir().join("config.toml"))
+            std::fs::read_to_string(self.config_dir().join("config.toml"))
                 .ok()
                 .and_then(|c| c.parse::<toml::Table>().ok())
                 .and_then(|t| t.get("scrapper")?.as_table()?.get("keys_path")?.as_str().map(PathBuf::from))
         };
-        let env_path = custom_env_path.clone().unwrap_or_else(|| Self::config_dir().join(".env"));
+        let env_path = custom_env_path.clone().unwrap_or_else(|| self.config_dir().join(".env"));
         if let Some(ref p) = custom_env_path { self.keys_env_path = Some(p.clone()); }
         dotenvy::from_path(&env_path).ok();
         if let Ok(k) = std::env::var("TMDB_API_KEY") { self.tmdb_api_key = k; }
         if let Ok(k) = std::env::var("FANART_API_KEY") { self.fanart_api_key = k; }
     }
     fn save_config(&self) {
-        let mut parsed = if let Ok(c) = std::fs::read_to_string(Self::config_dir().join("config.toml")) {
+        let mut parsed = if let Ok(c) = std::fs::read_to_string(self.config_dir().join("config.toml")) {
             c.parse::<toml::Table>().unwrap_or_else(|_| toml::Table::new())
         } else {
             toml::Table::new()
@@ -549,7 +577,26 @@ impl OxytoolsApp {
                 }
             }
         }
-        let _ = std::fs::write(Self::config_dir().join("config.toml"), toml::to_string(&parsed).unwrap_or_default());
+        let toml_str = toml::to_string(&parsed).unwrap_or_default();
+        // Sauver dans le config_dir effectif
+        let _ = std::fs::write(self.config_dir().join("config.toml"), &toml_str);
+        // Sauver aussi dans le bootstrap exe pour que custom_config_dir survive au redémarrage
+        if self.custom_config_dir.is_some() {
+            let bootstrap_dir = Self::exe_config_dir();
+            let mut bootstrap_parsed = std::fs::read_to_string(bootstrap_dir.join("config.toml"))
+                .ok()
+                .and_then(|c| c.parse::<toml::Table>().ok())
+                .unwrap_or_default();
+            let app = bootstrap_parsed.entry("app").or_insert(toml::Value::Table(toml::Table::new()));
+            if let Some(t) = app.as_table_mut() {
+                if let Some(ref p) = self.custom_config_dir {
+                    t.insert("config_dir".to_string(), toml::Value::String(p.to_string_lossy().into_owned()));
+                } else {
+                    t.remove("config_dir");
+                }
+            }
+            let _ = std::fs::write(bootstrap_dir.join("config.toml"), toml::to_string(&bootstrap_parsed).unwrap_or_default());
+        }
     }
     fn apply_theme(&self, ctx: &egui::Context) {
         match self.current_theme.as_str() {
@@ -1920,7 +1967,7 @@ impl eframe::App for OxytoolsApp {
                     });
 
                     // ── Chemin cible du .env ─────────────────────────────────
-                    let default_env = Self::config_dir().join(".env");
+                    let default_env = self.config_dir().join(".env");
                     let save_target = self.keys_env_path.clone().unwrap_or_else(|| default_env.clone());
                     ui.horizontal(|ui| {
                         ui.label(self.lang.scrap_keys_path);
@@ -2919,12 +2966,39 @@ impl eframe::App for OxytoolsApp {
                         });
                         ui.label(self.lang.settings_jobs_hint);
                         ui.separator();
+                        ui.heading(self.lang.settings_config_dir);
+                        ui.horizontal(|ui| {
+                            let current = self.config_dir();
+                            ui.label(egui::RichText::new(current.to_string_lossy()).weak().italics());
+                        });
+                        ui.horizontal(|ui| {
+                            if ui.button("📁 Browse…").clicked() {
+                                if let Some(p) = rfd::FileDialog::new().pick_folder() {
+                                    self.custom_config_dir = Some(p);
+                                    self.save_config();
+                                }
+                            }
+                            if self.custom_config_dir.is_some() {
+                                if ui.button(self.lang.settings_config_dir_reset).clicked() {
+                                    self.custom_config_dir = None;
+                                    // Supprimer config_dir du bootstrap
+                                    let bootstrap_dir = Self::exe_config_dir();
+                                    if let Ok(c) = std::fs::read_to_string(bootstrap_dir.join("config.toml")) {
+                                        if let Ok(mut parsed) = c.parse::<toml::Table>() {
+                                            if let Some(app) = parsed.get_mut("app").and_then(|a| a.as_table_mut()) {
+                                                app.remove("config_dir");
+                                            }
+                                            let _ = std::fs::write(bootstrap_dir.join("config.toml"), toml::to_string(&parsed).unwrap_or_default());
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                        ui.label(egui::RichText::new(self.lang.settings_config_dir_hint).small().weak());
+                        ui.separator();
                         ui.heading("Logs");
                         if ui.button("📋 Open log file").clicked() {
-                            let log_path = std::env::current_exe()
-                                .ok()
-                                .and_then(|p| p.parent().map(|d| d.join("config").join("oxytools.log")))
-                                .unwrap_or_else(|| std::path::PathBuf::from("oxytools.log"));
+                            let log_path = self.config_dir().join("oxytools.log");
                             if log_path.exists() {
                                 let _ = open::that(&log_path);
                             } else {
