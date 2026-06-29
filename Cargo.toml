@@ -12,13 +12,13 @@ path = "src/main.rs"
 [dependencies]
 chrono = "0.4"
 dotenvy = "0.15"
-eframe = "0.34.1"
+eframe = "0.35"
 flate2 = "1"
 html2md = "0.2"
 image = { version = "0.25", features = ["avif", "exr", "gif", "hdr", "ico", "jpeg", "png", "tiff", "webp"] }
 jxl-oxide = { version = "0.12", features = ["image"] }
 kamadak-exif = "0.6"
-lopdf = "0.41"
+lopdf = "0.43"
 open = "5"
 psd = "0.3"
 pulldown-cmark = "0.13"

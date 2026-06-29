@@ -79,6 +79,7 @@ This project is licensed under the GNU General Public License v3.0 — see Licen
 ## 🔴 NOW
  - ### Main
     - Dispatch monolithic main
+    - Security audit and quality control
 ## 🟡 NEXT
  - ### Release:
     - Chocolatey
