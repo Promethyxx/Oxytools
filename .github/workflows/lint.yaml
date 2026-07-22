@@ -1,0 +1,54 @@
+name: Lint & Audit
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  clippy:
+    runs-on: ubuntu-latest
+    name: Clippy
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: clippy-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: clippy-cargo-
+
+      - name: Install Linux deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc g++ cmake pkg-config libfontconfig1-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev libgl1-mesa-dev libwayland-dev libxkbcommon-dev libssl-dev
+
+      # include_bytes! a juste besoin que les fichiers existent pour compiler ;
+      # leur contenu n'a pas d'importance pour clippy (il n'exécute rien).
+      - name: Placeholder bundled binaries
+        run: |
+          mkdir -p bin-linux-x64
+          touch bin-linux-x64/ffmpeg bin-linux-x64/ffprobe bin-linux-x64/mkvpropedit
+          chmod +x bin-linux-x64/*
+
+      - name: Clippy — version bundled (défaut)
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Clippy — version Office (non-bundled)
+        run: cargo clippy --no-default-features --features api --all-targets -- -D warnings
+
+  deny:
+    runs-on: ubuntu-latest
+    name: cargo-deny
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
