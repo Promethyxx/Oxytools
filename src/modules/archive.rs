@@ -1,13 +1,13 @@
 #![allow(dead_code)]
 use std::fs;
 use std::io::{Write, Seek};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 // ════════════════════════════════════════════════════════════════════════
 //  ZIP — via crate `zip`
 // ════════════════════════════════════════════════════════════════════════
 
-fn compresser_zip(input: &Path, output: &str, niveau: u32) -> Result<(), String> {
+fn compresser_zip(input: &Path, output: &Path, niveau: u32) -> Result<(), String> {
     let file = fs::File::create(output)
         .map_err(|e| format!("Erreur creation zip : {}", e))?;
     let mut zip_writer = zip::ZipWriter::new(file);
@@ -55,7 +55,7 @@ fn ajouter_dossier_zip<W: Write + Seek>(
     Ok(())
 }
 
-fn extraire_zip(input: &Path, destination: &str) -> Result<(), String> {
+fn extraire_zip(input: &Path, destination: &Path) -> Result<(), String> {
     let file = fs::File::open(input).map_err(|e| format!("Erreur ouverture zip : {}", e))?;
     let mut archive = zip::ZipArchive::new(file)
         .map_err(|e| format!("Erreur lecture zip : {}", e))?;
@@ -68,12 +68,12 @@ fn extraire_zip(input: &Path, destination: &str) -> Result<(), String> {
 //  7Z — via crate `sevenz-rust2`
 // ════════════════════════════════════════════════════════════════════════
 
-fn compresser_7z(input: &Path, output: &str, _niveau: u32) -> Result<(), String> {
+fn compresser_7z(input: &Path, output: &Path, _niveau: u32) -> Result<(), String> {
     sevenz_rust2::compress_to_path(input, output)
         .map_err(|e| format!("Erreur compression 7z : {}", e))
 }
 
-fn extraire_7z(input: &Path, destination: &str) -> Result<(), String> {
+fn extraire_7z(input: &Path, destination: &Path) -> Result<(), String> {
     sevenz_rust2::decompress_file(input, destination)
         .map_err(|e| format!("Erreur extraction 7z : {}", e))
 }
@@ -82,7 +82,7 @@ fn extraire_7z(input: &Path, destination: &str) -> Result<(), String> {
 //  TAR.GZ — via crates `tar` + `flate2`
 // ════════════════════════════════════════════════════════════════════════
 
-fn compresser_tar(input: &Path, output: &str, niveau: u32) -> Result<(), String> {
+fn compresser_tar(input: &Path, output: &Path, niveau: u32) -> Result<(), String> {
     let file = fs::File::create(output)
         .map_err(|e| format!("Erreur creation tar.gz : {}", e))?;
     let encoder = flate2::write::GzEncoder::new(file, flate2::Compression::new(niveau));
@@ -103,7 +103,7 @@ fn compresser_tar(input: &Path, output: &str, niveau: u32) -> Result<(), String>
     Ok(())
 }
 
-fn extraire_tar(input: &Path, destination: &str) -> Result<(), String> {
+fn extraire_tar(input: &Path, destination: &Path) -> Result<(), String> {
     let file = fs::File::open(input).map_err(|e| format!("Erreur ouverture tar.gz : {}", e))?;
     let decoder = flate2::read::GzDecoder::new(file);
     let mut archive = tar::Archive::new(decoder);
@@ -117,10 +117,10 @@ fn extraire_tar(input: &Path, destination: &str) -> Result<(), String> {
 // ════════════════════════════════════════════════════════════════════════
 
 /// Compression : cree une archive (7z, zip, tar)
-pub fn compresser(input: &Path, output: &str, format_archive: &str, niveau: u32) -> bool {
+pub fn compresser(input: &Path, output: &Path, format_archive: &str, niveau: u32) -> bool {
     crate::log_info(&format!(
         "archive::compresser | format={} | niveau={} | {:?} -> {} | est_dossier={}",
-        format_archive, niveau, input, output, input.is_dir()
+        format_archive, niveau, input, output.display(), input.is_dir()
     ));
     if input.is_dir() {
         // Compter les fichiers pour anticiper la durée
@@ -137,14 +137,14 @@ pub fn compresser(input: &Path, output: &str, format_archive: &str, niveau: u32)
         _ => Err(format!("Format d'archive non supporte : {}", format_archive)),
     };
     match &result {
-        Ok(()) => crate::log_info(&format!("archive::compresser OK | {}", output)),
+        Ok(()) => crate::log_info(&format!("archive::compresser OK | {}", output.display())),
         Err(e) => crate::log_error(&format!("archive::compresser ÉCHEC | format={} | {:?} | raison={}", format_archive, input, e)),
     }
     result.is_ok()
 }
 
 /// Extraction : decompresse une archive
-pub fn extraire(input: &Path, destination: &str) -> bool {
+pub fn extraire(input: &Path, destination: &Path) -> bool {
     let ext = input.extension()
         .and_then(|e| e.to_str())
         .unwrap_or("")
@@ -152,7 +152,7 @@ pub fn extraire(input: &Path, destination: &str) -> bool {
     let taille = std::fs::metadata(input).map(|m| m.len()).unwrap_or(0);
     crate::log_info(&format!(
         "archive::extraire | ext={} | taille={:.1} Mo | {:?} -> {}",
-        ext, taille as f64 / 1_048_576.0, input, destination
+        ext, taille as f64 / 1_048_576.0, input, destination.display()
     ));
 
     let result = match ext.as_str() {
@@ -203,7 +203,7 @@ fn doit_exclure(relative: &str, exclusions: &[&str]) -> bool {
 
 fn compresser_zip_exclusions(
     input: &Path,
-    output: &str,
+    output: &Path,
     niveau: u32,
     exclusions: &[&str],
 ) -> Result<(), String> {
@@ -268,18 +268,17 @@ fn ajouter_dossier_zip_exclusions<W: Write + Seek>(
 /// Crée un zip daté (Backup_YYYYMMDD.zip) du dossier source dans dest_dir.
 /// Exclut .git, .github, target par défaut.
 /// Retourne le chemin du zip créé ou une erreur.
-pub fn backup_zip(source: &Path, dest_dir: &str, exclusions: &[&str]) -> Result<String, String> {
+pub fn backup_zip(source: &Path, dest_dir: &Path, exclusions: &[&str]) -> Result<String, String> {
     if !source.exists() {
         return Err(format!("Source introuvable : {}", source.display()));
     }
 
-    let dest = Path::new(dest_dir);
-    if !dest.exists() {
-        fs::create_dir_all(dest).map_err(|e| format!("Impossible de créer {} : {}", dest_dir, e))?;
+    if !dest_dir.exists() {
+        fs::create_dir_all(dest_dir).map_err(|e| format!("Impossible de créer {} : {}", dest_dir.display(), e))?;
     }
 
     let today = chrono::Local::now().format("%Y%m%d").to_string();
-    let zip_path = dest.join(format!("Backup_{}.zip", today));
+    let zip_path = dest_dir.join(format!("Backup_{}.zip", today));
     let zip_str = zip_path.to_string_lossy().to_string();
 
     crate::log_info(&format!(
@@ -287,7 +286,7 @@ pub fn backup_zip(source: &Path, dest_dir: &str, exclusions: &[&str]) -> Result<
         source, zip_str, exclusions
     ));
 
-    compresser_zip_exclusions(source, &zip_str, 9, exclusions)?;
+    compresser_zip_exclusions(source, &zip_path, 9, exclusions)?;
 
     let taille = fs::metadata(&zip_path).map(|m| m.len()).unwrap_or(0);
     crate::log_info(&format!(
@@ -337,11 +336,10 @@ pub fn compresser_multi(parent: &Path, format_archive: &str, niveau: u32) -> (us
 
         let name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
         let output = parent.join(format!("{}.{}", name, format_archive));
-        let output_str = output.to_string_lossy().to_string();
 
-        crate::log_info(&format!("archive::compresser_multi | {} -> {}", name, output_str));
+        crate::log_info(&format!("archive::compresser_multi | {} -> {}", name, output.display()));
 
-        if compresser(&path, &output_str, format_archive, niveau) {
+        if compresser(&path, &output, format_archive, niveau) {
             ok += 1;
         } else {
             erreurs.push(format!("{} → compression échouée", name));
@@ -359,15 +357,14 @@ pub fn compresser_multi(parent: &Path, format_archive: &str, niveau: u32) -> (us
 /// Conversion : Change le format via dossier temporaire
 pub fn convertir(input: &Path, format_cible: &str) -> bool {
     let temp_dir = std::env::temp_dir().join("oxytools_archive_conv");
-    let temp_str = temp_dir.to_string_lossy().to_string();
 
     // 1. Extraire
-    if !extraire(input, &temp_str) {
+    if !extraire(input, &temp_dir) {
         return false;
     }
     // 2. Recompresser
     let nom_base = input.file_stem().unwrap_or_default().to_string_lossy();
-    let sortie = format!("{}.{}", nom_base, format_cible);
+    let sortie = PathBuf::from(format!("{}.{}", nom_base, format_cible));
     let success = compresser(&temp_dir, &sortie, format_cible, 6);
     // 3. Nettoyer
     let _ = fs::remove_dir_all(&temp_dir);

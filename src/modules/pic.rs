@@ -50,8 +50,8 @@ impl ImageFormat {
 
 /// Convertit/compresse l'image avec un contrôle de qualité (1=rapide, 10=max qualité).
 /// La résolution n'est JAMAIS modifiée.
-pub fn compresser(input: &Path, output: &str, qualite: u32) -> bool {
-    crate::log_info(&format!("pic::compresser | qualite={} | {:?} -> {}", qualite, input, output));
+pub fn compresser(input: &Path, output: &Path, qualite: u32) -> bool {
+    crate::log_info(&format!("pic::compresser | qualite={} | {:?} -> {}", qualite, input, output.display()));
     // Détection du format d'entrée
     if let Some(ext) = input.extension().and_then(|e| e.to_str()) {
         match ext.to_lowercase().as_str() {
@@ -71,17 +71,17 @@ pub fn compresser(input: &Path, output: &str, qualite: u32) -> bool {
         Some(i) => i,
         None => return false,
     };
-    let out_lower = output.to_lowercase();
-    if out_lower.ends_with(".jxl") {
+    let ext_out = output.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+    if ext_out == "jxl" {
         return encoder_jxl(&img, output);
     }
-    if out_lower.ends_with(".ico") {
+    if ext_out == "ico" {
         return convertir_ico_sizes(&img, output, &[256]);
     }
-    if out_lower.ends_with(".jpg") || out_lower.ends_with(".jpeg") {
+    if ext_out == "jpg" || ext_out == "jpeg" {
         return sauvegarder_jpeg(&img, output, qualite);
     }
-    if out_lower.ends_with(".webp") {
+    if ext_out == "webp" {
         return sauvegarder_webp(&img, output, qualite);
     }
     let fmt = detecter_format_image(output);
@@ -90,7 +90,7 @@ pub fn compresser(input: &Path, output: &str, qualite: u32) -> bool {
         None => img.save(output).is_ok(),
     };
     if !ok {
-        crate::log_error(&format!("pic::compresser échec save | {:?} -> {}", input, output));
+        crate::log_error(&format!("pic::compresser échec save | {:?} -> {}", input, output.display()));
     }
     ok
 }
@@ -122,8 +122,8 @@ fn ouvrir_par_contenu(input: &Path) -> Option<image::DynamicImage> {
 }
 
 /// Détecte le format image de sortie depuis l'extension du chemin output
-fn detecter_format_image(output: &str) -> Option<image::ImageFormat> {
-    let ext = Path::new(output).extension()?.to_str()?.to_lowercase();
+fn detecter_format_image(output: &Path) -> Option<image::ImageFormat> {
+    let ext = output.extension()?.to_str()?.to_lowercase();
     match ext.as_str() {
         "png"  => Some(image::ImageFormat::Png),
         "jpg" | "jpeg" => Some(image::ImageFormat::Jpeg),
@@ -138,13 +138,13 @@ fn detecter_format_image(output: &str) -> Option<image::ImageFormat> {
 }
 
 /// Sauvegarde JPEG avec qualité (1-10 → 10-100%)
-fn sauvegarder_jpeg(img: &image::DynamicImage, output: &str, qualite: u32) -> bool {
+fn sauvegarder_jpeg(img: &image::DynamicImage, output: &Path, qualite: u32) -> bool {
     use image::codecs::jpeg::JpegEncoder;
     let q = (qualite.clamp(1, 10) * 10) as u8; // 1→10%, 10→100%
     let file = match std::fs::File::create(output) {
         Ok(f) => f,
         Err(e) => {
-            crate::log_error(&format!("pic::sauvegarder_jpeg création fichier {} : {}", output, e));
+            crate::log_error(&format!("pic::sauvegarder_jpeg création fichier {} : {}", output.display(), e));
             return false;
         }
     };
@@ -158,19 +158,19 @@ fn sauvegarder_jpeg(img: &image::DynamicImage, output: &str, qualite: u32) -> bo
     ) {
         Ok(()) => true,
         Err(e) => {
-            crate::log_error(&format!("pic::sauvegarder_jpeg échec encodage {} : {}", output, e));
+            crate::log_error(&format!("pic::sauvegarder_jpeg échec encodage {} : {}", output.display(), e));
             false
         }
     }
 }
 
 /// Sauvegarde WebP — qualité via image crate save (lossless)
-fn sauvegarder_webp(img: &image::DynamicImage, output: &str, _qualite: u32) -> bool {
+fn sauvegarder_webp(img: &image::DynamicImage, output: &Path, _qualite: u32) -> bool {
     // La crate image encode en WebP lossless par défaut
     match img.save(output) {
         Ok(()) => true,
         Err(e) => {
-            crate::log_error(&format!("pic::sauvegarder_webp échec save {} : {}", output, e));
+            crate::log_error(&format!("pic::sauvegarder_webp échec save {} : {}", output.display(), e));
             false
         }
     }
@@ -182,8 +182,8 @@ fn sauvegarder_webp(img: &image::DynamicImage, output: &str, _qualite: u32) -> b
 
 /// Convertit une image en ICO avec les tailles demandées.
 /// Chaque entrée est encodée en PNG dans le fichier ICO (compatible universel).
-fn convertir_ico_sizes(img: &image::DynamicImage, output: &str, sizes: &[u32]) -> bool {
-    crate::log_info(&format!("pic::convertir_ico_sizes | sizes={:?} | -> {}", sizes, output));
+fn convertir_ico_sizes(img: &image::DynamicImage, output: &Path, sizes: &[u32]) -> bool {
+    crate::log_info(&format!("pic::convertir_ico_sizes | sizes={:?} | -> {}", sizes, output.display()));
 
     // Préparer les entrées PNG
     let mut png_entries: Vec<(u32, Vec<u8>)> = Vec::new();
@@ -250,7 +250,7 @@ fn convertir_ico_sizes(img: &image::DynamicImage, output: &str, sizes: &[u32]) -
             true
         }
         Err(e) => {
-            crate::log_error(&format!("pic::convertir_ico_sizes échec écriture {} : {}", output, e));
+            crate::log_error(&format!("pic::convertir_ico_sizes échec écriture {} : {}", output.display(), e));
             false
         }
     }
@@ -259,8 +259,8 @@ fn convertir_ico_sizes(img: &image::DynamicImage, output: &str, sizes: &[u32]) -
 /// Point d'entrée public pour la conversion ICO multi-tailles.
 /// `sizes` contient les tailles demandées (ex: [16, 32, 64, 256]).
 /// Génère un fichier .ico avec toutes les tailles.
-pub fn generer_ico_multi(input: &Path, output: &str, sizes: &[u32]) -> bool {
-    crate::log_info(&format!("pic::generer_ico_multi | sizes={:?} | {:?} -> {}", sizes, input, output));
+pub fn generer_ico_multi(input: &Path, output: &Path, sizes: &[u32]) -> bool {
+    crate::log_info(&format!("pic::generer_ico_multi | sizes={:?} | {:?} -> {}", sizes, input, output.display()));
 
     // Ouvrir selon le format d'entrée
     let img = if let Some(ext) = input.extension().and_then(|e| e.to_str()) {
@@ -302,7 +302,7 @@ pub fn generer_ico_multi(input: &Path, output: &str, sizes: &[u32]) -> bool {
 }
 
 /// Conversion de format (ex: PNG -> JPG, WEBP -> PNG)
-pub fn convertir(input: &Path, output: &str) -> bool {
+pub fn convertir(input: &Path, output: &Path) -> bool {
     if let Some(ext) = input.extension().and_then(|e| e.to_str()) {
         match ext.to_lowercase().as_str() {
             "svg" => return convertir_svg(input, output),
@@ -320,17 +320,17 @@ pub fn convertir(input: &Path, output: &str) -> bool {
         Some(i) => i,
         None => return false,
     };
-    let out_lower = output.to_lowercase();
-    if out_lower.ends_with(".jxl") {
+    let ext_out = output.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+    if ext_out == "jxl" {
         return encoder_jxl(&img, output);
     }
-    if out_lower.ends_with(".ico") {
+    if ext_out == "ico" {
         return convertir_ico_sizes(&img, output, &[256]);
     }
-    if out_lower.ends_with(".jpg") || out_lower.ends_with(".jpeg") {
+    if ext_out == "jpg" || ext_out == "jpeg" {
         return sauvegarder_jpeg(&img, output, 10);
     }
-    if out_lower.ends_with(".webp") {
+    if ext_out == "webp" {
         return sauvegarder_webp(&img, output, 10);
     }
     let fmt = detecter_format_image(output);
@@ -339,7 +339,7 @@ pub fn convertir(input: &Path, output: &str) -> bool {
         None => img.save(output).is_ok(),
     };
     if !ok {
-        crate::log_error(&format!("pic::convertir échec save | {:?} -> {}", input, output));
+        crate::log_error(&format!("pic::convertir échec save | {:?} -> {}", input, output.display()));
     }
     ok
 }
@@ -364,7 +364,7 @@ pub fn lire_exif(input: &Path) -> Vec<String> {
 }
 
 /// Supprime l'EXIF en réenregistrant les pixels nus
-pub fn supprimer_exif(input: &Path, output: &str) -> bool {
+pub fn supprimer_exif(input: &Path, output: &Path) -> bool {
     if let Ok(img) = image::open(input) {
         // Enregistre uniquement les données de pixels, ignore les métadonnées sources
         img.save(output).is_ok()
@@ -374,8 +374,8 @@ pub fn supprimer_exif(input: &Path, output: &str) -> bool {
 }
 
 /// Rotation simple (90, 180, 270)
-pub fn pivoter(input: &Path, output: &str, angle: u32) -> bool {
-    crate::log_info(&format!("pic::pivoter | angle={} | {:?} -> {}", angle, input, output));
+pub fn pivoter(input: &Path, output: &Path, angle: u32) -> bool {
+    crate::log_info(&format!("pic::pivoter | angle={} | {:?} -> {}", angle, input, output.display()));
     match image::open(input) {
         Ok(img) => {
             let rotated = match angle {
@@ -401,8 +401,8 @@ pub fn pivoter(input: &Path, output: &str, angle: u32) -> bool {
 /// Recadrage d'image (crop) - coordonnées en pourcentage de l'image
 /// x, y = coin supérieur gauche (0-100)
 /// width, height = dimensions du crop (0-100)
-pub fn recadrer(input: &Path, output: &str, x_pct: u32, y_pct: u32, width_pct: u32, height_pct: u32) -> bool {
-    crate::log_info(&format!("pic::recadrer | x={}% y={}% w={}% h={}% | {:?} -> {}", x_pct, y_pct, width_pct, height_pct, input, output));
+pub fn recadrer(input: &Path, output: &Path, x_pct: u32, y_pct: u32, width_pct: u32, height_pct: u32) -> bool {
+    crate::log_info(&format!("pic::recadrer | x={}% y={}% w={}% h={}% | {:?} -> {}", x_pct, y_pct, width_pct, height_pct, input, output.display()));
     match image::open(input) {
         Ok(img) => {
             let (img_w, img_h) = (img.width(), img.height());
@@ -435,8 +435,8 @@ pub fn recadrer(input: &Path, output: &str, x_pct: u32, y_pct: u32, width_pct: u
 }
 
 /// Redimensionne à une largeur/hauteur spécifique en pixels
-pub fn redimensionner_pixels(input: &Path, output: &str, target_width: u32, target_height: u32) -> bool {
-    crate::log_info(&format!("pic::redimensionner_pixels | {}x{} | {:?} -> {}", target_width, target_height, input, output));
+pub fn redimensionner_pixels(input: &Path, output: &Path, target_width: u32, target_height: u32) -> bool {
+    crate::log_info(&format!("pic::redimensionner_pixels | {}x{} | {:?} -> {}", target_width, target_height, input, output.display()));
     match image::open(input) {
         Ok(img) => {
             let resized = img.resize_exact(target_width, target_height, FilterType::Lanczos3);
@@ -453,8 +453,8 @@ pub fn redimensionner_pixels(input: &Path, output: &str, target_width: u32, targ
 
 /// Redimensionne pour atteindre un poids maximum (en Ko)
 /// Réduit progressivement jusqu'à atteindre le poids cible
-pub fn redimensionner_poids(input: &Path, output: &str, max_size_kb: u32) -> bool {
-    crate::log_info(&format!("pic::redimensionner_poids | max={}Ko | {:?} -> {}", max_size_kb, input, output));
+pub fn redimensionner_poids(input: &Path, output: &Path, max_size_kb: u32) -> bool {
+    crate::log_info(&format!("pic::redimensionner_poids | max={}Ko | {:?} -> {}", max_size_kb, input, output.display()));
     let img = match image::open(input) {
         Ok(i) => i,
         Err(e) => {
@@ -495,7 +495,7 @@ pub fn redimensionner_poids(input: &Path, output: &str, max_size_kb: u32) -> boo
 // === FONCTIONS POUR FORMATS SPÉCIAUX ===
 
 /// Conversion SVG vers format raster
-fn convertir_svg(input: &Path, output: &str) -> bool {
+fn convertir_svg(input: &Path, output: &Path) -> bool {
     let mut file = match File::open(input) {
         Ok(f) => f,
         Err(_) => return false,
@@ -534,14 +534,14 @@ fn convertir_svg(input: &Path, output: &str) -> bool {
 }
 
 /// Compression SVG (rasterise sans redimensionnement)
-fn compresser_svg(input: &Path, output: &str) -> bool {
+fn compresser_svg(input: &Path, output: &Path) -> bool {
     convertir_svg(input, output)
 }
 
 // === FONCTIONS POUR FORMAT JXL ===
 
 /// Encode une DynamicImage en JXL via zune-jpegxl (lossless)
-fn encoder_jxl(img: &image::DynamicImage, output: &str) -> bool {
+fn encoder_jxl(img: &image::DynamicImage, output: &Path) -> bool {
     let rgba = img.to_rgba8();
     let (w, h) = (rgba.width(), rgba.height());
     let pixels = rgba.as_raw();
@@ -584,10 +584,10 @@ fn decoder_jxl(input: &Path) -> Option<image::DynamicImage> {
 }
 
 /// Conversion JXL vers format standard (PNG, JPG, etc.)
-fn convertir_jxl(input: &Path, output: &str) -> bool {
+fn convertir_jxl(input: &Path, output: &Path) -> bool {
     match decoder_jxl(input) {
         Some(img) => {
-            if output.to_lowercase().ends_with(".jxl") {
+            if output.extension().and_then(|e| e.to_str()).map(|e| e.eq_ignore_ascii_case("jxl")).unwrap_or(false) {
                 return encoder_jxl(&img, output);
             }
             img.save(output).is_ok()
@@ -597,10 +597,10 @@ fn convertir_jxl(input: &Path, output: &str) -> bool {
 }
 
 /// Compression JXL avec qualité (décode puis réencode sans resize)
-fn compresser_jxl_qualite(input: &Path, output: &str, _qualite: u32) -> bool {
+fn compresser_jxl_qualite(input: &Path, output: &Path, _qualite: u32) -> bool {
     match decoder_jxl(input) {
         Some(img) => {
-            if output.to_lowercase().ends_with(".jxl") {
+            if output.extension().and_then(|e| e.to_str()).map(|e| e.eq_ignore_ascii_case("jxl")).unwrap_or(false) {
                 return encoder_jxl(&img, output);
             }
             img.save(output).is_ok()
@@ -609,7 +609,7 @@ fn compresser_jxl_qualite(input: &Path, output: &str, _qualite: u32) -> bool {
     }
 }
 /// Conversion RAW vers format standard
-fn convertir_raw(input: &Path, output: &str) -> bool {
+fn convertir_raw(input: &Path, output: &Path) -> bool {
     let mut file = match File::open(input) {
         Ok(f) => f,
         Err(_) => return false,
@@ -642,12 +642,12 @@ fn convertir_raw(input: &Path, output: &str) -> bool {
 }
 
 /// Compression RAW (décode sans redimensionnement)
-fn compresser_raw(input: &Path, output: &str) -> bool {
+fn compresser_raw(input: &Path, output: &Path) -> bool {
     convertir_raw(input, output)
 }
 
 /// Conversion PSD vers format standard
-fn convertir_psd(input: &Path, output: &str) -> bool {
+fn convertir_psd(input: &Path, output: &Path) -> bool {
     let mut file = match File::open(input) {
         Ok(f) => f,
         Err(_) => return false,
@@ -682,7 +682,7 @@ fn convertir_psd(input: &Path, output: &str) -> bool {
 }
 
 /// Compression PSD (décode sans redimensionnement)
-fn compresser_psd(input: &Path, output: &str) -> bool {
+fn compresser_psd(input: &Path, output: &Path) -> bool {
     convertir_psd(input, output)
 }
 
@@ -708,8 +708,7 @@ pub fn convertir_jxl_lossless(input: &Path) -> Result<(), String> {
     let img = image::open(input)
         .map_err(|e| format!("Impossible d'ouvrir {:?} : {}", input, e))?;
 
-    let out_str = out.to_string_lossy().to_string();
-    if encoder_jxl(&img, &out_str) {
+    if encoder_jxl(&img, &out) {
         Ok(())
     } else {
         Err(format!("Encodage JXL échoué pour {:?}", input))
@@ -748,8 +747,7 @@ pub fn convertir_jxl_dossier(input: &Path) -> Result<(), String> {
     let img = image::open(input)
         .map_err(|e| format!("Impossible d'ouvrir {:?} : {}", input, e))?;
 
-    let out_str = out.to_string_lossy().to_string();
-    if encoder_jxl(&img, &out_str) {
+    if encoder_jxl(&img, &out) {
         Ok(())
     } else {
         Err(format!("Encodage JXL échoué pour {:?}", input))
@@ -783,8 +781,7 @@ pub fn convertir_jxl_pivot(input: &Path) -> Result<(), String> {
     let clean_img = image::open(&temp_png)
         .map_err(|e| format!("Impossible de réouvrir PNG pivot : {}", e))?;
 
-    let out_str = out.to_string_lossy().to_string();
-    let result = if encoder_jxl(&clean_img, &out_str) {
+    let result = if encoder_jxl(&clean_img, &out) {
         Ok(())
     } else {
         Err(format!("Encodage JXL pivot échoué pour {:?}", input))
@@ -827,8 +824,8 @@ fn collecter_sources_jxl_inner(dir: &Path, out: &mut Vec<std::path::PathBuf>) {
 
 /// Ajoute un watermark texte en diagonal au centre de l'image.
 /// taille = taille du texte en pixels, opacite = 0.0..1.0
-pub fn watermark(input: &Path, output: &str, texte: &str, taille: f32, opacite: f32) -> bool {
-    crate::log_info(&format!("pic::watermark | texte='{}' taille={} opacite={} | {:?} -> {}", texte, taille, opacite, input, output));
+pub fn watermark(input: &Path, output: &Path, texte: &str, taille: f32, opacite: f32) -> bool {
+    crate::log_info(&format!("pic::watermark | texte='{}' taille={} opacite={} | {:?} -> {}", texte, taille, opacite, input, output.display()));
     let img = match image::open(input) {
         Ok(i) => i,
         Err(e) => {
@@ -953,8 +950,8 @@ fn get_bitmap_glyph(ch: char) -> [u8; 7] {
 
 /// Ajoute du texte meme-style (haut + bas) sur l'image.
 /// Bande noire avec texte blanc, style classique.
-pub fn meme(input: &Path, output: &str, top_text: &str, bottom_text: &str) -> bool {
-    crate::log_info(&format!("pic::meme | top='{}' bottom='{}' | {:?} -> {}", top_text, bottom_text, input, output));
+pub fn meme(input: &Path, output: &Path, top_text: &str, bottom_text: &str) -> bool {
+    crate::log_info(&format!("pic::meme | top='{}' bottom='{}' | {:?} -> {}", top_text, bottom_text, input, output.display()));
     let img = match image::open(input) {
         Ok(i) => i,
         Err(e) => {
@@ -1023,9 +1020,9 @@ fn draw_meme_text(canvas: &mut image::RgbaImage, text: &str, width: u32, y_start
 
 /// Agrandit l'image par un facteur entier (2x, 3x, 4x).
 /// Utilise Lanczos3 pour une qualité correcte.
-pub fn upscale(input: &Path, output: &str, factor: u32) -> bool {
+pub fn upscale(input: &Path, output: &Path, factor: u32) -> bool {
     let factor = factor.clamp(2, 8);
-    crate::log_info(&format!("pic::upscale | factor={}x | {:?} -> {}", factor, input, output));
+    crate::log_info(&format!("pic::upscale | factor={}x | {:?} -> {}", factor, input, output.display()));
     match image::open(input) {
         Ok(img) => {
             let new_w = img.width() * factor;
@@ -1048,8 +1045,8 @@ pub fn upscale(input: &Path, output: &str, factor: u32) -> bool {
 
 /// Convertit un fichier HTML en image PNG en rendant le HTML comme du texte stylisé.
 /// Approche simple sans navigateur : extrait le texte et le rend sur un canvas.
-pub fn html_to_image(input: &Path, output: &str, width: u32) -> bool {
-    crate::log_info(&format!("pic::html_to_image | width={} | {:?} -> {}", width, input, output));
+pub fn html_to_image(input: &Path, output: &Path, width: u32) -> bool {
+    crate::log_info(&format!("pic::html_to_image | width={} | {:?} -> {}", width, input, output.display()));
 
     let html = match std::fs::read_to_string(input) {
         Ok(h) => h,

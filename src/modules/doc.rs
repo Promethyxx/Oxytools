@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 use std::collections::BTreeMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::io::Read;
 
@@ -43,8 +43,8 @@ pub fn detecter_format_entree(path: &Path) -> Option<FormatEntree> {
     })
 }
 
-pub fn detecter_format_sortie(output: &str) -> Option<FormatSortie> {
-    Path::new(output).extension()?.to_str().and_then(|ext| match ext.to_lowercase().as_str() {
+pub fn detecter_format_sortie(output: &Path) -> Option<FormatSortie> {
+    output.extension()?.to_str().and_then(|ext| match ext.to_lowercase().as_str() {
         "docx" => Some(FormatSortie::Docx),
         "html" | "htm" => Some(FormatSortie::Html),
         "md" | "markdown" => Some(FormatSortie::Md),
@@ -225,7 +225,7 @@ fn extraire_texte_xml(xml: &str, balises_texte: &[&str]) -> Result<String, Strin
 // ════════════════════════════════════════════════════════════════════════
 
 /// Génère un PDF à partir de texte brut, avec retour à la ligne et pagination
-fn texte_vers_pdf(texte: &str, output: &str) -> Result<(), String> {
+fn texte_vers_pdf(texte: &str, output: &Path) -> Result<(), String> {
     let mut doc = Document::with_version("1.5");
 
     let font_id = doc.add_object(dictionary! {
@@ -429,8 +429,8 @@ fn encoder_winansi(texte: &str) -> Vec<u8> {
 // ════════════════════════════════════════════════════════════════════════
 
 /// Conversion générale : détecte les formats d'entrée/sortie et convertit
-pub fn convertir(input: &Path, output: &str) -> bool {
-    crate::log_info(&format!("doc::convertir | {:?} -> {}", input, output));
+pub fn convertir(input: &Path, output: &Path) -> bool {
+    crate::log_info(&format!("doc::convertir | {:?} -> {}", input, output.display()));
 
     let fmt_in = detecter_format_entree(input);
     let fmt_out = detecter_format_sortie(output);
@@ -551,7 +551,7 @@ pub fn convertir(input: &Path, output: &str) -> bool {
 
     match result {
         Ok(()) => {
-            crate::log_info(&format!("doc::convertir OK | {:?} -> {}", input, output));
+            crate::log_info(&format!("doc::convertir OK | {:?} -> {}", input, output.display()));
             true
         }
         Err(e) => {
@@ -563,7 +563,7 @@ pub fn convertir(input: &Path, output: &str) -> bool {
 
 /// Conversion avec formats explicites
 pub fn convertir_avec_formats(
-    input: &Path, output: &str,
+    input: &Path, output: &Path,
     _format_entree: Option<FormatEntree>,
     _format_sortie: Option<FormatSortie>,
 ) -> bool {
@@ -572,7 +572,7 @@ pub fn convertir_avec_formats(
 }
 
 /// Extraire le texte brut d'un document
-pub fn extraire_texte(input: &Path, output: &str) -> bool {
+pub fn extraire_texte(input: &Path, output: &Path) -> bool {
     let result = match detecter_format_entree(input) {
         Some(FormatEntree::Docx) | Some(FormatEntree::Dotx) => lire_docx_texte(input),
         Some(FormatEntree::Odt) => lire_odt_texte(input),
@@ -595,7 +595,7 @@ pub fn extraire_texte(input: &Path, output: &str) -> bool {
 }
 
 /// Écrire un DOCX minimal (un seul paragraphe de texte)
-fn ecrire_docx_simple(texte: &str, output: &str) -> Result<(), String> {
+fn ecrire_docx_simple(texte: &str, output: &Path) -> Result<(), String> {
     use std::io::Write;
     let file = std::fs::File::create(output)
         .map_err(|e| format!("Erreur création DOCX : {}", e))?;
@@ -656,16 +656,15 @@ fn ecrire_docx_simple(texte: &str, output: &str) -> Result<(), String> {
 }
 
 // Fonctions de compatibilité (dead code mais gardées pour l'API)
-pub fn convertir_csv(input: &Path, output: &str, _fmt: FormatSortie) -> bool { convertir(input, output) }
-pub fn traiter_log(input: &Path, output: &str) -> bool { convertir(input, output) }
-pub fn convertir_yaml(input: &Path, output: &str, _fmt: FormatSortie) -> bool { convertir(input, output) }
-pub fn convertir_typst(input: &Path, output: &str, _fmt: FormatSortie) -> bool { convertir(input, output) }
-pub fn convertir_pdf(input: &Path, output: &str, _fmt: FormatSortie) -> bool { convertir(input, output) }
+pub fn convertir_csv(input: &Path, output: &Path, _fmt: FormatSortie) -> bool { convertir(input, output) }
+pub fn traiter_log(input: &Path, output: &Path) -> bool { convertir(input, output) }
+pub fn convertir_yaml(input: &Path, output: &Path, _fmt: FormatSortie) -> bool { convertir(input, output) }
+pub fn convertir_typst(input: &Path, output: &Path, _fmt: FormatSortie) -> bool { convertir(input, output) }
+pub fn convertir_pdf(input: &Path, output: &Path, _fmt: FormatSortie) -> bool { convertir(input, output) }
 pub fn convertir_vers_pdf(input: &Path, _format_entree: Option<FormatEntree>) -> Result<String, String> {
     let output = input.with_extension("pdf");
-    let output_str = output.to_str().ok_or("Chemin de sortie invalide")?;
-    if convertir(input, output_str) {
-        Ok(output_str.to_string())
+    if convertir(input, &output) {
+        Ok(output.to_string_lossy().to_string())
     } else {
         Err("Conversion vers PDF échouée".into())
     }
@@ -683,51 +682,51 @@ fn est_pdf(path: &Path) -> bool {
 }
 
 /// Convertit un fichier non-PDF en PDF temporaire (Rust pur)
-fn vers_pdf_temp(input: &Path) -> Result<String, String> {
+fn vers_pdf_temp(input: &Path) -> Result<PathBuf, String> {
     let tmp = std::env::temp_dir().join(format!(
         "oxytools_tmp_{}.pdf",
         input.file_stem().unwrap_or_default().to_string_lossy()
     ));
-    let tmp_str = tmp.to_str().ok_or("Chemin temp invalide")?;
-    crate::log_info(&format!("vers_pdf_temp | {:?} -> {}", input, tmp_str));
-    if convertir(input, tmp_str) {
-        Ok(tmp_str.to_string())
+    crate::log_info(&format!("vers_pdf_temp | {:?} -> {}", input, tmp.display()));
+    if convertir(input, &tmp) {
+        Ok(tmp)
     } else {
         Err(format!("Conversion vers PDF temporaire échouée pour {}", input.display()))
     }
 }
 
 /// Reconvertit un PDF temporaire vers le format original
-fn depuis_pdf_temp(pdf_path: &str, output: &str) -> Result<(), String> {
+fn depuis_pdf_temp(pdf_path: &Path, output: &Path) -> Result<(), String> {
     let fmt_out = detecter_format_sortie(output);
     if fmt_out.is_none() || matches!(fmt_out, Some(FormatSortie::Pdf)) {
         std::fs::copy(pdf_path, output)
-            .map_err(|e| format!("Erreur copie {} → {} : {}", pdf_path, output, e))?;
+            .map_err(|e| format!("Erreur copie {} → {} : {}", pdf_path.display(), output.display(), e))?;
         return Ok(());
     }
-    if convertir(Path::new(pdf_path), output) {
+    if convertir(pdf_path, output) {
         Ok(())
     } else {
-        Err(format!("Reconversion depuis PDF échouée pour {}", output))
+        Err(format!("Reconversion depuis PDF échouée pour {}", output.display()))
     }
 }
 
-fn nettoyer_temp(path: &str) {
+fn nettoyer_temp(path: &Path) {
     let _ = std::fs::remove_file(path);
 }
 
-fn appliquer_operation_doc<F>(input: &Path, output: &str, op_pdf: F) -> Result<(), String>
+fn appliquer_operation_doc<F>(input: &Path, output: &Path, op_pdf: F) -> Result<(), String>
 where
-    F: FnOnce(&Path, &str) -> Result<(), String>,
+    F: FnOnce(&Path, &Path) -> Result<(), String>,
 {
     if est_pdf(input) {
-        crate::log_info(&format!("appliquer_operation_doc | PDF direct | {:?} -> {}", input, output));
+        crate::log_info(&format!("appliquer_operation_doc | PDF direct | {:?} -> {}", input, output.display()));
         return op_pdf(input, output);
     }
     crate::log_info(&format!("appliquer_operation_doc | non-PDF, conversion intermédiaire | {:?}", input));
     let pdf_in = vers_pdf_temp(input)?;
-    let pdf_out = format!("{}_out.pdf", pdf_in.trim_end_matches(".pdf"));
-    let result = op_pdf(Path::new(&pdf_in), &pdf_out);
+    let stem = pdf_in.file_stem().unwrap_or_default().to_string_lossy().to_string();
+    let pdf_out = pdf_in.with_file_name(format!("{}_out.pdf", stem));
+    let result = op_pdf(&pdf_in, &pdf_out);
     nettoyer_temp(&pdf_in);
     if result.is_err() {
         nettoyer_temp(&pdf_out);
@@ -893,7 +892,7 @@ fn ajouter_overlay_page(
 }
 
 /// Helper : doc.save() retourne Result<File, _> en 0.38, on le mappe en Result<(), _>
-fn sauvegarder(doc: &mut Document, output: &str) -> Result<(), String> {
+fn sauvegarder(doc: &mut Document, output: &Path) -> Result<(), String> {
     doc.save(output).map(|_| ()).map_err(|e| format!("Erreur sauvegarde : {}", e))
 }
 
@@ -901,7 +900,7 @@ fn sauvegarder(doc: &mut Document, output: &str) -> Result<(), String> {
 //  PDF SPLIT
 // ════════════════════════════════════════════════════════════════════════
 
-fn pdf_split_interne(input: &Path, output_dir: &str) -> Result<Vec<String>, String> {
+fn pdf_split_interne(input: &Path, output_dir: &Path) -> Result<Vec<String>, String> {
     std::fs::create_dir_all(output_dir)
         .map_err(|e| format!("Impossible de créer le dossier : {}", e))?;
 
@@ -913,7 +912,7 @@ fn pdf_split_interne(input: &Path, output_dir: &str) -> Result<Vec<String>, Stri
         return Err("Le PDF ne contient aucune page".into());
     }
 
-    crate::log_info(&format!("pdf_split_interne | {:?} | {} pages -> {}", input, pages.len(), output_dir));
+    crate::log_info(&format!("pdf_split_interne | {:?} | {} pages -> {}", input, pages.len(), output_dir.display()));
 
     let base_name = input.file_stem().unwrap_or_default().to_string_lossy();
     let mut fichiers = Vec::new();
@@ -957,22 +956,22 @@ fn pdf_split_interne(input: &Path, output_dir: &str) -> Result<Vec<String>, Stri
         new_doc.trailer.set("Root", catalog_id);
         new_doc.compress();
 
-        let output_path = format!("{}/{}_page_{:04}.pdf", output_dir, base_name, i + 1);
+        let output_path = output_dir.join(format!("{}_page_{:04}.pdf", base_name, i + 1));
         sauvegarder(&mut new_doc, &output_path)?;
-        fichiers.push(output_path);
+        fichiers.push(output_path.to_string_lossy().to_string());
     }
 
     Ok(fichiers)
 }
 
 /// Split : fonctionne sur PDF et autres formats (convertit d'abord en PDF)
-pub fn pdf_split(input: &Path, output_dir: &str) -> Result<Vec<String>, String> {
+pub fn pdf_split(input: &Path, output_dir: &Path) -> Result<Vec<String>, String> {
     if est_pdf(input) {
         return pdf_split_interne(input, output_dir);
     }
     // Non-PDF : convertir d'abord
     let pdf_tmp = vers_pdf_temp(input)?;
-    let result = pdf_split_interne(Path::new(&pdf_tmp), output_dir);
+    let result = pdf_split_interne(&pdf_tmp, output_dir);
     nettoyer_temp(&pdf_tmp);
     result
 }
@@ -981,18 +980,18 @@ pub fn pdf_split(input: &Path, output_dir: &str) -> Result<Vec<String>, String> 
 //  PDF MERGE
 // ════════════════════════════════════════════════════════════════════════
 
-pub fn pdf_merge(inputs: &[&Path], output: &str) -> Result<(), String> {
+pub fn pdf_merge(inputs: &[&Path], output: &Path) -> Result<(), String> {
     if inputs.is_empty() {
         return Err("Aucun fichier à fusionner".into());
     }
-    crate::log_info(&format!("pdf_merge | {} fichier(s) -> {}", inputs.len(), output));
+    crate::log_info(&format!("pdf_merge | {} fichier(s) -> {}", inputs.len(), output.display()));
     for (i, p) in inputs.iter().enumerate() {
         crate::log_info(&format!("  [{}] {:?}", i+1, p));
     }
 
     // Convertir les non-PDF en PDF temporaire
     let mut documents: Vec<Document> = Vec::new();
-    let mut temps: Vec<String> = Vec::new();
+    let mut temps: Vec<PathBuf> = Vec::new();
     for path in inputs {
         if est_pdf(path) {
             documents.push(
@@ -1003,7 +1002,7 @@ pub fn pdf_merge(inputs: &[&Path], output: &str) -> Result<(), String> {
             let tmp = vers_pdf_temp(path)?;
             documents.push(
                 Document::load(&tmp)
-                    .map_err(|e| format!("Erreur chargement temp {} : {}", tmp, e))?
+                    .map_err(|e| format!("Erreur chargement temp {} : {}", tmp.display(), e))?
             );
             temps.push(tmp);
         }
@@ -1097,7 +1096,7 @@ pub fn pdf_merge(inputs: &[&Path], output: &str) -> Result<(), String> {
 //  PDF ROTATE
 // ════════════════════════════════════════════════════════════════════════
 
-fn pdf_rotate_interne(input: &Path, output: &str, rotation: u16, pages_cibles: Option<&[u32]>) -> Result<(), String> {
+fn pdf_rotate_interne(input: &Path, output: &Path, rotation: u16, pages_cibles: Option<&[u32]>) -> Result<(), String> {
     let mut doc = Document::load(input)
         .map_err(|e| format!("Erreur chargement PDF : {}", e))?;
 
@@ -1121,7 +1120,7 @@ fn pdf_rotate_interne(input: &Path, output: &str, rotation: u16, pages_cibles: O
     sauvegarder(&mut doc, output)
 }
 
-pub fn pdf_rotate(input: &Path, output: &str, rotation: u16, pages_cibles: Option<&[u32]>) -> Result<(), String> {
+pub fn pdf_rotate(input: &Path, output: &Path, rotation: u16, pages_cibles: Option<&[u32]>) -> Result<(), String> {
     appliquer_operation_doc(input, output, |pdf_in, pdf_out| {
         pdf_rotate_interne(pdf_in, pdf_out, rotation, pages_cibles)
     })
@@ -1131,7 +1130,7 @@ pub fn pdf_rotate(input: &Path, output: &str, rotation: u16, pages_cibles: Optio
 //  PDF COMPRESS
 // ════════════════════════════════════════════════════════════════════════
 
-fn pdf_compresser_interne(input: &Path, output: &str) -> Result<u64, String> {
+fn pdf_compresser_interne(input: &Path, output: &Path) -> Result<u64, String> {
     let taille_avant = std::fs::metadata(input).map(|m| m.len()).unwrap_or(0);
 
     let mut doc = Document::load(input)
@@ -1157,8 +1156,8 @@ fn pdf_compresser_interne(input: &Path, output: &str) -> Result<u64, String> {
     Ok(taille_avant.saturating_sub(taille_apres))
 }
 
-pub fn pdf_compresser(input: &Path, output: &str) -> Result<u64, String> {
-    crate::log_info(&format!("pdf_compresser | {:?} -> {}", input, output));
+pub fn pdf_compresser(input: &Path, output: &Path) -> Result<u64, String> {
+    crate::log_info(&format!("pdf_compresser | {:?} -> {}", input, output.display()));
     if est_pdf(input) {
         let result = pdf_compresser_interne(input, output);
         if let Ok(bytes_gagnés) = &result {
@@ -1167,7 +1166,7 @@ pub fn pdf_compresser(input: &Path, output: &str) -> Result<u64, String> {
         return result;
     }
     let pdf_tmp = vers_pdf_temp(input)?;
-    let result = pdf_compresser_interne(Path::new(&pdf_tmp), output);
+    let result = pdf_compresser_interne(&pdf_tmp, output);
     nettoyer_temp(&pdf_tmp);
     result
 }
@@ -1177,7 +1176,7 @@ pub fn pdf_compresser(input: &Path, output: &str) -> Result<u64, String> {
 // ════════════════════════════════════════════════════════════════════════
 
 fn pdf_crop_interne(
-    input: &Path, output: &str,
+    input: &Path, output: &Path,
     x_pct: f64, y_pct: f64, w_pct: f64, h_pct: f64,
     pages_cibles: Option<&[u32]>,
 ) -> Result<(), String> {
@@ -1214,7 +1213,7 @@ fn pdf_crop_interne(
 }
 
 pub fn pdf_crop(
-    input: &Path, output: &str,
+    input: &Path, output: &Path,
     x_pct: f64, y_pct: f64, w_pct: f64, h_pct: f64,
     pages_cibles: Option<&[u32]>,
 ) -> Result<(), String> {
@@ -1227,7 +1226,7 @@ pub fn pdf_crop(
 //  PDF ORGANIZE — Réorganise / supprime des pages
 // ════════════════════════════════════════════════════════════════════════
 
-fn pdf_organiser_interne(input: &Path, output: &str, nouvel_ordre: &[u32]) -> Result<(), String> {
+fn pdf_organiser_interne(input: &Path, output: &Path, nouvel_ordre: &[u32]) -> Result<(), String> {
     let mut doc = Document::load(input)
         .map_err(|e| format!("Erreur chargement PDF : {}", e))?;
 
@@ -1260,14 +1259,14 @@ fn pdf_organiser_interne(input: &Path, output: &str, nouvel_ordre: &[u32]) -> Re
     sauvegarder(&mut doc, output)
 }
 
-pub fn pdf_organiser(input: &Path, output: &str, nouvel_ordre: &[u32]) -> Result<(), String> {
+pub fn pdf_organiser(input: &Path, output: &Path, nouvel_ordre: &[u32]) -> Result<(), String> {
     let ordre = nouvel_ordre.to_vec();
     appliquer_operation_doc(input, output, |pdf_in, pdf_out| {
         pdf_organiser_interne(pdf_in, pdf_out, &ordre)
     })
 }
 
-pub fn pdf_supprimer_pages(input: &Path, output: &str, pages_a_supprimer: &[u32]) -> Result<(), String> {
+pub fn pdf_supprimer_pages(input: &Path, output: &Path, pages_a_supprimer: &[u32]) -> Result<(), String> {
     // On a besoin du nombre total de pages → charger d'abord
     let total = if est_pdf(input) {
         let doc = Document::load(input).map_err(|e| format!("Erreur : {}", e))?;
@@ -1302,7 +1301,7 @@ pub enum PositionNumero {
 }
 
 fn pdf_numeroter_interne(
-    input: &Path, output: &str,
+    input: &Path, output: &Path,
     debut: u32,
     position: PositionNumero,
     taille_police: f64,
@@ -1353,7 +1352,7 @@ fn pdf_numeroter_interne(
 }
 
 pub fn pdf_numeroter(
-    input: &Path, output: &str,
+    input: &Path, output: &Path,
     debut: u32,
     position: PositionNumero,
     taille_police: f64,
@@ -1368,7 +1367,7 @@ pub fn pdf_numeroter(
 // ════════════════════════════════════════════════════════════════════════
 
 fn pdf_proteger_interne(
-    input: &Path, output: &str,
+    input: &Path, output: &Path,
     mot_de_passe_owner: &str,
     mot_de_passe_user: &str,
     autoriser_impression: bool,
@@ -1409,7 +1408,7 @@ fn pdf_proteger_interne(
 }
 
 pub fn pdf_proteger(
-    input: &Path, output: &str,
+    input: &Path, output: &Path,
     mot_de_passe_owner: &str,
     mot_de_passe_user: &str,
     autoriser_impression: bool,
@@ -1424,7 +1423,7 @@ pub fn pdf_proteger(
 //  PDF UNLOCK
 // ════════════════════════════════════════════════════════════════════════
 
-pub fn pdf_dechiffrer(input: &Path, output: &str, mot_de_passe: &str) -> Result<(), String> {
+pub fn pdf_dechiffrer(input: &Path, output: &Path, mot_de_passe: &str) -> Result<(), String> {
     let mut doc = Document::load(input)
         .map_err(|e| format!("Erreur chargement PDF : {}", e))?;
 
@@ -1444,7 +1443,7 @@ pub fn pdf_dechiffrer(input: &Path, output: &str, mot_de_passe: &str) -> Result<
 //  PDF REPAIR
 // ════════════════════════════════════════════════════════════════════════
 
-fn pdf_reparer_interne(input: &Path, output: &str) -> Result<(), String> {
+fn pdf_reparer_interne(input: &Path, output: &Path) -> Result<(), String> {
     let mut doc = Document::load(input)
         .map_err(|e| format!("Erreur chargement PDF (fichier trop corrompu ?) : {}", e))?;
 
@@ -1456,7 +1455,7 @@ fn pdf_reparer_interne(input: &Path, output: &str) -> Result<(), String> {
     sauvegarder(&mut doc, output)
 }
 
-pub fn pdf_reparer(input: &Path, output: &str) -> Result<(), String> {
+pub fn pdf_reparer(input: &Path, output: &Path) -> Result<(), String> {
     appliquer_operation_doc(input, output, |pdf_in, pdf_out| {
         pdf_reparer_interne(pdf_in, pdf_out)
     })
@@ -1467,7 +1466,7 @@ pub fn pdf_reparer(input: &Path, output: &str) -> Result<(), String> {
 // ════════════════════════════════════════════════════════════════════════
 
 fn pdf_watermark_interne(
-    input: &Path, output: &str,
+    input: &Path, output: &Path,
     texte: &str,
     taille_police: f64,
     opacite: f64,
@@ -1535,7 +1534,7 @@ fn pdf_watermark_interne(
 }
 
 pub fn pdf_watermark(
-    input: &Path, output: &str,
+    input: &Path, output: &Path,
     texte: &str,
     taille_police: f64,
     opacite: f64,
@@ -1555,7 +1554,7 @@ pub fn pdf_watermark(
 // ════════════════════════════════════════════════════════════════════════
 
 fn pdf_annoter_interne(
-    input: &Path, output: &str,
+    input: &Path, output: &Path,
     texte: &str,
     x: f64, y: f64,
     largeur: f64, hauteur: f64,
@@ -1616,7 +1615,7 @@ fn pdf_annoter_interne(
 }
 
 pub fn pdf_annoter(
-    input: &Path, output: &str,
+    input: &Path, output: &Path,
     texte: &str,
     x: f64, y: f64,
     largeur: f64, hauteur: f64,
@@ -1636,7 +1635,7 @@ pub fn pdf_annoter(
 // ════════════════════════════════════════════════════════════════════════
 
 fn pdf_signer_interne(
-    input: &Path, output: &str,
+    input: &Path, output: &Path,
     nom_signataire: &str,
     position: PositionNumero,
     taille_police: f64,
@@ -1729,7 +1728,7 @@ fn jours_vers_date(jours_epoch: u64) -> (u64, u64, u64) {
 }
 
 pub fn pdf_signer(
-    input: &Path, output: &str,
+    input: &Path, output: &Path,
     nom_signataire: &str,
     position: PositionNumero,
     taille_police: f64,

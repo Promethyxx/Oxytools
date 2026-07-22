@@ -32,7 +32,6 @@ enum ModuleType {
     #[cfg(feature = "api")]
     Video,
     Rename,
-    Tools,
     Settings,
 }
 struct OxytoolsApp {
@@ -158,11 +157,6 @@ struct OxytoolsApp {
         job_queue: Arc<Mutex<Vec<PathBuf>>>,
         conv_progress: Arc<Mutex<f32>>,
         active_pids: Arc<Mutex<Vec<u32>>>,
-        tools_cfg: modules::tools::ToolsConfig,
-        tools_new_name: String,
-        tools_new_path: String,
-        tools_new_folder: String,
-        tools_result: String,
 }
 impl Default for OxytoolsApp {
     fn default() -> Self {
@@ -278,11 +272,6 @@ impl Default for OxytoolsApp {
                 job_queue: Arc::new(Mutex::new(Vec::new())),
                 conv_progress: Arc::new(Mutex::new(-1.0f32)),
                 active_pids: Arc::new(Mutex::new(Vec::new())),
-                tools_cfg: modules::tools::ToolsConfig::default(),
-                tools_new_name: String::new(),
-                tools_new_path: String::new(),
-                tools_new_folder: String::new(),
-                tools_result: String::new(),
                 rename_cfg: modules::rename::RenameConfig::default(),
                 rename_previews: Vec::new(),
                 rename_results: Vec::new(),
@@ -338,7 +327,6 @@ impl OxytoolsApp {
             ModuleType::Image => self.format_choisi = String::new(),
             ModuleType::Doc => self.format_choisi = String::new(),
             ModuleType::Rename => {},
-            ModuleType::Tools => {},
             #[cfg(feature = "api")]
             ModuleType::Video => self.format_choisi = String::new(),
             #[cfg(feature = "api")]
@@ -358,7 +346,6 @@ impl OxytoolsApp {
                     self.lang = match lang_str { "fr" => &crate::lang::FR, _ => &crate::lang::EN };
                     self.lang_id = match lang_str { "fr" => "fr", _ => "en" };
                 }
-                self.tools_cfg = modules::tools::ToolsConfig::load(&parsed);
                 if let Some(doc) = parsed.get("doc") {
                     if let Some(fmt) = doc.get("format").and_then(|f| f.as_str()) {
                         if self.module_actif == ModuleType::Doc {
@@ -565,7 +552,6 @@ impl OxytoolsApp {
                 }
             }
         }
-        self.tools_cfg.save(&mut parsed);
         // ── Persister le dernier profil multi-replace ────────────
         {
             let rename_table = parsed.entry("rename").or_insert(toml::Value::Table(toml::Table::new()));
@@ -624,14 +610,14 @@ impl OxytoolsApp {
             log_info(&format!("  Fichier en queue: {:?}", f));
         }
 
-        *self.completed_jobs.lock().unwrap() = 0;
-        *self.total_jobs.lock().unwrap() = self.current_files.len();
-        *self.active_jobs.lock().unwrap() = 0;
-        let mut queue = self.job_queue.lock().unwrap();
+        *self.completed_jobs.lock().unwrap_or_else(|e| e.into_inner()) = 0;
+        *self.total_jobs.lock().unwrap_or_else(|e| e.into_inner()) = self.current_files.len();
+        *self.active_jobs.lock().unwrap_or_else(|e| e.into_inner()) = 0;
+        let mut queue = self.job_queue.lock().unwrap_or_else(|e| e.into_inner());
         queue.clear();
         queue.extend(self.current_files.clone());
         drop(queue);
-        *self.status.lock().unwrap() = self.lang.starting_tasks.replace("{}", &self.current_files.len().to_string());
+        *self.status.lock().unwrap_or_else(|e| e.into_inner()) = self.lang.starting_tasks.replace("{}", &self.current_files.len().to_string());
         for _ in 0..self.max_parallel_jobs.min(self.current_files.len()) {
             self.spawn_worker(ctx.clone());
         }
@@ -723,36 +709,47 @@ impl OxytoolsApp {
         std::thread::spawn(move || {
             loop {
                 let job = {
-                    let mut q = queue.lock().unwrap();
+                    let mut q = queue.lock().unwrap_or_else(|e| e.into_inner());
                     q.pop()
                 };
                 let input = match job {
                     Some(path) => path,
                     None => break,
                 };
-                *active.lock().unwrap() += 1;
+                *active.lock().unwrap_or_else(|e| e.into_inner()) += 1;
                 let effective_fmt = if module == ModuleType::Doc && doc_action != "Convert" {
                     "pdf".to_string()
                 } else {
                     fmt.to_lowercase()
                 };
-                let output = input.parent().unwrap().join(format!(
-                    "{}_oxytools.{}",
-                    input.file_stem().unwrap_or_default().to_string_lossy(),
-                    effective_fmt
-                ));
-                let out_str = output.to_str().unwrap().to_string();
+                let output = match input.parent() {
+                    Some(parent) => parent.join(format!(
+                        "{}_oxytools.{}",
+                        input.file_stem().unwrap_or_default().to_string_lossy(),
+                        effective_fmt
+                    )),
+                    None => {
+                        log_error(&format!("FAILED | file={:?} | reason=fichier sans dossier parent", input));
+                        *active.lock().unwrap_or_else(|e| e.into_inner()) -= 1;
+                        *completed.lock().unwrap_or_else(|e| e.into_inner()) += 1;
+                        let done = *completed.lock().unwrap_or_else(|e| e.into_inner());
+                        let total_count = *total.lock().unwrap_or_else(|e| e.into_inner());
+                        *status_arc.lock().unwrap_or_else(|e| e.into_inner()) = crate::lang::fmt2(lang.processing_files, &done.to_string(), &total_count.to_string());
+                        ctx.request_repaint();
+                        continue;
+                    }
+                };
 
                 // ── Timing ──────────────────────────────────────────────
                 let start = std::time::Instant::now();
                 log_info(&format!(
                     "START | module={:?} | fichier={:?} | sortie={:?}",
-                    module, input, out_str
+                    module, input, output
                 ));
 
-                let current = *completed.lock().unwrap() + *active.lock().unwrap();
-                let total_count = *total.lock().unwrap();
-                *status_arc.lock().unwrap() = crate::lang::fmt2(lang.processing_files, &current.to_string(), &total_count.to_string());
+                let current = *completed.lock().unwrap_or_else(|e| e.into_inner()) + *active.lock().unwrap_or_else(|e| e.into_inner());
+                let total_count = *total.lock().unwrap_or_else(|e| e.into_inner());
+                *status_arc.lock().unwrap_or_else(|e| e.into_inner()) = crate::lang::fmt2(lang.processing_files, &current.to_string(), &total_count.to_string());
                 ctx.request_repaint();
 
                 // ── Exécution avec résultat détaillé ────────────────────
@@ -760,15 +757,19 @@ impl OxytoolsApp {
                     ModuleType::Archive => {
                         match archive_action.as_str() {
                             "extract" => {
-                                let dest = input.parent().unwrap().join(
-                                    input.file_stem().unwrap_or_default().to_string_lossy().to_string()
-                                );
-                                let dest_str = dest.to_string_lossy().to_string();
-                                log_info(&format!("Archive: extraction | {:?} -> {}", input, dest_str));
-                                if modules::archive::extraire(&input, &dest_str) {
-                                    Ok(())
-                                } else {
-                                    Err(format!("extraire() failed | file={:?}", input))
+                                match input.parent() {
+                                    None => Err(format!("extract: fichier sans dossier parent | {:?}", input)),
+                                    Some(parent) => {
+                                        let dest = parent.join(
+                                            input.file_stem().unwrap_or_default().to_string_lossy().to_string()
+                                        );
+                                        log_info(&format!("Archive: extraction | {:?} -> {:?}", input, dest));
+                                        if modules::archive::extraire(&input, &dest) {
+                                            Ok(())
+                                        } else {
+                                            Err(format!("extraire() failed | file={:?}", input))
+                                        }
+                                    }
                                 }
                             },
                             "convert" => {
@@ -781,19 +782,23 @@ impl OxytoolsApp {
                             },
                             "multi" => {
                                 // input = un sous-dossier, output = dossier.{fmt} à côté
-                                let name = input.file_name().unwrap_or_default().to_string_lossy().to_string();
-                                let multi_out = input.parent().unwrap().join(format!("{}.{}", name, fmt));
-                                let multi_out_str = multi_out.to_string_lossy().to_string();
-                                log_info(&format!("Archive multi: {} -> {}", name, multi_out_str));
-                                if modules::archive::compresser(&input, &multi_out_str, &fmt, archive_niveau) {
-                                    Ok(())
-                                } else {
-                                    Err(format!("multi compresser() failed | {} | fmt={}", name, fmt))
+                                match input.parent() {
+                                    None => Err(format!("multi: fichier sans dossier parent | {:?}", input)),
+                                    Some(parent) => {
+                                        let name = input.file_name().unwrap_or_default().to_string_lossy().to_string();
+                                        let multi_out = parent.join(format!("{}.{}", name, fmt));
+                                        log_info(&format!("Archive multi: {} -> {:?}", name, multi_out));
+                                        if modules::archive::compresser(&input, &multi_out, &fmt, archive_niveau) {
+                                            Ok(())
+                                        } else {
+                                            Err(format!("multi compresser() failed | {} | fmt={}", name, fmt))
+                                        }
+                                    }
                                 }
                             },
                             _ => {
                                 log_info(&format!("Archive: compression fmt={} niveau={} | {:?}", fmt, archive_niveau, input));
-                                if modules::archive::compresser(&input, &out_str, &fmt, archive_niveau) {
+                                if modules::archive::compresser(&input, &output, &fmt, archive_niveau) {
                                     Ok(())
                                 } else {
                                     Err(format!("compresser() returned false | fmt={} | file={:?}", fmt, input))
@@ -806,24 +811,28 @@ impl OxytoolsApp {
                         match audio_action.as_str() {
                             "extract" => {
                                 log_info(&format!("Audio: extraction | {:?}", input));
-                                let ext = modules::audio::detecter_extension(&input);
-                                let extract_out = input.parent().unwrap().join(format!(
-                                    "{}_oxytools.{}",
-                                    input.file_stem().unwrap_or_default().to_string_lossy(),
-                                    if ext.is_empty() { "mka".to_string() } else { ext }
-                                ));
-                                let extract_str = extract_out.to_str().unwrap().to_string();
-                                match modules::audio::extraire(&input, &extract_str) {
-                                    Ok(child) => {
-                                        let dur = get_duration_secs(&input);
-                                        wait_ffmpeg_with_progress(child, dur, &conv_progress, &active_pids)
-                                    },
-                                    Err(e) => Err(format!("impossible de lancer ffmpeg extraction: {}", e)),
+                                match input.parent() {
+                                    None => Err(format!("Audio extract: fichier sans dossier parent | {:?}", input)),
+                                    Some(parent) => {
+                                        let ext = modules::audio::detecter_extension(&input);
+                                        let extract_out = parent.join(format!(
+                                            "{}_oxytools.{}",
+                                            input.file_stem().unwrap_or_default().to_string_lossy(),
+                                            if ext.is_empty() { "mka".to_string() } else { ext }
+                                        ));
+                                        match modules::audio::extraire(&input, &extract_out) {
+                                            Ok(child) => {
+                                                let dur = get_duration_secs(&input);
+                                                wait_ffmpeg_with_progress(child, dur, &conv_progress, &active_pids)
+                                            },
+                                            Err(e) => Err(format!("impossible de lancer ffmpeg extraction: {}", e)),
+                                        }
+                                    }
                                 }
                             },
                             _ => {
                                 log_info(&format!("Audio: conversion | {:?}", input));
-                                match modules::audio::convertir(&input, &out_str, audio_qualite) {
+                                match modules::audio::convertir(&input, &output, audio_qualite) {
                                     Ok(child) => {
                                         let dur = get_duration_secs(&input);
                                         wait_ffmpeg_with_progress(child, dur, &conv_progress, &active_pids)
@@ -836,7 +845,7 @@ impl OxytoolsApp {
                     #[cfg(feature = "api")]
                     ModuleType::Video => {
                         log_info(&format!("Video: copie_flux={} speed={} | {:?}", copie, video_speed, input));
-                        match modules::video::traiter_video(&input, &out_str, copie, false, video_speed) {
+                        match modules::video::traiter_video(&input, &output, copie, false, video_speed) {
                             Ok(child) => {
                                 let dur = get_duration_secs(&input);
                                 wait_ffmpeg_with_progress(child, dur, &conv_progress, &active_pids)
@@ -849,48 +858,58 @@ impl OxytoolsApp {
                         match doc_action.as_str() {
                             "Convert" => {
                                 let format_entree = modules::doc::detecter_format_entree(&input);
-                                let format_sortie = modules::doc::detecter_format_sortie(&out_str);
+                                let format_sortie = modules::doc::detecter_format_sortie(&output);
                                 log_info(&format!("Doc Convert: entree={:?} sortie={:?}", format_entree, format_sortie));
-                                if modules::doc::convertir_avec_formats(&input, &out_str, format_entree, format_sortie) {
+                                if modules::doc::convertir_avec_formats(&input, &output, format_entree, format_sortie) {
                                     Ok(())
                                 } else {
                                     Err(format!("Convert_avec_formats failed | input={:?} output={:?} | file={:?}", format_entree, format_sortie, input))
                                 }
                             },
                             "pdf_split" => {
-                                let output_dir = input.parent().unwrap().join(format!(
-                                    "{}_pages",
-                                    input.file_stem().unwrap_or_default().to_string_lossy()
-                                ));
-                                std::fs::create_dir_all(&output_dir).ok();
-                                log_info(&format!("Doc pdf_split: output_dir={:?}", output_dir));
-                                modules::doc::pdf_split(&input, output_dir.to_str().unwrap())
-                                    .map(|_| ())
-                                    .map_err(|e| format!("pdf_split failed: {}", e))
+                                match input.parent() {
+                                    None => Err(format!("pdf_split: fichier sans dossier parent | {:?}", input)),
+                                    Some(parent) => {
+                                        let output_dir = parent.join(format!(
+                                            "{}_pages",
+                                            input.file_stem().unwrap_or_default().to_string_lossy()
+                                        ));
+                                        std::fs::create_dir_all(&output_dir).ok();
+                                        log_info(&format!("Doc pdf_split: output_dir={:?}", output_dir));
+                                        modules::doc::pdf_split(&input, &output_dir)
+                                            .map(|_| ())
+                                            .map_err(|e| format!("pdf_split failed: {}", e))
+                                    }
+                                }
                             },
                             "pdf_merge" => {
-                                let paths: Vec<&Path> = pdf_merge_list.iter().map(|p| p.as_path()).collect();
-                                let output_merge = input.parent().unwrap().join("merged_oxytools.pdf");
-                                log_info(&format!("Doc pdf_merge: {} fichiers -> {:?}", paths.len(), output_merge));
-                                modules::doc::pdf_merge(&paths, output_merge.to_str().unwrap())
-                                    .map_err(|e| format!("pdf_merge failed: {}", e))
+                                match input.parent() {
+                                    None => Err(format!("pdf_merge: fichier sans dossier parent | {:?}", input)),
+                                    Some(parent) => {
+                                        let paths: Vec<&Path> = pdf_merge_list.iter().map(|p| p.as_path()).collect();
+                                        let output_merge = parent.join("merged_oxytools.pdf");
+                                        log_info(&format!("Doc pdf_merge: {} fichiers -> {:?}", paths.len(), output_merge));
+                                        modules::doc::pdf_merge(&paths, &output_merge)
+                                            .map_err(|e| format!("pdf_merge failed: {}", e))
+                                    }
+                                }
                             },
                             "pdf_rotate" => {
                                 let pages_opt = parse_pages_spec(&pdf_pages);
                                 log_info(&format!("Doc pdf_rotate: angle={} pages={:?}", pdf_angle, pages_opt));
-                                modules::doc::pdf_rotate(&input, &out_str, pdf_angle, pages_opt.as_deref())
+                                modules::doc::pdf_rotate(&input, &output, pdf_angle, pages_opt.as_deref())
                                     .map_err(|e| format!("pdf_rotate failed: {}", e))
                             },
                             "pdf_compress" => {
                                 log_info(&format!("Doc pdf_compress: {:?}", input));
-                                modules::doc::pdf_compresser(&input, &out_str)
+                                modules::doc::pdf_compresser(&input, &output)
                                     .map(|_| ())
                                     .map_err(|e| format!("pdf_compress failed: {}", e))
                             },
                             "pdf_crop" => {
                                 let pages_opt = parse_pages_spec(&pdf_pages);
                                 log_info(&format!("Doc pdf_crop: x={} y={} w={} h={} pages={:?}", pdf_crop_x, pdf_crop_y, pdf_crop_w, pdf_crop_h, pages_opt));
-                                modules::doc::pdf_crop(&input, &out_str, pdf_crop_x, pdf_crop_y, pdf_crop_w, pdf_crop_h, pages_opt.as_deref())
+                                modules::doc::pdf_crop(&input, &output, pdf_crop_x, pdf_crop_y, pdf_crop_w, pdf_crop_h, pages_opt.as_deref())
                                     .map_err(|e| format!("pdf_crop failed: {}", e))
                             },
                             "pdf_organize" => {
@@ -901,7 +920,7 @@ impl OxytoolsApp {
                                 if ordre.is_empty() {
                                     Err("pdf_organize: ordre vide ou invalide".to_string())
                                 } else {
-                                    modules::doc::pdf_organiser(&input, &out_str, &ordre)
+                                    modules::doc::pdf_organiser(&input, &output, &ordre)
                                         .map_err(|e| format!("pdf_organize failed: {}", e))
                                 }
                             },
@@ -913,7 +932,7 @@ impl OxytoolsApp {
                                 if pages_a_sup.is_empty() {
                                     Err("pdf_delete_pages: liste de pages vide ou invalide".to_string())
                                 } else {
-                                    modules::doc::pdf_supprimer_pages(&input, &out_str, &pages_a_sup)
+                                    modules::doc::pdf_supprimer_pages(&input, &output, &pages_a_sup)
                                         .map_err(|e| format!("pdf_delete_pages failed: {}", e))
                                 }
                             },
@@ -927,34 +946,34 @@ impl OxytoolsApp {
                                     _            => modules::doc::PositionNumero::BasCentre,
                                 };
                                 log_info(&format!("Doc pdf_numbers: debut={} position={} taille={}", pdf_num_debut, pdf_num_position, pdf_num_taille));
-                                modules::doc::pdf_numeroter(&input, &out_str, pdf_num_debut, position, pdf_num_taille)
+                                modules::doc::pdf_numeroter(&input, &output, pdf_num_debut, position, pdf_num_taille)
                                     .map_err(|e| format!("pdf_number_pages failed: {}", e))
                             },
                             "pdf_protect" => {
                                 log_info(&format!("Doc pdf_protect: print={} copy={}", pdf_allow_print, pdf_allow_copy));
-                                modules::doc::pdf_proteger(&input, &out_str, &pdf_owner_pass, &pdf_user_pass, pdf_allow_print, pdf_allow_copy)
+                                modules::doc::pdf_proteger(&input, &output, &pdf_owner_pass, &pdf_user_pass, pdf_allow_print, pdf_allow_copy)
                                     .map_err(|e| format!("pdf_protect failed: {}", e))
                             },
                             "pdf_unlock" => {
                                 log_info("Doc pdf_unlock");
-                                modules::doc::pdf_dechiffrer(&input, &out_str, &pdf_unlock_pass)
+                                modules::doc::pdf_dechiffrer(&input, &output, &pdf_unlock_pass)
                                     .map_err(|e| format!("pdf_unlock failed: {}", e))
                             },
                             "pdf_repair" => {
                                 log_info(&format!("Doc pdf_repair: {:?}", input));
-                                modules::doc::pdf_reparer(&input, &out_str)
+                                modules::doc::pdf_reparer(&input, &output)
                                     .map_err(|e| format!("pdf_repair failed: {}", e))
                             },
                             "pdf_watermark" => {
                                 let pages_opt = parse_pages_spec(&pdf_pages);
                                 log_info(&format!("Doc pdf_watermark: texte='{}' taille={} opacite={}", pdf_wm_texte, pdf_wm_taille, pdf_wm_opacite));
-                                modules::doc::pdf_watermark(&input, &out_str, &pdf_wm_texte, pdf_wm_taille, pdf_wm_opacite, pages_opt.as_deref())
+                                modules::doc::pdf_watermark(&input, &output, &pdf_wm_texte, pdf_wm_taille, pdf_wm_opacite, pages_opt.as_deref())
                                     .map_err(|e| format!("pdf_watermark failed: {}", e))
                             },
                             "pdf_annotate" => {
                                 let pages_opt = parse_pages_spec(&pdf_pages);
                                 log_info(&format!("Doc pdf_annotate: texte='{}' x={} y={} w={} h={}", pdf_annot_texte, pdf_annot_x, pdf_annot_y, pdf_annot_w, pdf_annot_h));
-                                modules::doc::pdf_annoter(&input, &out_str, &pdf_annot_texte, pdf_annot_x, pdf_annot_y, pdf_annot_w, pdf_annot_h, pages_opt.as_deref())
+                                modules::doc::pdf_annoter(&input, &output, &pdf_annot_texte, pdf_annot_x, pdf_annot_y, pdf_annot_w, pdf_annot_h, pages_opt.as_deref())
                                     .map_err(|e| format!("pdf_annotate failed: {}", e))
                             },
                             "pdf_sign" => {
@@ -968,12 +987,12 @@ impl OxytoolsApp {
                                     _            => modules::doc::PositionNumero::BasDroite,
                                 };
                                 log_info(&format!("Doc pdf_sign: nom='{}' position={} taille={}", pdf_sign_nom, pdf_sign_position, pdf_sign_taille));
-                                modules::doc::pdf_signer(&input, &out_str, &pdf_sign_nom, sign_pos, pdf_sign_taille, pages_opt.as_deref())
+                                modules::doc::pdf_signer(&input, &output, &pdf_sign_nom, sign_pos, pdf_sign_taille, pages_opt.as_deref())
                                     .map_err(|e| format!("pdf_sign failed: {}", e))
                             },
                             autre => {
                                 log_warn(&format!("Doc: action inconnue '{}', fallback Convert()", autre));
-                                if modules::doc::convertir(&input, &out_str) {
+                                if modules::doc::convertir(&input, &output) {
                                     Ok(())
                                 } else {
                                     Err(format!("Convert() fallback failed for {:?}", input))
@@ -995,26 +1014,31 @@ impl OxytoolsApp {
                                 } else if fmt.to_uppercase() == "ICO" {
                                     // ICO : un fichier par taille
                                     log_info(&format!("Image ICO: sizes={:?}", ico_sizes));
-                                    let stem = input.file_stem().unwrap_or_default().to_string_lossy();
-                                    let parent = input.parent().unwrap();
-                                    let mut all_ok = true;
-                                    for &sz in &ico_sizes {
-                                        let ico_out = parent.join(format!("{}_{sz}x{sz}.ico", stem));
-                                        let ico_str = ico_out.to_string_lossy().to_string();
-                                        log_info(&format!("ICO entry: {}x{} -> {}", sz, sz, ico_str));
-                                        if !modules::pic::generer_ico_multi(&input, &ico_str, &[sz]) {
-                                            log_error(&format!("pic::generer_ico_multi failed | {}x{} | {:?}", sz, sz, input));
-                                            all_ok = false;
+                                    match input.parent() {
+                                        None => Err(format!("ICO: fichier sans dossier parent | {:?}", input)),
+                                        Some(parent) => {
+                                            let stem = input.file_stem().unwrap_or_default().to_string_lossy();
+                                            let mut all_ok = true;
+                                            for &sz in &ico_sizes {
+                                                let ico_out = parent.join(format!("{}_{sz}x{sz}.ico", stem));
+                                                log_info(&format!("ICO entry: {}x{} -> {:?}", sz, sz, ico_out));
+                                                if !modules::pic::generer_ico_multi(&input, &ico_out, &[sz]) {
+                                                    log_error(&format!("pic::generer_ico_multi failed | {}x{} | {:?}", sz, sz, input));
+                                                    all_ok = false;
+                                                }
+                                            }
+                                            if all_ok { Ok(()) }
+                                            else { Err(format!("ICO: some sizes failed | {:?}", input)) }
                                         }
                                     }
-                                    if all_ok { Ok(()) }
-                                    else { Err(format!("ICO: some sizes failed | {:?}", input)) }
                                 } else if convert_resize_w > 0 && convert_resize_h > 0 {
                                     // Resize before converting
                                     log_info(&format!("Image Convert+resize: {}x{} fmt={}", convert_resize_w, convert_resize_h, fmt));
-                                    let temp = format!("{}_temp_cvt.png", out_str);
+                                    let mut temp_name = output.as_os_str().to_os_string();
+                                    temp_name.push("_temp_cvt.png");
+                                    let temp = PathBuf::from(temp_name);
                                     if modules::pic::redimensionner_pixels(&input, &temp, convert_resize_w, convert_resize_h) {
-                                        let result = if modules::pic::compresser(Path::new(&temp), &out_str, ratio) { Ok(()) }
+                                        let result = if modules::pic::compresser(&temp, &output, ratio) { Ok(()) }
                                         else { Err(format!("pic::compresser after resize failed | {:?}", input)) };
                                         let _ = std::fs::remove_file(&temp);
                                         result
@@ -1022,7 +1046,7 @@ impl OxytoolsApp {
                                         Err(format!("pic::resize for convert failed | {}x{} | {:?}", convert_resize_w, convert_resize_h, input))
                                     }
                                 } else {
-                                    if modules::pic::compresser(&input, &out_str, ratio) { Ok(()) }
+                                    if modules::pic::compresser(&input, &output, ratio) { Ok(()) }
                                     else { Err(format!("pic::compresser failed | fmt={} ratio={} | {:?}", fmt, ratio, input)) }
                                 }
                             },
@@ -1030,9 +1054,11 @@ impl OxytoolsApp {
                                 log_info(&format!("Image resize: w={} h={} kb={}", resize_w, resize_h, resize_kb));
                                 if resize_w > 0 && resize_h > 0 {
                                     if resize_kb > 0 {
-                                        let temp = format!("{}_temp.{}", out_str, fmt);
+                                        let mut temp_name = output.as_os_str().to_os_string();
+                                        temp_name.push(format!("_temp.{}", fmt));
+                                        let temp = PathBuf::from(temp_name);
                                         if modules::pic::redimensionner_pixels(&input, &temp, resize_w, resize_h) {
-                                            if modules::pic::redimensionner_poids(Path::new(&temp), &out_str, resize_kb) {
+                                            if modules::pic::redimensionner_poids(&temp, &output, resize_kb) {
                                                 Ok(())
                                             } else {
                                                 Err(format!("resize by size failed | max_kb={} | file={:?}", resize_kb, input))
@@ -1041,56 +1067,60 @@ impl OxytoolsApp {
                                             Err(format!("resize by pixels failed | w={} h={} | file={:?}", resize_w, resize_h, input))
                                         }
                                     } else {
-                                        if modules::pic::redimensionner_pixels(&input, &out_str, resize_w, resize_h) { Ok(()) }
+                                        if modules::pic::redimensionner_pixels(&input, &output, resize_w, resize_h) { Ok(()) }
                                         else { Err(format!("resize by pixels failed | w={} h={} | file={:?}", resize_w, resize_h, input)) }
                                     }
                                 } else if resize_kb > 0 {
-                                    if modules::pic::redimensionner_poids(&input, &out_str, resize_kb) { Ok(()) }
+                                    if modules::pic::redimensionner_poids(&input, &output, resize_kb) { Ok(()) }
                                     else { Err(format!("resize by size only failed | max_kb={} | file={:?}", resize_kb, input)) }
                                 } else {
                                     log_warn("Image resize: no w/h or kb specified, fallback to compress");
-                                    if modules::pic::compresser(&input, &out_str, 1) { Ok(()) }
+                                    if modules::pic::compresser(&input, &output, 1) { Ok(()) }
                                     else { Err(format!("pic::compresser fallback failed for {:?}", input)) }
                                 }
                             },
                             "rotate" => {
                                 log_info(&format!("Image rotate: angle={}", angle));
-                                if modules::pic::pivoter(&input, &out_str, angle) { Ok(()) }
+                                if modules::pic::pivoter(&input, &output, angle) { Ok(()) }
                                 else { Err(format!("pic::rotate failed | angle={} | file={:?}", angle, input)) }
                             },
                             "crop" => {
                                 log_info(&format!("Image crop: x={} y={} w={} h={}", crop_x, crop_y, crop_w, crop_h));
-                                if modules::pic::recadrer(&input, &out_str, crop_x, crop_y, crop_w, crop_h) { Ok(()) }
+                                if modules::pic::recadrer(&input, &output, crop_x, crop_y, crop_w, crop_h) { Ok(()) }
                                 else { Err(format!("pic::crop failed | x={} y={} w={} h={} | file={:?}", crop_x, crop_y, crop_w, crop_h, input)) }
                             },
                             "watermark" => {
                                 log_info(&format!("Image watermark: texte='{}' taille={} opacite={}", img_wm_texte, img_wm_taille, img_wm_opacite));
-                                if modules::pic::watermark(&input, &out_str, &img_wm_texte, img_wm_taille, img_wm_opacite) { Ok(()) }
+                                if modules::pic::watermark(&input, &output, &img_wm_texte, img_wm_taille, img_wm_opacite) { Ok(()) }
                                 else { Err(format!("pic::watermark failed for {:?}", input)) }
                             },
                             "meme" => {
                                 log_info(&format!("Image meme: top='{}' bottom='{}'", img_meme_top, img_meme_bottom));
-                                if modules::pic::meme(&input, &out_str, &img_meme_top, &img_meme_bottom) { Ok(()) }
+                                if modules::pic::meme(&input, &output, &img_meme_top, &img_meme_bottom) { Ok(()) }
                                 else { Err(format!("pic::meme failed for {:?}", input)) }
                             },
                             "upscale" => {
                                 log_info(&format!("Image upscale: factor={}x", img_upscale_factor));
-                                if modules::pic::upscale(&input, &out_str, img_upscale_factor) { Ok(()) }
+                                if modules::pic::upscale(&input, &output, img_upscale_factor) { Ok(()) }
                                 else { Err(format!("pic::upscale failed for {:?}", input)) }
                             },
                             "html_to_image" => {
-                                let png_out = input.parent().unwrap().join(format!(
-                                    "{}_oxytools.png",
-                                    input.file_stem().unwrap_or_default().to_string_lossy()
-                                ));
-                                let png_str = png_out.to_str().unwrap().to_string();
-                                log_info(&format!("Image html_to_image: {:?} -> {}", input, png_str));
-                                if modules::pic::html_to_image(&input, &png_str, 1024) { Ok(()) }
-                                else { Err(format!("pic::html_to_image failed for {:?}", input)) }
+                                match input.parent() {
+                                    None => Err(format!("html_to_image: fichier sans dossier parent | {:?}", input)),
+                                    Some(parent) => {
+                                        let png_out = parent.join(format!(
+                                            "{}_oxytools.png",
+                                            input.file_stem().unwrap_or_default().to_string_lossy()
+                                        ));
+                                        log_info(&format!("Image html_to_image: {:?} -> {:?}", input, png_out));
+                                        if modules::pic::html_to_image(&input, &png_out, 1024) { Ok(()) }
+                                        else { Err(format!("pic::html_to_image failed for {:?}", input)) }
+                                    }
+                                }
                             },
                             autre => {
                                 log_warn(&format!("Image: action inconnue '{}', fallback compresser", autre));
-                                if modules::pic::compresser(&input, &out_str, ratio) { Ok(()) }
+                                if modules::pic::compresser(&input, &output, ratio) { Ok(()) }
                                 else { Err(format!("pic::compresser fallback failed for {:?}", input)) }
                             },
                         }
@@ -1122,15 +1152,15 @@ impl OxytoolsApp {
                     }
                 }
 
-                *active.lock().unwrap() -= 1;
-                *completed.lock().unwrap() += 1;
-                let done = *completed.lock().unwrap();
-                let total_count = *total.lock().unwrap();
+                *active.lock().unwrap_or_else(|e| e.into_inner()) -= 1;
+                *completed.lock().unwrap_or_else(|e| e.into_inner()) += 1;
+                let done = *completed.lock().unwrap_or_else(|e| e.into_inner());
+                let total_count = *total.lock().unwrap_or_else(|e| e.into_inner());
                 if done >= total_count {
                     log_info(&format!("=== BATCH END | {}/{} files processed ===", done, total_count));
-                    *status_arc.lock().unwrap() = crate::lang::fmt2(lang.done_files, &done.to_string(), &total_count.to_string());
+                    *status_arc.lock().unwrap_or_else(|e| e.into_inner()) = crate::lang::fmt2(lang.done_files, &done.to_string(), &total_count.to_string());
                 } else {
-                    *status_arc.lock().unwrap() = crate::lang::fmt2(lang.processing_files, &done.to_string(), &total_count.to_string());
+                    *status_arc.lock().unwrap_or_else(|e| e.into_inner()) = crate::lang::fmt2(lang.processing_files, &done.to_string(), &total_count.to_string());
                 }
                 ctx.request_repaint();
             }
@@ -1205,7 +1235,7 @@ fn wait_ffmpeg_with_progress(
 
     // Enregistrer le PID pour pouvoir killer depuis on_exit
     let pid = child.id();
-    active_pids.lock().unwrap().push(pid);
+    active_pids.lock().unwrap_or_else(|e| e.into_inner()).push(pid);
 
     let stderr = child.stderr.take();
     let (tx, rx) = std::sync::mpsc::channel::<String>();
@@ -1231,7 +1261,7 @@ fn wait_ffmpeg_with_progress(
         });
     }
 
-    *conv_progress.lock().unwrap() = 0.0;
+    *conv_progress.lock().unwrap_or_else(|e| e.into_inner()) = 0.0;
 
     loop {
         for line in rx.try_iter() {
@@ -1239,22 +1269,22 @@ fn wait_ffmpeg_with_progress(
                 let time_str = line[pos + 5..].split_whitespace().next().unwrap_or("");
                 if let (Some(elapsed), Some(total)) = (parse_time_to_secs(time_str), duration_secs) {
                     if total > 0.0 {
-                        *conv_progress.lock().unwrap() = (elapsed / total).min(1.0) as f32;
+                        *conv_progress.lock().unwrap_or_else(|e| e.into_inner()) = (elapsed / total).min(1.0) as f32;
                     }
                 }
             }
         }
         match child.try_wait() {
             Ok(Some(status)) => {
-                *conv_progress.lock().unwrap() = -1.0;
-                active_pids.lock().unwrap().retain(|&p| p != pid);
+                *conv_progress.lock().unwrap_or_else(|e| e.into_inner()) = -1.0;
+                active_pids.lock().unwrap_or_else(|e| e.into_inner()).retain(|&p| p != pid);
                 return if status.success() { Ok(()) }
                        else { Err(format!("ffmpeg exited with code {:?}", status.code())) };
             }
             Ok(None) => std::thread::sleep(std::time::Duration::from_millis(100)),
             Err(e) => {
-                *conv_progress.lock().unwrap() = -1.0;
-                active_pids.lock().unwrap().retain(|&p| p != pid);
+                *conv_progress.lock().unwrap_or_else(|e| e.into_inner()) = -1.0;
+                active_pids.lock().unwrap_or_else(|e| e.into_inner()).retain(|&p| p != pid);
                 return Err(format!("wait error: {}", e));
             }
         }
@@ -1264,14 +1294,14 @@ fn wait_ffmpeg_with_progress(
 impl eframe::App for OxytoolsApp {
     fn on_exit(&mut self) {
         // Kill tous les process ffmpeg en cours à la fermeture
-        let pids = self.active_pids.lock().unwrap().clone();
+        let pids = self.active_pids.lock().unwrap_or_else(|e| e.into_inner()).clone();
         for pid in pids {
             #[cfg(unix)]
             { let _ = std::process::Command::new("kill").arg(pid.to_string()).status(); }
             #[cfg(windows)]
             { let _ = std::process::Command::new("taskkill").args(["/PID", &pid.to_string(), "/F"]).status(); }
         }
-        self.active_pids.lock().unwrap().clear();
+        self.active_pids.lock().unwrap_or_else(|e| e.into_inner()).clear();
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
@@ -1316,15 +1346,15 @@ impl eframe::App for OxytoolsApp {
                     self.current_stem = p.file_stem().unwrap_or_default().to_string_lossy().to_string();
                 }
                 #[cfg(feature = "api")]
-                self.results_ui.lock().unwrap().clear();
+                self.results_ui.lock().unwrap_or_else(|e| e.into_inner()).clear();
                 if !self.current_files.is_empty() {
-                    *self.status.lock().unwrap() = self.lang.files_loaded.replace("{}", &self.current_files.len().to_string());
+                    *self.status.lock().unwrap_or_else(|e| e.into_inner()) = self.lang.files_loaded.replace("{}", &self.current_files.len().to_string());
                 }
             }
         });
         if let Some(ref mut c) = self.process {
             if let Ok(Some(_)) = c.try_wait() {
-                *self.status.lock().unwrap() = self.lang.done.into();
+                *self.status.lock().unwrap_or_else(|e| e.into_inner()) = self.lang.done.into();
                 self.process = None;
             }
             ctx.request_repaint();
@@ -1344,7 +1374,6 @@ impl eframe::App for OxytoolsApp {
                 mods.push((ModuleType::Rename, self.lang.tab_rename));
                 #[cfg(feature = "api")] mods.push((ModuleType::Scrapper, self.lang.tab_scrapper));
                 #[cfg(feature = "api")] mods.push((ModuleType::Tag, self.lang.tab_tag));
-                mods.push((ModuleType::Tools, self.lang.tab_tools));
                 #[cfg(feature = "api")] mods.push((ModuleType::Video, self.lang.tab_video));
                 mods.push((ModuleType::Settings, self.lang.tab_settings));
                 for (m, txt) in mods {
@@ -1444,12 +1473,13 @@ impl eframe::App for OxytoolsApp {
                                     .filter(|s| !s.is_empty())
                                     .collect();
                                 let source = std::path::Path::new(&self.archive_backup_source);
-                                match modules::archive::backup_zip(source, &self.archive_backup_dest, &exclusions) {
+                                let dest = std::path::Path::new(&self.archive_backup_dest);
+                                match modules::archive::backup_zip(source, dest, &exclusions) {
                                     Ok(path) => {
-                                        *self.status.lock().unwrap() = format!("✅ Backup: {}", path);
+                                        *self.status.lock().unwrap_or_else(|e| e.into_inner()) = format!("✅ Backup: {}", path);
                                     }
                                     Err(e) => {
-                                        *self.status.lock().unwrap() = format!("⚠️ Backup: {}", e);
+                                        *self.status.lock().unwrap_or_else(|e| e.into_inner()) = format!("⚠️ Backup: {}", e);
                                     }
                                 }
                             }
@@ -1489,7 +1519,7 @@ impl eframe::App for OxytoolsApp {
                                             .filter(|p| p.is_dir())
                                             .collect();
                                         if self.current_files.is_empty() {
-                                            *self.status.lock().unwrap() = "No subfolders found.".into();
+                                            *self.status.lock().unwrap_or_else(|e| e.into_inner()) = "No subfolders found.".into();
                                         } else {
                                             crate::log_info(&format!(
                                                 "Archive multi: {} subfolders found in {:?}",
@@ -1499,7 +1529,7 @@ impl eframe::App for OxytoolsApp {
                                         }
                                     }
                                     Err(e) => {
-                                        *self.status.lock().unwrap() = format!("⚠️ {}", e);
+                                        *self.status.lock().unwrap_or_else(|e| e.into_inner()) = format!("⚠️ {}", e);
                                     }
                                 }
                             }
@@ -2079,12 +2109,12 @@ impl eframe::App for OxytoolsApp {
                         let lang = self.lang;
                         let tmdb_key = self.tmdb_api_key.clone();
                         let search = |is_series: bool, res_arc: Arc<Mutex<Vec<ScrapeEntry>>>, stem: String, ctx_c: egui::Context, status_c: Arc<Mutex<String>>, tk: String, nrf: Arc<Mutex<bool>>| {
-                            res_arc.lock().unwrap().clear();
+                            res_arc.lock().unwrap_or_else(|e| e.into_inner()).clear();
                             std::thread::spawn(move || {
                                 match modules::scrap::search_tmdb(&stem, is_series, &tk) {
                                     Ok(results) if results.is_empty() => {
-                                        *status_c.lock().unwrap() = lang.scrap_no_results.into();
-                                        *nrf.lock().unwrap() = true;
+                                        *status_c.lock().unwrap_or_else(|e| e.into_inner()) = lang.scrap_no_results.into();
+                                        *nrf.lock().unwrap_or_else(|e| e.into_inner()) = true;
                                         ctx_c.request_repaint();
                                     }
                                     Ok(results) => {
@@ -2099,12 +2129,12 @@ impl eframe::App for OxytoolsApp {
                                                     );
                                                     ctx_c.load_texture(format!("p_{}", r.id), ci, Default::default())
                                                 });
-                                            res_arc.lock().unwrap().push(ScrapeEntry { data: r, texture: tex });
+                                            res_arc.lock().unwrap_or_else(|e| e.into_inner()).push(ScrapeEntry { data: r, texture: tex });
                                             ctx_c.request_repaint();
                                         }
                                     }
                                     Err(e) => {
-                                        *status_c.lock().unwrap() = format!("⚠️ {}", e);
+                                        *status_c.lock().unwrap_or_else(|e| e.into_inner()) = format!("⚠️ {}", e);
                                         ctx_c.request_repaint();
                                     }
                                 }
@@ -2113,7 +2143,7 @@ impl eframe::App for OxytoolsApp {
                         let no_result_flag = Arc::clone(&self.no_result_flag);
                         if ui.button(self.lang.scrap_movie).clicked() {
                             if tmdb_key.is_empty() {
-                                *self.status.lock().unwrap() = self.lang.scrap_error_no_key.into();
+                                *self.status.lock().unwrap_or_else(|e| e.into_inner()) = self.lang.scrap_error_no_key.into();
                             } else {
                                 self.scrap_last_is_series = false;
                                 search(false, Arc::clone(&self.results_ui), self.current_stem.clone(), ctx.clone(), Arc::clone(&status_arc), tmdb_key.clone(), Arc::clone(&no_result_flag));
@@ -2121,7 +2151,7 @@ impl eframe::App for OxytoolsApp {
                         }
                         if ui.button(self.lang.scrap_series).clicked() {
                             if tmdb_key.is_empty() {
-                                *self.status.lock().unwrap() = self.lang.scrap_error_no_key.into();
+                                *self.status.lock().unwrap_or_else(|e| e.into_inner()) = self.lang.scrap_error_no_key.into();
                             } else {
                                 self.scrap_last_is_series = true;
                                 let query = if let Some((title, _)) = modules::scrap::detect_series(&self.current_files) {
@@ -2135,8 +2165,8 @@ impl eframe::App for OxytoolsApp {
                     });
 
                     // Vérifier le flag no_result entre les frames et ouvrir la popup
-                    if *self.no_result_flag.lock().unwrap() {
-                        *self.no_result_flag.lock().unwrap() = false;
+                    if *self.no_result_flag.lock().unwrap_or_else(|e| e.into_inner()) {
+                        *self.no_result_flag.lock().unwrap_or_else(|e| e.into_inner()) = false;
                         self.scrap_popup_query = Some(self.current_stem.clone());
                     }
 
@@ -2160,7 +2190,7 @@ impl eframe::App for OxytoolsApp {
                                     let is_series2 = self.scrap_last_is_series;
                                     if ui.button(self.lang.scrap_retry_search).clicked() {
                                         self.scrap_popup_query = None;
-                                        res2.lock().unwrap().clear();
+                                        res2.lock().unwrap_or_else(|e| e.into_inner()).clear();
 
                                         // Détecter si c'est un ID numérique ou une URL TMDB
                                         let trimmed = query2.trim().to_string();
@@ -2183,7 +2213,7 @@ impl eframe::App for OxytoolsApp {
                                             };
                                             match result {
                                                 Ok(results) if results.is_empty() => {
-                                                    *status_arc2.lock().unwrap() = lang2.scrap_no_results.into();
+                                                    *status_arc2.lock().unwrap_or_else(|e| e.into_inner()) = lang2.scrap_no_results.into();
                                                     ctx2.request_repaint();
                                                 }
                                                 Ok(results) => {
@@ -2198,12 +2228,12 @@ impl eframe::App for OxytoolsApp {
                                                                 );
                                                                 ctx2.load_texture(format!("p_{}", r.id), ci, Default::default())
                                                             });
-                                                        res2.lock().unwrap().push(ScrapeEntry { data: r, texture: tex });
+                                                        res2.lock().unwrap_or_else(|e| e.into_inner()).push(ScrapeEntry { data: r, texture: tex });
                                                         ctx2.request_repaint();
                                                     }
                                                 }
                                                 Err(e) => {
-                                                    *status_arc2.lock().unwrap() = format!("⚠️ {}", e);
+                                                    *status_arc2.lock().unwrap_or_else(|e| e.into_inner()) = format!("⚠️ {}", e);
                                                     ctx2.request_repaint();
                                                 }
                                             }
@@ -2218,7 +2248,7 @@ impl eframe::App for OxytoolsApp {
                     }
 
                     // ── Résultats avec année + images plus grandes + plein écran (point 3) ──
-                    let entries = self.results_ui.lock().unwrap().clone();
+                    let entries = self.results_ui.lock().unwrap_or_else(|e| e.into_inner()).clone();
                     egui::ScrollArea::vertical().max_height(400.0).show(ui, |ui| {
                         for entry in &entries {
                             ui.horizontal(|ui| {
@@ -2303,7 +2333,7 @@ impl eframe::App for OxytoolsApp {
                                         Err(e) => { crate::log_error(&format!("marquer_vu {:?}: {}", path, e)); err += 1; }
                                     }
                                 }
-                                *self.status.lock().unwrap() = format!("✅ {ok} VU | ⚠️ {err}");
+                                *self.status.lock().unwrap_or_else(|e| e.into_inner()) = format!("✅ {ok} VU | ⚠️ {err}");
                             }
                             if ui.button(self.lang.tag_inject_nfo).clicked() {
                                 let (mut ok, mut err) = (0usize, 0usize);
@@ -2318,7 +2348,7 @@ impl eframe::App for OxytoolsApp {
                                         Err(e) => { crate::log_error(&format!("appliquer_tags {:?}: {}", path, e)); err += 1; }
                                     }
                                 }
-                                *self.status.lock().unwrap() = format!("✅ {ok} NFO | ⚠️ {err}");
+                                *self.status.lock().unwrap_or_else(|e| e.into_inner()) = format!("✅ {ok} NFO | ⚠️ {err}");
                             }
                             if ui.button(self.lang.tag_add_poster).clicked() {
                                 let (mut ok, mut err) = (0usize, 0usize);
@@ -2337,7 +2367,7 @@ impl eframe::App for OxytoolsApp {
                                         Err(e) => { crate::log_error(&format!("ajouter_images {:?}: {}", path, e)); err += 1; }
                                     }
                                 }
-                                *self.status.lock().unwrap() = format!("✅ {ok} images | ⚠️ {err}");
+                                *self.status.lock().unwrap_or_else(|e| e.into_inner()) = format!("✅ {ok} images | ⚠️ {err}");
                             }
 
                             // ── Inject NFO + Poster avec checkboxes custom ───
@@ -2365,7 +2395,7 @@ impl eframe::App for OxytoolsApp {
                                             (Err(e), _) | (_, Err(e)) => { crate::log_error(&format!("{:?}: {}", path, e)); err += 1; }
                                         }
                                     }
-                                    *self.status.lock().unwrap() = format!("✅ {ok} NFO+poster | ⚠️ {err}");
+                                    *self.status.lock().unwrap_or_else(|e| e.into_inner()) = format!("✅ {ok} NFO+poster | ⚠️ {err}");
                                 }
                                 // Checkbox NFO custom
                                 ui.checkbox(&mut self.use_custom_nfo, self.lang.tag_custom_nfo);
@@ -2404,7 +2434,7 @@ impl eframe::App for OxytoolsApp {
                                         Err(e) => { crate::log_error(&format!("supprimer_tags {:?}: {}", path, e)); err += 1; }
                                     }
                                 }
-                                *self.status.lock().unwrap() = format!("✅ {ok} reset | ⚠️ {err}");
+                                *self.status.lock().unwrap_or_else(|e| e.into_inner()) = format!("✅ {ok} reset | ⚠️ {err}");
                             }
                             ui.horizontal(|ui| {
                                 ui.text_edit_singleline(&mut self.tag_edit_val);
@@ -2417,7 +2447,7 @@ impl eframe::App for OxytoolsApp {
                                             Err(e) => { crate::log_error(&format!("modifier_tag {:?}: {}", path, e)); err += 1; }
                                         }
                                     }
-                                    *self.status.lock().unwrap() = format!("✅ {ok} title | ⚠️ {err}");
+                                    *self.status.lock().unwrap_or_else(|e| e.into_inner()) = format!("✅ {ok} title | ⚠️ {err}");
                                 }
                             });
                         });
@@ -2788,146 +2818,6 @@ impl eframe::App for OxytoolsApp {
                         }
                     });
                 },
-                ModuleType::Tools => {
-                    ui.vertical(|ui| {
-                        ui.heading("🛠 Tools");
-                        ui.separator();
-
-                        // ── Dossier de sortie ──
-                        ui.horizontal(|ui| {
-                            ui.label("Output folder:");
-                            ui.add(egui::TextEdit::singleline(&mut self.tools_cfg.list_dir).desired_width(300.0));
-                            if ui.button("📂").clicked() {
-                                if let Some(path) = rfd::FileDialog::new().pick_folder() {
-                                    self.tools_cfg.list_dir = path.to_string_lossy().to_string();
-                                    self.save_config();
-                                }
-                            }
-                        });
-
-                        ui.separator();
-
-                        // ── File Sources ──
-                        ui.collapsing("📁 File Sources (files listing)", |ui| {
-                            // Tableau existant
-                            let mut to_remove: Option<String> = None;
-                            if !self.tools_cfg.file_sources.is_empty() {
-                                egui::ScrollArea::vertical().max_height(150.0).id_salt("tools_files_scroll").show(ui, |ui| {
-                                    egui::Grid::new("tools_files_grid").striped(true).show(ui, |ui| {
-                                        ui.strong("Name");
-                                        ui.strong("Path");
-                                        ui.label("");
-                                        ui.end_row();
-                                        for (name, path) in &self.tools_cfg.file_sources {
-                                            ui.label(name);
-                                            ui.label(path);
-                                            if ui.small_button("🗑").clicked() {
-                                                to_remove = Some(name.clone());
-                                            }
-                                            ui.end_row();
-                                        }
-                                    });
-                                });
-                            }
-                            if let Some(key) = to_remove {
-                                self.tools_cfg.file_sources.remove(&key);
-                                self.save_config();
-                            }
-                            // Ajouter
-                            ui.horizontal(|ui| {
-                                ui.label("Name:");
-                                ui.add(egui::TextEdit::singleline(&mut self.tools_new_name).desired_width(100.0));
-                                ui.label("Path:");
-                                ui.add(egui::TextEdit::singleline(&mut self.tools_new_path).desired_width(200.0));
-                                if ui.button("📂").clicked() {
-                                    if let Some(path) = rfd::FileDialog::new().pick_folder() {
-                                        self.tools_new_path = path.to_string_lossy().to_string();
-                                    }
-                                }
-                                if ui.button("➕").clicked() && !self.tools_new_name.is_empty() && !self.tools_new_path.is_empty() {
-                                    self.tools_cfg.file_sources.insert(
-                                        self.tools_new_name.clone(),
-                                        self.tools_new_path.clone(),
-                                    );
-                                    self.tools_new_name.clear();
-                                    self.tools_new_path.clear();
-                                    self.save_config();
-                                }
-                            });
-                        });
-
-                        // ── Folder Sources ──
-                        ui.collapsing("📂 Folder Sources (directory listing)", |ui| {
-                            let mut to_remove_idx: Option<usize> = None;
-                            if !self.tools_cfg.folder_sources.is_empty() {
-                                egui::ScrollArea::vertical().max_height(120.0).id_salt("tools_folders_scroll").show(ui, |ui| {
-                                    for (i, src) in self.tools_cfg.folder_sources.iter().enumerate() {
-                                        ui.horizontal(|ui| {
-                                            ui.label(src);
-                                            if ui.small_button("🗑").clicked() {
-                                                to_remove_idx = Some(i);
-                                            }
-                                        });
-                                    }
-                                });
-                            }
-                            if let Some(i) = to_remove_idx {
-                                self.tools_cfg.folder_sources.remove(i);
-                                self.save_config();
-                            }
-                            ui.horizontal(|ui| {
-                                ui.label("Path:");
-                                ui.add(egui::TextEdit::singleline(&mut self.tools_new_folder).desired_width(250.0));
-                                if ui.button("📂").clicked() {
-                                    if let Some(path) = rfd::FileDialog::new().pick_folder() {
-                                        self.tools_new_folder = path.to_string_lossy().to_string();
-                                    }
-                                }
-                                if ui.button("➕").clicked() && !self.tools_new_folder.is_empty() {
-                                    self.tools_cfg.folder_sources.push(self.tools_new_folder.clone());
-                                    self.tools_new_folder.clear();
-                                    self.save_config();
-                                }
-                            });
-                        });
-
-                        ui.separator();
-
-                        // ── Boutons d'exécution ──
-                        let can_run = !self.tools_cfg.list_dir.is_empty() && !self.tools_cfg.is_empty();
-                        ui.add_enabled_ui(can_run, |ui| {
-                        ui.horizontal(|ui| {
-                            if ui.button("📋 List Files").clicked() {
-                                let (ok, errs) = modules::tools::lister_fichiers(&self.tools_cfg);
-                                if errs.is_empty() {
-                                    self.tools_result = format!("✅ {} sources processed → {}", ok, self.tools_cfg.list_dir);
-                                } else {
-                                    self.tools_result = format!("✅ {} ok | ⚠️ {}\n{}", ok, errs.len(), errs.join("\n"));
-                                }
-                                crate::log_info(&format!("Tools lister_fichiers: ok={} err={}", ok, errs.len()));
-                            }
-                            if ui.button("📂 List Folders").clicked() {
-                                let (ok, errs) = modules::tools::lister_dossiers(&self.tools_cfg);
-                                if errs.is_empty() {
-                                    self.tools_result = format!("✅ {} sources → multimedia.txt in {}", ok, self.tools_cfg.list_dir);
-                                } else {
-                                    self.tools_result = format!("✅ {} ok | ⚠️ {}\n{}", ok, errs.len(), errs.join("\n"));
-                                }
-                                crate::log_info(&format!("Tools lister_dossiers: ok={} err={}", ok, errs.len()));
-                            }
-                        }); // horizontal
-                        }); // add_enabled_ui
-                        if !can_run {
-                            ui.colored_label(egui::Color32::YELLOW, "Configure output folder and at least one source above.");
-                        }
-
-                        // ── Résultat ──
-                        if !self.tools_result.is_empty() {
-                            ui.separator();
-                            ui.label(&self.tools_result);
-                        }
-                    });
-                },
                 ModuleType::Settings => {
                     ui.vertical(|ui| {
                         ui.heading(self.lang.settings_heading);
@@ -3002,13 +2892,13 @@ impl eframe::App for OxytoolsApp {
                             if log_path.exists() {
                                 let _ = open::that(&log_path);
                             } else {
-                                *self.status.lock().unwrap() = "No log file found.".into();
+                                *self.status.lock().unwrap_or_else(|e| e.into_inner()) = "No log file found.".into();
                             }
                         }
                     });
                 },
             }
-            let mut hide_exec = self.module_actif == ModuleType::Settings || self.module_actif == ModuleType::Rename || self.module_actif == ModuleType::Tools;
+            let mut hide_exec = self.module_actif == ModuleType::Settings || self.module_actif == ModuleType::Rename;
             #[cfg(feature = "api")]
             { hide_exec = hide_exec || self.module_actif == ModuleType::Scrapper || self.module_actif == ModuleType::Tag; }
             if !self.current_files.is_empty() && !hide_exec {
@@ -3029,8 +2919,8 @@ impl eframe::App for OxytoolsApp {
                                     self.current_stem = p.file_stem().unwrap_or_default().to_string_lossy().to_string();
                                 }
                                 #[cfg(feature = "api")]
-                                self.results_ui.lock().unwrap().clear();
-                                *self.status.lock().unwrap() = self.lang.files_loaded.replace("{}", &self.current_files.len().to_string());
+                                self.results_ui.lock().unwrap_or_else(|e| e.into_inner()).clear();
+                                *self.status.lock().unwrap_or_else(|e| e.into_inner()) = self.lang.files_loaded.replace("{}", &self.current_files.len().to_string());
                             }
                         }
                     });
@@ -3038,9 +2928,9 @@ impl eframe::App for OxytoolsApp {
             }
             ui.add_space(10.0);
             ui.vertical_centered(|ui| {
-                let completed = *self.completed_jobs.lock().unwrap();
-                let total = *self.total_jobs.lock().unwrap();
-                let ff_progress = *self.conv_progress.lock().unwrap();
+                let completed = *self.completed_jobs.lock().unwrap_or_else(|e| e.into_inner());
+                let total = *self.total_jobs.lock().unwrap_or_else(|e| e.into_inner());
+                let ff_progress = *self.conv_progress.lock().unwrap_or_else(|e| e.into_inner());
 
                 if ff_progress >= 0.0 {
                     // Conversion ffmpeg en cours — barre de progression du fichier courant
@@ -3048,15 +2938,15 @@ impl eframe::App for OxytoolsApp {
                     ui.heading(format!("⚙️ {} {}%", completed + 1, pct));
                     ui.add(egui::ProgressBar::new(ff_progress).animate(false));
                 } else if total > 0 && completed < total {
-                    let active = *self.active_jobs.lock().unwrap();
+                    let active = *self.active_jobs.lock().unwrap_or_else(|e| e.into_inner());
                     let pct = (completed as f32 / total as f32 * 100.0).round() as u32;
                     ui.heading(crate::lang::fmt3(self.lang.processing_pct, &completed.to_string(), &total.to_string(), &pct.to_string()));
                     ui.add(egui::ProgressBar::new(completed as f32 / total as f32).animate(true));
-                    ui.small(crate::lang::fmt2(self.lang.active_pending, &active.to_string(), &self.job_queue.lock().unwrap().len().to_string()));
+                    ui.small(crate::lang::fmt2(self.lang.active_pending, &active.to_string(), &self.job_queue.lock().unwrap_or_else(|e| e.into_inner()).len().to_string()));
                 } else if total > 0 && completed >= total {
                     ui.heading(self.lang.done_processed.replace("{}", &total.to_string()));
                 } else {
-                    ui.heading(&*self.status.lock().unwrap());
+                    ui.heading(&*self.status.lock().unwrap_or_else(|e| e.into_inner()));
                 }
                 if ff_progress >= 0.0 {
                     ctx.request_repaint_after(std::time::Duration::from_millis(100));

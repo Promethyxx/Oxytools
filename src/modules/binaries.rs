@@ -38,6 +38,16 @@ mod embedded {
 }
 
 // ════════════════════════════════════════════════════════════════════════
+//  INTÉGRITÉ — SHA-256 des binaires embarqués/extraits
+// ════════════════════════════════════════════════════════════════════════
+fn sha256_hex(data: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+    let mut hasher = Sha256::new();
+    hasher.update(data);
+    format!("{:x}", hasher.finalize())
+}
+
+// ════════════════════════════════════════════════════════════════════════
 //  EXTRACTION
 // ════════════════════════════════════════════════════════════════════════
 pub fn extraire_deps() -> Result<(), String> {
@@ -48,19 +58,48 @@ pub fn extraire_deps() -> Result<(), String> {
         if !temp_dir.exists() {
             std::fs::create_dir_all(&temp_dir).map_err(|e| e.to_string())?;
         }
+
+        // Restreint l'accès au dossier au seul propriétaire du process.
+        // Empêche un autre utilisateur de la machine de lire, remplacer
+        // ou pré-créer les binaires avant nous (multi-utilisateur / TOCTOU).
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&temp_dir, std::fs::Permissions::from_mode(0o700))
+                .map_err(|e| e.to_string())?;
+        }
+
         let f = |name: &str, bytes: &[u8]| -> Result<(), String> {
             let path = temp_dir.join(name);
-            if !path.exists() {
+            let expected = sha256_hex(bytes);
+
+            // Ré-extrait si absent OU si le contenu sur disque ne correspond
+            // plus au binaire embarqué (corruption, extraction interrompue,
+            // ou fichier remplacé entre deux lancements).
+            let deja_valide = path.exists()
+                && std::fs::read(&path)
+                    .map(|existing| sha256_hex(&existing) == expected)
+                    .unwrap_or(false);
+
+            if !deja_valide {
                 std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
                 #[cfg(unix)]
                 {
                     use std::os::unix::fs::PermissionsExt;
                     std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755))
-                    .map_err(|e| e.to_string())?;
+                        .map_err(|e| e.to_string())?;
                 }
                 crate::log_info(&format!("binaries::extraire_deps | extrait {}", name));
             } else {
-                crate::log_info(&format!("binaries::extraire_deps | déjà présent {}", name));
+                crate::log_info(&format!("binaries::extraire_deps | déjà présent et vérifié {}", name));
+            }
+
+            // Vérification finale : ce qui est sur le disque doit correspondre
+            // exactement à ce qui est embarqué dans le binaire, sans quoi on
+            // refuse d'utiliser ce fichier.
+            let on_disk = std::fs::read(&path).map_err(|e| e.to_string())?;
+            if sha256_hex(&on_disk) != expected {
+                return Err(format!("binaries::extraire_deps | vérification d'intégrité échouée pour {}", name));
             }
             Ok(())
         };
@@ -82,6 +121,7 @@ pub fn extraire_deps() -> Result<(), String> {
 //  HELPERS
 // ════════════════════════════════════════════════════════════════════════
 pub fn silent_cmd(program: PathBuf) -> Command {
+    #[cfg_attr(not(target_os = "windows"), allow(unused_mut))]
     let mut cmd = Command::new(program);
     #[cfg(target_os = "windows")]
     {
@@ -95,7 +135,9 @@ pub fn silent_cmd(program: PathBuf) -> Command {
 fn get_tool(name: &str) -> PathBuf {
     match TOOLS_DIR.get() {
         Some(Some(dir)) => dir.join(format!("{name}{EXT}")),
-        _ => PathBuf::from(format!("/app/bin/{name}")),
+        // Mode non-bundled : cherche d'abord sur le PATH système, et ne se
+        // rabat sur le chemin Flatpak que si rien n'a été trouvé.
+        _ => which::which(name).unwrap_or_else(|_| PathBuf::from(format!("/app/bin/{name}"))),
     }
 }
 

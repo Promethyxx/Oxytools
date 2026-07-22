@@ -1,35 +1,40 @@
 #![allow(dead_code)]
-use std::path::PathBuf;
+use std::ffi::OsString;
+use std::path::{Path, PathBuf};
 use std::process::{Child, Stdio}; // Stdio importé pour pouvoir utiliser .null()
 use crate::modules::binaries;
 
 /// Convertit ou change le conteneur d'une vidéo
 pub fn traiter_video(
     input: &PathBuf,
-    output: &str,
+    output: &Path,
     copie_flux: bool,
     est_audio_uniquement: bool,
     speed: u32,
 ) -> Result<Child, std::io::Error> {
     let ffmpeg = binaries::get_ffmpeg();
     crate::log_info(&format!(
-        "video::traiter_video | ffmpeg={:?} | copie_flux={} | audio_only={} | speed={} | {:?} -> {}",
+        "video::traiter_video | ffmpeg={:?} | copie_flux={} | audio_only={} | speed={} | {:?} -> {:?}",
         ffmpeg, copie_flux, est_audio_uniquement, speed, input, output
     ));
-    
+
     // -nostdin évite que FFmpeg attende une commande utilisateur en arrière-plan
-    let mut args = vec!["-nostdin".to_string(), "-i".to_string(), input.to_str().unwrap().to_string()];
+    let mut args: Vec<OsString> = vec![
+        "-nostdin".into(),
+        "-i".into(),
+        input.as_os_str().to_os_string(),
+    ];
 
     if copie_flux {
         if est_audio_uniquement {
-            args.extend(["-vn", "-c:a", "copy"].map(String::from));
+            args.extend(["-vn", "-c:a", "copy"].map(OsString::from));
         } else {
-            args.extend(["-c", "copy"].map(String::from));
+            args.extend(["-c", "copy"].map(OsString::from));
         }
     } else if est_audio_uniquement {
-        args.push("-vn".to_string());
+        args.push("-vn".into());
     } else {
-        let ext = std::path::Path::new(output)
+        let ext = output
             .extension()
             .and_then(|e| e.to_str())
             .unwrap_or("")
@@ -38,9 +43,9 @@ pub fn traiter_video(
             "webm" => {
                 let threads = num_cpus();
                 // Ajout de -deadline realtime pour booster la vitesse du VP9
-                args.extend(["-c:v", "libvpx-vp9", "-row-mt", "1", "-deadline", "realtime"].map(String::from));
-                args.extend(["-threads".to_string(), threads.to_string()]);
-                args.extend(["-speed".to_string(), speed.to_string()]);
+                args.extend(["-c:v", "libvpx-vp9", "-row-mt", "1", "-deadline", "realtime"].map(OsString::from));
+                args.extend(["-threads".into(), OsString::from(threads.to_string())]);
+                args.extend(["-speed".into(), OsString::from(speed.to_string())]);
             },
             "mp4" | "mkv" | "mov" => {
                 let preset = match speed {
@@ -49,13 +54,13 @@ pub fn traiter_video(
                     5..=6 => "fast",
                     _     => "ultrafast",
                 };
-                args.extend(["-c:v", "libx264", "-preset", preset].map(String::from));
+                args.extend(["-c:v", "libx264", "-preset", preset].map(OsString::from));
             },
             _ => {}
         }
     }
 
-    args.extend(["-y".to_string(), output.to_string()]);
+    args.extend(["-y".into(), output.as_os_str().to_os_string()]);
 
     // On redirige tout vers le néant : pas de logs, pas de buffers pleins, pas de blocage
     let child = binaries::silent_cmd(binaries::get_ffmpeg())
@@ -80,7 +85,7 @@ fn num_cpus() -> usize {
 /// Analyse le codec audio d'un fichier via ffprobe
 pub fn extraire_nom_codec(input: &PathBuf) -> String {
     let out = binaries::silent_cmd(binaries::get_ffprobe())
-        .stdin(Stdio::null()) 
+        .stdin(Stdio::null())
         .args(&[
             "-v",
             "error",
@@ -90,8 +95,8 @@ pub fn extraire_nom_codec(input: &PathBuf) -> String {
             "stream=codec_name",
             "-of",
             "default=noprint_wrappers=1:nokey=1",
-            input.to_str().unwrap(),
         ])
+        .arg(input)
         .output();
 
     if let Ok(o) = out {

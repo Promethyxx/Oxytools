@@ -20,7 +20,6 @@ pub struct Lang {
     pub tab_image: &'static str,
     pub tab_scrapper: &'static str,
     pub tab_tag: &'static str,
-    pub tab_tools: &'static str,
     pub tab_video: &'static str,
     pub tab_settings: &'static str,
 
@@ -196,7 +195,6 @@ pub const EN: Lang = Lang {
     tab_image: "🖼️ Picture",
     tab_scrapper: "🔍 Scrapper",
     tab_tag: "🏷️ Tag",
-    tab_tools: "🛠 Tools",
     tab_video: "🎬 Video",
     tab_settings: "⚙ Settings",
 
@@ -361,7 +359,6 @@ pub const FR: Lang = Lang {
     tab_image: "🖼️ Image",
     tab_scrapper: "🔍 Scrapper",
     tab_tag: "🏷️ Tag",
-    tab_tools: "🛠 Outils",
     tab_video: "🎬 Vidéo",
     tab_settings: "⚙ Paramètres",
 

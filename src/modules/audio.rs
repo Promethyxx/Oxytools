@@ -4,10 +4,10 @@ use crate::modules::binaries;
 
 /// Conversion & Compression
 /// qualite : VBR 0 (meilleure qualite) a 9 (plus leger), mappe selon le codec de sortie
-pub fn convertir(input: &Path, output: &str, qualite: u32) -> std::io::Result<std::process::Child> {
+pub fn convertir(input: &Path, output: &Path, qualite: u32) -> std::io::Result<std::process::Child> {
     let ffmpeg = binaries::get_ffmpeg();
-    crate::log_info(&format!("audio::convertir | ffmpeg={:?} | qualite={} | {:?} -> {}", ffmpeg, qualite, input, output));
-    let ext = std::path::Path::new(output)
+    crate::log_info(&format!("audio::convertir | ffmpeg={:?} | qualite={} | {:?} -> {:?}", ffmpeg, qualite, input, output));
+    let ext = output
         .extension()
         .and_then(|e| e.to_str())
         .unwrap_or("")
@@ -97,8 +97,8 @@ pub fn formats_compatibles(codec_source: &str) -> Vec<&'static str> {
 }
 
 /// Extraction : Récupère l'audio d'une vidéo
-pub fn extraire(input: &Path, output: &str) -> std::io::Result<std::process::Child> {
-    crate::log_info(&format!("audio::extraire | {:?} -> {}", input, output));
+pub fn extraire(input: &Path, output: &Path) -> std::io::Result<std::process::Child> {
+    crate::log_info(&format!("audio::extraire | {:?} -> {:?}", input, output));
     let child = binaries::silent_cmd(binaries::get_ffmpeg())
         .arg("-i")
         .arg(input)
