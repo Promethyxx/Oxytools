@@ -42,7 +42,7 @@ fn ajouter_dossier_zip<W: Write + Seek>(
         let name = relative.to_string_lossy().replace('\\', "/");
 
         if path.is_dir() {
-            zip_writer.add_directory(&format!("{}/", name), options)
+            zip_writer.add_directory(format!("{}/", name), options)
                 .map_err(|e| format!("Erreur zip add_directory : {}", e))?;
             ajouter_dossier_zip(zip_writer, base, &path, options)?;
         } else {
@@ -248,7 +248,7 @@ fn ajouter_dossier_zip_exclusions<W: Write + Seek>(
         }
 
         if path.is_dir() {
-            zip_writer.add_directory(&format!("{}/", name), options)
+            zip_writer.add_directory(format!("{}/", name), options)
                 .map_err(|e| format!("Erreur zip add_directory : {}", e))?;
             ajouter_dossier_zip_exclusions(zip_writer, base, &path, options, exclusions)?;
         } else {

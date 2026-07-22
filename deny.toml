@@ -1,0 +1,66 @@
+# Configuration de cargo-deny — voir https://embarkstudios.github.io/cargo-deny/
+# Lancer : cargo deny check
+
+[graph]
+targets = []
+
+# ════════════════════════════════════════════════════════════════════════
+#  ADVISORIES — vulnérabilités connues (RustSec) et crates non maintenues
+# ════════════════════════════════════════════════════════════════════════
+[advisories]
+db-urls = ["https://github.com/rustsec/advisory-db"]
+yanked = "deny"
+
+ignore = [
+    { id = "RUSTSEC-2026-0194", reason = "quick-xml 0.39.4 tiré uniquement par wayland-scanner (proc-macro utilisé au build), jamais présent dans le binaire final, jamais exposé à une entrée utilisateur. wayland-scanner 0.31.10 fixe la contrainte à quick-xml=\"^0.39\" ; aucune release corrigée disponible pour l'instant. À réévaluer à chaque mise à jour de wayland-scanner/rfd." },
+    { id = "RUSTSEC-2026-0195", reason = "Même chaîne de dépendance que RUSTSEC-2026-0194 (quick-xml via wayland-scanner, build-time uniquement)." },
+    { id = "RUSTSEC-2024-0436", reason = "paste (macro helper) non maintenue, tirée transitivement par exr/image. Pas de faille connue, juste plus de mises à jour. Aucun correctif disponible ; à surveiller si une alternative (pastey) devient nécessaire." },
+    { id = "RUSTSEC-2026-0206", reason = "rustybuzz (rendu de police) non maintenue, tirée par resvg pour le rendu SVG. Pas de faille connue. Aucun correctif disponible ; alternative possible (harfrust) à évaluer plus tard." },
+    { id = "RUSTSEC-2026-0192", reason = "ttf-parser non maintenue, tirée par resvg/fontdb pour le rendu de police. Pas de faille connue. Aucun correctif disponible ; alternative possible (skrifa) à évaluer plus tard." },
+]
+
+# ════════════════════════════════════════════════════════════════════════
+#  LICENSES — compatibilité avec GPL-3.0-or-later
+# ════════════════════════════════════════════════════════════════════════
+[licenses]
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "MPL-2.0",
+    "Zlib",
+    "Unicode-3.0",
+    "CC0-1.0",
+    "BSL-1.0",
+    "GPL-3.0",
+    "GPL-3.0-or-later",
+    "LGPL-2.1",
+    "LGPL-2.1-or-later",
+    "LGPL-3.0",
+    "LGPL-3.0-or-later",
+    "OFL-1.1",
+    "Ubuntu-font-1.0",
+    "bzip2-1.0.6",
+    "NCSA",
+    "CDLA-Permissive-2.0",
+]
+confidence-threshold = 0.8
+
+# ════════════════════════════════════════════════════════════════════════
+#  BANS — doublons de versions et crates explicitement écartées
+# ════════════════════════════════════════════════════════════════════════
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+deny = []
+
+# ════════════════════════════════════════════════════════════════════════
+#  SOURCES — uniquement crates.io officiel
+# ════════════════════════════════════════════════════════════════════════
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

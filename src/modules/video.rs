@@ -86,7 +86,7 @@ fn num_cpus() -> usize {
 pub fn extraire_nom_codec(input: &PathBuf) -> String {
     let out = binaries::silent_cmd(binaries::get_ffprobe())
         .stdin(Stdio::null())
-        .args(&[
+        .args([
             "-v",
             "error",
             "-select_streams",

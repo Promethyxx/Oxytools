@@ -180,7 +180,7 @@ fn extraire_texte_xml(xml: &str, balises_texte: &[&str]) -> Result<String, Strin
             Ok(Event::Start(ref e)) => {
                 let name_bytes = e.name().into_inner().to_vec();
                 let nom = std::str::from_utf8(&name_bytes).unwrap_or("");
-                if balises_texte.iter().any(|b| *b == nom) {
+                if balises_texte.contains(&nom) {
                     dans_balise_texte = true;
                 }
                 // Détecter les paragraphes pour ajouter des sauts de ligne
@@ -194,7 +194,7 @@ fn extraire_texte_xml(xml: &str, balises_texte: &[&str]) -> Result<String, Strin
             Ok(Event::End(ref e)) => {
                 let name_bytes = e.name().into_inner().to_vec();
                 let nom = std::str::from_utf8(&name_bytes).unwrap_or("");
-                if balises_texte.iter().any(|b| *b == nom) {
+                if balises_texte.contains(&nom) {
                     dans_balise_texte = false;
                 }
                 if nom == "w:p" || nom == "text:p" || nom == "text:h" {
@@ -760,8 +760,8 @@ fn obtenir_mediabox(doc: &Document, page_id: ObjectId) -> Option<[f64; 4]> {
         return None;
     };
 
-    if let Object::Array(ref arr) = mediabox_obj {
-        if arr.len() == 4 {
+    if let Object::Array(ref arr) = mediabox_obj
+        && arr.len() == 4 {
             let vals: Vec<f64> = arr.iter().filter_map(|o| match o {
                 Object::Integer(i) => Some(*i as f64),
                 Object::Real(r) => Some((*r).into()),
@@ -771,7 +771,6 @@ fn obtenir_mediabox(doc: &Document, page_id: ObjectId) -> Option<[f64; 4]> {
                 return Some([vals[0], vals[1], vals[2], vals[3]]);
             }
         }
-    }
     None
 }
 
@@ -927,12 +926,11 @@ fn pdf_split_interne(input: &Path, output_dir: &Path) -> Result<Vec<String>, Str
 
         let mut id_map: BTreeMap<ObjectId, ObjectId> = BTreeMap::new();
         for &old_id in &objets {
-            if !id_map.contains_key(&old_id) {
-                if let Ok(obj) = doc.get_object(old_id) {
+            if !id_map.contains_key(&old_id)
+                && let Ok(obj) = doc.get_object(old_id) {
                     let new_id = new_doc.add_object(obj.clone());
                     id_map.insert(old_id, new_id);
                 }
-            }
         }
 
         let new_page_id = id_map.get(&page_id).copied().unwrap_or(page_id);
@@ -1018,7 +1016,7 @@ pub fn pdf_merge(inputs: &[&Path], output: &Path) -> Result<(), String> {
         max_id = doc.max_id + 1;
 
         documents_pages.extend(
-            doc.get_pages().into_iter().map(|(_, object_id)| {
+            doc.get_pages().into_values().map(|object_id| {
                 (object_id, doc.get_object(object_id).unwrap().to_owned())
             }).collect::<BTreeMap<ObjectId, Object>>()
         );
@@ -1039,11 +1037,10 @@ pub fn pdf_merge(inputs: &[&Path], output: &Path) -> Result<(), String> {
             b"Pages" => {
                 if let Ok(dict) = object.as_dict() {
                     let mut dict = dict.clone();
-                    if let Some((_, ref old)) = pages_object {
-                        if let Ok(old_dict) = old.as_dict() {
+                    if let Some((_, ref old)) = pages_object
+                        && let Ok(old_dict) = old.as_dict() {
                             dict.extend(old_dict);
                         }
-                    }
                     pages_object = Some((
                         pages_object.map_or(*object_id, |(id, _)| id),
                         Object::Dictionary(dict),
@@ -1107,7 +1104,7 @@ fn pdf_rotate_interne(input: &Path, output: &Path, rotation: u16, pages_cibles: 
     let pages = obtenir_pages_ordonnees(&doc);
     for (i, &page_id) in pages.iter().enumerate() {
         let page_num = (i + 1) as u32;
-        if !pages_cibles.map_or(true, |c| c.contains(&page_num)) { continue; }
+        if !pages_cibles.is_none_or(|c| c.contains(&page_num)) { continue; }
 
         if let Ok(Object::Dictionary(dict)) = doc.get_object_mut(page_id) {
             let actuel = dict.get(b"Rotate").ok()
@@ -1186,7 +1183,7 @@ fn pdf_crop_interne(
     let pages = obtenir_pages_ordonnees(&doc);
     for (i, &page_id) in pages.iter().enumerate() {
         let page_num = (i + 1) as u32;
-        if !pages_cibles.map_or(true, |c| c.contains(&page_num)) { continue; }
+        if !pages_cibles.is_none_or(|c| c.contains(&page_num)) { continue; }
 
         let [mb_x, mb_y, mb_w, mb_h] = obtenir_mediabox(&doc, page_id)
             .ok_or_else(|| format!("MediaBox introuvable page {}", page_num))?;
@@ -1493,7 +1490,7 @@ fn pdf_watermark_interne(
 
     for (i, &page_id) in pages.iter().enumerate() {
         let page_num = (i + 1) as u32;
-        if !pages_cibles.map_or(true, |c| c.contains(&page_num)) { continue; }
+        if !pages_cibles.is_none_or(|c| c.contains(&page_num)) { continue; }
 
         let mediabox = obtenir_mediabox(&doc, page_id).unwrap_or([0.0, 0.0, 595.0, 842.0]);
         let cx = (mediabox[2] - mediabox[0]) / 2.0;
@@ -1541,7 +1538,6 @@ pub fn pdf_watermark(
     pages_cibles: Option<&[u32]>,
 ) -> Result<(), String> {
     let texte = texte.to_string();
-    let opacite = opacite;
     let taille = taille_police;
     let pages = pages_cibles.map(|p| p.to_vec());
     appliquer_operation_doc(input, output, move |pdf_in, pdf_out| {
@@ -1553,11 +1549,20 @@ pub fn pdf_watermark(
 //  PDF ANNOTATE — ajoute une note de texte (annotation) sur les pages
 // ════════════════════════════════════════════════════════════════════════
 
+/// Rectangle exprimé en pourcentages de la page (0-100), utilisé pour
+/// positionner une annotation PDF.
+#[derive(Debug, Clone, Copy)]
+pub struct RectPct {
+    pub x: f64,
+    pub y: f64,
+    pub largeur: f64,
+    pub hauteur: f64,
+}
+
 fn pdf_annoter_interne(
     input: &Path, output: &Path,
     texte: &str,
-    x: f64, y: f64,
-    largeur: f64, hauteur: f64,
+    rect: RectPct,
     pages_cibles: Option<&[u32]>,
 ) -> Result<(), String> {
     let mut doc = Document::load(input)
@@ -1567,17 +1572,17 @@ fn pdf_annoter_interne(
 
     for (i, &page_id) in pages.iter().enumerate() {
         let page_num = (i + 1) as u32;
-        if !pages_cibles.map_or(true, |c| c.contains(&page_num)) { continue; }
+        if !pages_cibles.is_none_or(|c| c.contains(&page_num)) { continue; }
 
         let mediabox = obtenir_mediabox(&doc, page_id).unwrap_or([0.0, 0.0, 595.0, 842.0]);
         let page_w = mediabox[2] - mediabox[0];
         let page_h = mediabox[3] - mediabox[1];
 
         // Convertir pourcentages en points
-        let abs_x = mediabox[0] + (page_w * x / 100.0);
-        let abs_y = mediabox[1] + (page_h * y / 100.0);
-        let abs_w = page_w * largeur / 100.0;
-        let abs_h = page_h * hauteur / 100.0;
+        let abs_x = mediabox[0] + (page_w * rect.x / 100.0);
+        let abs_y = mediabox[1] + (page_h * rect.y / 100.0);
+        let abs_w = page_w * rect.largeur / 100.0;
+        let abs_h = page_h * rect.hauteur / 100.0;
 
         let annot_dict = dictionary! {
             "Type" => "Annot",
@@ -1617,16 +1622,13 @@ fn pdf_annoter_interne(
 pub fn pdf_annoter(
     input: &Path, output: &Path,
     texte: &str,
-    x: f64, y: f64,
-    largeur: f64, hauteur: f64,
+    rect: RectPct,
     pages_cibles: Option<&[u32]>,
 ) -> Result<(), String> {
     let texte = texte.to_string();
-    let x = x; let y = y;
-    let largeur = largeur; let hauteur = hauteur;
     let pages = pages_cibles.map(|p| p.to_vec());
     appliquer_operation_doc(input, output, move |pdf_in, pdf_out| {
-        pdf_annoter_interne(pdf_in, pdf_out, &texte, x, y, largeur, hauteur, pages.as_deref())
+        pdf_annoter_interne(pdf_in, pdf_out, &texte, rect, pages.as_deref())
     })
 }
 
@@ -1668,7 +1670,7 @@ fn pdf_signer_interne(
 
     for (i, &page_id) in pages.iter().enumerate() {
         let page_num = (i + 1) as u32;
-        if !pages_cibles.map_or(true, |c| c.contains(&page_num)) { continue; }
+        if !pages_cibles.is_none_or(|c| c.contains(&page_num)) { continue; }
 
         let mediabox = obtenir_mediabox(&doc, page_id).unwrap_or([0.0, 0.0, 595.0, 842.0]);
         let largeur = mediabox[2] - mediabox[0];

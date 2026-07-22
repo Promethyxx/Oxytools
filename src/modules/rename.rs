@@ -27,8 +27,9 @@ impl ExtMode {
 
 // ── Position origin (début ou fin) ──────────────────────────────
 #[derive(Debug, Clone, PartialEq)]
-pub enum PosOrigin { FromStart, FromEnd }
-impl Default for PosOrigin { fn default() -> Self { PosOrigin::FromStart } }
+#[derive(Default)]
+pub enum PosOrigin { #[default]
+FromStart, FromEnd }
 impl PosOrigin {
     pub fn label(&self) -> &'static str {
         match self { PosOrigin::FromStart => "From start", PosOrigin::FromEnd => "From end" }
@@ -116,8 +117,8 @@ impl ReplaceList {
             if parts.len() < 2 { continue; }
             let find = parts[0].replace("\\t", "\t").replace("\\n", "\n");
             let replace = parts[1].replace("\\t", "\t").replace("\\n", "\n");
-            let use_regex = parts.get(2).map_or(false, |v| v.trim() == "true");
-            let enabled = parts.get(3).map_or(true, |v| v.trim() != "false");
+            let use_regex = parts.get(2).is_some_and(|v| v.trim() == "true");
+            let enabled = parts.get(3).is_none_or(|v| v.trim() != "false");
             rules.push(ReplaceRule { find, replace, use_regex, enabled });
         }
         Ok(Self { rules })

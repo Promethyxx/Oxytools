@@ -312,16 +312,14 @@ impl OxytoolsApp {
         // Bootstrap : lire custom_config_dir depuis le config.toml à côté de l'exe
         if self.custom_config_dir.is_none() {
             let bootstrap = Self::exe_config_dir().join("config.toml");
-            if let Ok(c) = std::fs::read_to_string(&bootstrap) {
-                if let Ok(parsed) = c.parse::<toml::Table>() {
-                    if let Some(p) = parsed.get("app").and_then(|a| a.get("config_dir")).and_then(|v| v.as_str()) {
+            if let Ok(c) = std::fs::read_to_string(&bootstrap)
+                && let Ok(parsed) = c.parse::<toml::Table>()
+                    && let Some(p) = parsed.get("app").and_then(|a| a.get("config_dir")).and_then(|v| v.as_str()) {
                         let pb = std::path::PathBuf::from(p);
                         if pb.exists() || std::fs::create_dir_all(&pb).is_ok() {
                             self.custom_config_dir = Some(pb);
                         }
                     }
-                }
-            }
         }
         match self.module_actif {
             ModuleType::Image => self.format_choisi = String::new(),
@@ -334,8 +332,8 @@ impl OxytoolsApp {
             ModuleType::Archive => self.format_choisi = String::new(),
             _ => (),
         }
-        if let Ok(c) = std::fs::read_to_string(self.config_dir().join("config.toml")) {
-            if let Ok(parsed) = c.parse::<toml::Table>() {
+        if let Ok(c) = std::fs::read_to_string(self.config_dir().join("config.toml"))
+            && let Ok(parsed) = c.parse::<toml::Table>() {
                 if let Some(theme) = parsed.get("display").and_then(|d| d.get("theme")).and_then(|t| t.as_str()) {
                     self.current_theme = theme.to_string();
                 }
@@ -346,29 +344,25 @@ impl OxytoolsApp {
                     self.lang = match lang_str { "fr" => &crate::lang::FR, _ => &crate::lang::EN };
                     self.lang_id = match lang_str { "fr" => "fr", _ => "en" };
                 }
-                if let Some(doc) = parsed.get("doc") {
-                    if let Some(fmt) = doc.get("format").and_then(|f| f.as_str()) {
-                        if self.module_actif == ModuleType::Doc {
+                if let Some(doc) = parsed.get("doc")
+                    && let Some(fmt) = doc.get("format").and_then(|f| f.as_str())
+                        && self.module_actif == ModuleType::Doc {
                             self.format_choisi = fmt.to_string();
                         }
-                    }
-                }
                 if let Some(img) = parsed.get("image") {
-                    if let Some(fmt) = img.get("format").and_then(|f| f.as_str()) {
-                        if self.module_actif == ModuleType::Image {
+                    if let Some(fmt) = img.get("format").and_then(|f| f.as_str())
+                        && self.module_actif == ModuleType::Image {
                             self.format_choisi = fmt.to_string();
                         }
-                    }
                     if let Some(ratio) = img.get("ratio_img").and_then(|r| r.as_integer()) {
                         self.ratio_img = ratio as u32;
                     }
                 }
                 if let Some(arc) = parsed.get("archive") {
-                    if let Some(fmt) = arc.get("format").and_then(|f| f.as_str()) {
-                        if self.module_actif == ModuleType::Archive {
+                    if let Some(fmt) = arc.get("format").and_then(|f| f.as_str())
+                        && self.module_actif == ModuleType::Archive {
                             self.format_choisi = fmt.to_string();
                         }
-                    }
                     if let Some(n) = arc.get("niveau").and_then(|v| v.as_integer()) {
                         self.archive_niveau = n as u32;
                     }
@@ -387,22 +381,20 @@ impl OxytoolsApp {
                 }
                 #[cfg(feature = "api")]
                 if let Some(aud) = parsed.get("audio") {
-                    if let Some(fmt) = aud.get("format").and_then(|f| f.as_str()) {
-                        if self.module_actif == ModuleType::Audio {
+                    if let Some(fmt) = aud.get("format").and_then(|f| f.as_str())
+                        && self.module_actif == ModuleType::Audio {
                             self.format_choisi = fmt.to_string();
                         }
-                    }
                     if let Some(q) = aud.get("qualite").and_then(|v| v.as_integer()) {
                         self.audio_qualite = q as u32;
                     }
                 }
                 #[cfg(feature = "api")]
                 if let Some(vid) = parsed.get("video") {
-                    if let Some(fmt) = vid.get("format").and_then(|f| f.as_str()) {
-                        if self.module_actif == ModuleType::Video {
+                    if let Some(fmt) = vid.get("format").and_then(|f| f.as_str())
+                        && self.module_actif == ModuleType::Video {
                             self.format_choisi = fmt.to_string();
                         }
-                    }
                     if let Some(copie) = vid.get("copie_flux").and_then(|c| c.as_bool()) {
                         self.copie_flux = copie;
                     }
@@ -411,24 +403,19 @@ impl OxytoolsApp {
                     }
                 }
             }
-        }
         // ── Charger le dernier profil multi-replace ──────────────
-        if let Ok(c) = std::fs::read_to_string(self.config_dir().join("config.toml")) {
-            if let Ok(parsed) = c.parse::<toml::Table>() {
-                if let Some(rn) = parsed.get("rename") {
-                    if let Some(p) = rn.get("last_list_path").and_then(|v| v.as_str()) {
+        if let Ok(c) = std::fs::read_to_string(self.config_dir().join("config.toml"))
+            && let Ok(parsed) = c.parse::<toml::Table>()
+                && let Some(rn) = parsed.get("rename")
+                    && let Some(p) = rn.get("last_list_path").and_then(|v| v.as_str()) {
                         let path = std::path::PathBuf::from(p);
-                        if path.exists() {
-                            if let Ok(list) = modules::rename::ReplaceList::load(&path) {
+                        if path.exists()
+                            && let Ok(list) = modules::rename::ReplaceList::load(&path) {
                                 self.rename_cfg.replace_list = list;
                                 self.rename_cfg.multi_replace = true;
                                 self.rename_last_list_path = Some(path);
                             }
-                        }
                     }
-                }
-            }
-        }
         // Charger le path custom de .env si enregistré dans config.toml
         let custom_env_path: Option<PathBuf> = {
             std::fs::read_to_string(self.config_dir().join("config.toml"))
@@ -474,22 +461,20 @@ impl OxytoolsApp {
             if let Some(doc_table) = doc.as_table_mut() {
                 doc_table.insert("format".to_string(), toml::Value::String(self.format_choisi.clone()));
             }
-        } else if !self.save_doc_format && self.module_actif == ModuleType::Doc {
-            if let Some(doc_table) = parsed.get_mut("doc").and_then(|v| v.as_table_mut()) {
+        } else if !self.save_doc_format && self.module_actif == ModuleType::Doc
+            && let Some(doc_table) = parsed.get_mut("doc").and_then(|v| v.as_table_mut()) {
                 doc_table.remove("format");
             }
-        }
         if self.save_image_format && !self.format_choisi.is_empty() && self.module_actif == ModuleType::Image {
             let image = parsed.entry("image").or_insert(toml::Value::Table(toml::Table::new()));
             if let Some(img_table) = image.as_table_mut() {
                 img_table.insert("format".to_string(), toml::Value::String(self.format_choisi.clone()));
                 img_table.insert("ratio_img".to_string(), toml::Value::Integer(self.ratio_img as i64));
             }
-        } else if !self.save_image_format && self.module_actif == ModuleType::Image {
-            if let Some(img_table) = parsed.get_mut("image").and_then(|v| v.as_table_mut()) {
+        } else if !self.save_image_format && self.module_actif == ModuleType::Image
+            && let Some(img_table) = parsed.get_mut("image").and_then(|v| v.as_table_mut()) {
                 img_table.remove("format");
             }
-        }
         if self.module_actif == ModuleType::Image {
             let image = parsed.entry("image").or_insert(toml::Value::Table(toml::Table::new()));
             if let Some(img_table) = image.as_table_mut() {
@@ -501,11 +486,10 @@ impl OxytoolsApp {
                 if let Some(arc_table) = archive.as_table_mut() {
                     arc_table.insert("format".to_string(), toml::Value::String(self.format_choisi.clone()));
                 }
-            } else if !self.save_archive_format && self.module_actif == ModuleType::Archive {
-                if let Some(arc_table) = parsed.get_mut("archive").and_then(|v| v.as_table_mut()) {
+            } else if !self.save_archive_format && self.module_actif == ModuleType::Archive
+                && let Some(arc_table) = parsed.get_mut("archive").and_then(|v| v.as_table_mut()) {
                     arc_table.remove("format");
                 }
-            }
             if self.module_actif == ModuleType::Archive {
                 let archive = parsed.entry("archive").or_insert(toml::Value::Table(toml::Table::new()));
                 if let Some(arc_table) = archive.as_table_mut() {
@@ -523,11 +507,10 @@ impl OxytoolsApp {
                 if let Some(aud_table) = audio.as_table_mut() {
                     aud_table.insert("format".to_string(), toml::Value::String(self.format_choisi.clone()));
                 }
-            } else if !self.save_audio_format && self.module_actif == ModuleType::Audio {
-                if let Some(aud_table) = parsed.get_mut("audio").and_then(|v| v.as_table_mut()) {
+            } else if !self.save_audio_format && self.module_actif == ModuleType::Audio
+                && let Some(aud_table) = parsed.get_mut("audio").and_then(|v| v.as_table_mut()) {
                     aud_table.remove("format");
                 }
-            }
             if self.module_actif == ModuleType::Audio {
                 let audio = parsed.entry("audio").or_insert(toml::Value::Table(toml::Table::new()));
                 if let Some(aud_table) = audio.as_table_mut() {
@@ -539,11 +522,10 @@ impl OxytoolsApp {
                 if let Some(vid_table) = video.as_table_mut() {
                     vid_table.insert("format".to_string(), toml::Value::String(self.format_choisi.clone()));
                 }
-            } else if !self.save_video_format && self.module_actif == ModuleType::Video {
-                if let Some(vid_table) = parsed.get_mut("video").and_then(|v| v.as_table_mut()) {
+            } else if !self.save_video_format && self.module_actif == ModuleType::Video
+                && let Some(vid_table) = parsed.get_mut("video").and_then(|v| v.as_table_mut()) {
                     vid_table.remove("format");
                 }
-            }
             if self.module_actif == ModuleType::Video {
                 let video = parsed.entry("video").or_insert(toml::Value::Table(toml::Table::new()));
                 if let Some(vid_table) = video.as_table_mut() {
@@ -696,11 +678,9 @@ impl OxytoolsApp {
             if self.ico_size_128 { s.push(128); }
             if self.ico_size_256 { s.push(256); }
             if self.ico_size_512 { s.push(512); }
-            if self.ico_size_custom {
-                if let Ok(w) = self.ico_custom_w.parse::<u32>() {
-                    if w > 0 { s.push(w); }
-                }
-            }
+            if self.ico_size_custom
+                && let Ok(w) = self.ico_custom_w.parse::<u32>()
+                    && w > 0 { s.push(w); }
             if s.is_empty() { s.push(256); }
             s
         };
@@ -973,7 +953,7 @@ impl OxytoolsApp {
                             "pdf_annotate" => {
                                 let pages_opt = parse_pages_spec(&pdf_pages);
                                 log_info(&format!("Doc pdf_annotate: texte='{}' x={} y={} w={} h={}", pdf_annot_texte, pdf_annot_x, pdf_annot_y, pdf_annot_w, pdf_annot_h));
-                                modules::doc::pdf_annoter(&input, &output, &pdf_annot_texte, pdf_annot_x, pdf_annot_y, pdf_annot_w, pdf_annot_h, pages_opt.as_deref())
+                                modules::doc::pdf_annoter(&input, &output, &pdf_annot_texte, modules::doc::RectPct { x: pdf_annot_x, y: pdf_annot_y, largeur: pdf_annot_w, hauteur: pdf_annot_h }, pages_opt.as_deref())
                                     .map_err(|e| format!("pdf_annotate failed: {}", e))
                             },
                             "pdf_sign" => {
@@ -1180,13 +1160,13 @@ fn expand_to_mkv(paths: &[std::path::PathBuf]) -> Vec<std::path::PathBuf> {
                 sub.sort();
                 for sp in &sub {
                     if sp.is_dir() {
-                        result.extend(expand_to_mkv(&[sp.clone()]));
-                    } else if sp.extension().map_or(false, |e| e.eq_ignore_ascii_case("mkv")) {
+                        result.extend(expand_to_mkv(std::slice::from_ref(sp)));
+                    } else if sp.extension().is_some_and(|e| e.eq_ignore_ascii_case("mkv")) {
                         result.push(sp.clone());
                     }
                 }
             }
-        } else if p.extension().map_or(false, |e| e.eq_ignore_ascii_case("mkv")) {
+        } else if p.extension().is_some_and(|e| e.eq_ignore_ascii_case("mkv")) {
             result.push(p.clone());
         }
     }
@@ -1267,11 +1247,10 @@ fn wait_ffmpeg_with_progress(
         for line in rx.try_iter() {
             if let Some(pos) = line.find("time=") {
                 let time_str = line[pos + 5..].split_whitespace().next().unwrap_or("");
-                if let (Some(elapsed), Some(total)) = (parse_time_to_secs(time_str), duration_secs) {
-                    if total > 0.0 {
+                if let (Some(elapsed), Some(total)) = (parse_time_to_secs(time_str), duration_secs)
+                    && total > 0.0 {
                         *conv_progress.lock().unwrap_or_else(|e| e.into_inner()) = (elapsed / total).min(1.0) as f32;
                     }
-                }
             }
         }
         match child.try_wait() {
@@ -1359,7 +1338,7 @@ impl eframe::App for OxytoolsApp {
             }
             ctx.request_repaint();
         }
-        egui::CentralPanel::default().show_inside(ui, |ui| {
+        egui::CentralPanel::default().show(ui, |ui| {
             ui.vertical_centered(|ui| ui.heading(format!("OXYTOOLS v{}", VERSION)));
             if !self.deps_manquantes.is_empty() {
                 ui.colored_label(egui::Color32::RED, self.lang.missing.replace("{}", &self.deps_manquantes.join(", ")));
@@ -1440,22 +1419,20 @@ impl eframe::App for OxytoolsApp {
                             ui.horizontal(|ui| {
                                 ui.label("Source:");
                                 ui.add(egui::TextEdit::singleline(&mut self.archive_backup_source).desired_width(250.0));
-                                if ui.button("📂").clicked() {
-                                    if let Some(path) = rfd::FileDialog::new().pick_folder() {
+                                if ui.button("📂").clicked()
+                                    && let Some(path) = rfd::FileDialog::new().pick_folder() {
                                         self.archive_backup_source = path.to_string_lossy().to_string();
                                         self.save_config();
                                     }
-                                }
                             });
                             ui.horizontal(|ui| {
                                 ui.label("Destination:");
                                 ui.add(egui::TextEdit::singleline(&mut self.archive_backup_dest).desired_width(250.0));
-                                if ui.button("📂").clicked() {
-                                    if let Some(path) = rfd::FileDialog::new().pick_folder() {
+                                if ui.button("📂").clicked()
+                                    && let Some(path) = rfd::FileDialog::new().pick_folder() {
                                         self.archive_backup_dest = path.to_string_lossy().to_string();
                                         self.save_config();
                                     }
-                                }
                             });
                             ui.horizontal(|ui| {
                                 ui.label("Exclusions:");
@@ -1488,12 +1465,11 @@ impl eframe::App for OxytoolsApp {
                             ui.horizontal(|ui| {
                                 ui.label("Parent folder:");
                                 ui.add(egui::TextEdit::singleline(&mut self.archive_multi_source).desired_width(250.0));
-                                if ui.button("📂").clicked() {
-                                    if let Some(path) = rfd::FileDialog::new().pick_folder() {
+                                if ui.button("📂").clicked()
+                                    && let Some(path) = rfd::FileDialog::new().pick_folder() {
                                         self.archive_multi_source = path.to_string_lossy().to_string();
                                         self.save_config();
                                     }
-                                }
                             });
                             ui.horizontal(|ui| {
                                 ui.label(self.lang.format_label);
@@ -1937,14 +1913,13 @@ impl eframe::App for OxytoolsApp {
                     match self.audio_action.as_str() {
                         "Convert" => {
                             // Détection codec au chargement de fichiers
-                            if let Some(f) = self.current_files.first() {
-                                if ui.button(self.lang.audio_detect_codec).clicked() {
+                            if let Some(f) = self.current_files.first()
+                                && ui.button(self.lang.audio_detect_codec).clicked() {
                                     let codec = modules::audio::detecter_extension(f);
                                     let fmts = modules::audio::formats_compatibles(&codec);
                                     self.audio_formats_dispo = fmts.iter().map(|s| s.to_string()).collect();
                                     crate::log_info(&format!("Audio: codec detected='{}' | formats compatibles={:?}", codec, self.audio_formats_dispo));
                                 }
-                            }
                             ui.horizontal(|ui| {
                                 ui.label(self.lang.format_label);
                                 egui::ComboBox::from_id_salt("afmt").selected_text(&self.format_choisi).show_ui(ui, |ui| {
@@ -2006,8 +1981,8 @@ impl eframe::App for OxytoolsApp {
                                 .weak()
                                 .italics()
                         );
-                        if ui.small_button(self.lang.scrap_browse_keys).clicked() {
-                            if let Some(p) = rfd::FileDialog::new()
+                        if ui.small_button(self.lang.scrap_browse_keys).clicked()
+                            && let Some(p) = rfd::FileDialog::new()
                                 .add_filter("env", &["env"])
                                 .set_file_name(".env")
                                 .save_file()
@@ -2015,7 +1990,6 @@ impl eframe::App for OxytoolsApp {
                                 self.keys_env_path = Some(p);
                                 self.save_config();
                             }
-                        }
                     });
 
                     // ── Save / Load ──────────────────────────────────────────
@@ -2025,7 +1999,7 @@ impl eframe::App for OxytoolsApp {
                             let do_write = if target.exists() {
                                 rfd::MessageDialog::new()
                                     .set_title("Oxytools")
-                                    .set_description(&format!(
+                                    .set_description(format!(
                                         "{} — {}",
                                         target.to_string_lossy(),
                                         if self.lang_id == "fr" {
@@ -2051,8 +2025,8 @@ impl eframe::App for OxytoolsApp {
                             }
                         }
 
-                        if ui.button(self.lang.scrap_load_keys).clicked() {
-                            if let Some(p) = rfd::FileDialog::new()
+                        if ui.button(self.lang.scrap_load_keys).clicked()
+                            && let Some(p) = rfd::FileDialog::new()
                                 .add_filter("env", &["env", "txt"])
                                 .pick_file()
                             {
@@ -2074,7 +2048,6 @@ impl eframe::App for OxytoolsApp {
                                     self.scrap_status = format!("⚠️ {}", p.to_string_lossy());
                                 }
                             }
-                        }
                     });
 
                     // ── Status save/load ─────────────────────────────────────
@@ -2269,8 +2242,8 @@ impl eframe::App for OxytoolsApp {
                                     let year = entry.data.release_date.split('-').next().unwrap_or("");
                                     ui.strong(format!("{} ({})", entry.data.title, year));
                                     ui.label(egui::RichText::new(&entry.data.overview).small().weak());
-                                    if !self.current_files.is_empty() {
-                                        if ui.button(self.lang.scrap_choose).clicked() {
+                                    if !self.current_files.is_empty()
+                                        && ui.button(self.lang.scrap_choose).clicked() {
                                             let fanart = self.fanart_api_key.clone();
                                             let ff = self.fetch_fanart;
                                             let fc = self.fetch_clearlogo;
@@ -2297,7 +2270,6 @@ impl eframe::App for OxytoolsApp {
                                                 modules::scrap::save_metadata(self.current_files[0].clone(), entry.data.clone(), &fanart, ff, fc);
                                             }
                                         }
-                                    }
                                 });
                             });
                             ui.separator();
@@ -2403,11 +2375,10 @@ impl eframe::App for OxytoolsApp {
                                     let label = self.custom_nfo_path.as_ref()
                                         .map(|p| p.file_name().unwrap_or_default().to_string_lossy().to_string())
                                         .unwrap_or_else(|| "…".into());
-                                    if ui.small_button(format!("📄 {}", label)).clicked() {
-                                        if let Some(p) = rfd::FileDialog::new().add_filter("NFO", &["nfo"]).pick_file() {
+                                    if ui.small_button(format!("📄 {}", label)).clicked()
+                                        && let Some(p) = rfd::FileDialog::new().add_filter("NFO", &["nfo"]).pick_file() {
                                             self.custom_nfo_path = Some(p);
                                         }
-                                    }
                                 }
                                 // Checkbox poster custom
                                 ui.checkbox(&mut self.use_custom_poster, self.lang.tag_custom_poster);
@@ -2415,14 +2386,13 @@ impl eframe::App for OxytoolsApp {
                                     let label = self.custom_poster_path.as_ref()
                                         .map(|p| p.file_name().unwrap_or_default().to_string_lossy().to_string())
                                         .unwrap_or_else(|| "…".into());
-                                    if ui.small_button(format!("🖼 {}", label)).clicked() {
-                                        if let Some(p) = rfd::FileDialog::new()
+                                    if ui.small_button(format!("🖼 {}", label)).clicked()
+                                        && let Some(p) = rfd::FileDialog::new()
                                             .add_filter("Image", &["jpg", "jpeg", "png"])
                                             .pick_file()
                                         {
                                             self.custom_poster_path = Some(p);
                                         }
-                                    }
                                 }
                             });
                             if ui.button(self.lang.tag_reset_tags).clicked() {
@@ -2508,11 +2478,9 @@ impl eframe::App for OxytoolsApp {
                                             .add_filter("TSV", &["tsv"])
                                             .set_file_name("replace_rules.tsv")
                                             .save_file()
-                                        {
-                                            if let Err(e) = self.rename_cfg.replace_list.save(&path) {
+                                            && let Err(e) = self.rename_cfg.replace_list.save(&path) {
                                                 log_error(&format!("Save replace list: {}", e));
                                             }
-                                        }
                                     }
                                     if ui.button("📂 Load").clicked() { // TODO lang
                                         if let Some(path) = rfd::FileDialog::new()
@@ -2862,27 +2830,24 @@ impl eframe::App for OxytoolsApp {
                             ui.label(egui::RichText::new(current.to_string_lossy()).weak().italics());
                         });
                         ui.horizontal(|ui| {
-                            if ui.button("📁 Browse…").clicked() {
-                                if let Some(p) = rfd::FileDialog::new().pick_folder() {
+                            if ui.button("📁 Browse…").clicked()
+                                && let Some(p) = rfd::FileDialog::new().pick_folder() {
                                     self.custom_config_dir = Some(p);
                                     self.save_config();
                                 }
-                            }
-                            if self.custom_config_dir.is_some() {
-                                if ui.button(self.lang.settings_config_dir_reset).clicked() {
+                            if self.custom_config_dir.is_some()
+                                && ui.button(self.lang.settings_config_dir_reset).clicked() {
                                     self.custom_config_dir = None;
                                     // Supprimer config_dir du bootstrap
                                     let bootstrap_dir = Self::exe_config_dir();
-                                    if let Ok(c) = std::fs::read_to_string(bootstrap_dir.join("config.toml")) {
-                                        if let Ok(mut parsed) = c.parse::<toml::Table>() {
+                                    if let Ok(c) = std::fs::read_to_string(bootstrap_dir.join("config.toml"))
+                                        && let Ok(mut parsed) = c.parse::<toml::Table>() {
                                             if let Some(app) = parsed.get_mut("app").and_then(|a| a.as_table_mut()) {
                                                 app.remove("config_dir");
                                             }
                                             let _ = std::fs::write(bootstrap_dir.join("config.toml"), toml::to_string(&parsed).unwrap_or_default());
                                         }
-                                    }
                                 }
-                            }
                         });
                         ui.label(egui::RichText::new(self.lang.settings_config_dir_hint).small().weak());
                         ui.separator();
@@ -2912,8 +2877,8 @@ impl eframe::App for OxytoolsApp {
                     ui.vertical_centered(|ui| {
                         ui.label(self.lang.drop_here);
                         ui.add_space(5.0);
-                        if ui.button(self.lang.browse).clicked() {
-                            if let Some(paths) = rfd::FileDialog::new().pick_files() {
+                        if ui.button(self.lang.browse).clicked()
+                            && let Some(paths) = rfd::FileDialog::new().pick_files() {
                                 self.current_files = paths;
                                 if let Some(p) = self.current_files.first() {
                                     self.current_stem = p.file_stem().unwrap_or_default().to_string_lossy().to_string();
@@ -2922,7 +2887,6 @@ impl eframe::App for OxytoolsApp {
                                 self.results_ui.lock().unwrap_or_else(|e| e.into_inner()).clear();
                                 *self.status.lock().unwrap_or_else(|e| e.into_inner()) = self.lang.files_loaded.replace("{}", &self.current_files.len().to_string());
                             }
-                        }
                     });
                 });
             }
@@ -2952,7 +2916,7 @@ impl eframe::App for OxytoolsApp {
                     ctx.request_repaint_after(std::time::Duration::from_millis(100));
                 }
             });
-            if !self.current_files.is_empty() { if ui.button(self.lang.clear_all).clicked() { self.current_files.clear(); } }
+            if !self.current_files.is_empty() && ui.button(self.lang.clear_all).clicked() { self.current_files.clear(); }
         });
     }
 }
@@ -2961,8 +2925,8 @@ fn percent_decode(input: &str) -> String {
     let bytes = input.as_bytes();
     let mut i = 0;
     while i < bytes.len() {
-        if bytes[i] == b'%' && i + 2 < bytes.len() {
-            if let Ok(val) = u8::from_str_radix(
+        if bytes[i] == b'%' && i + 2 < bytes.len()
+            && let Ok(val) = u8::from_str_radix(
                 std::str::from_utf8(&bytes[i+1..i+3]).unwrap_or(""),
                 16,
             ) {
@@ -2970,7 +2934,6 @@ fn percent_decode(input: &str) -> String {
                 i += 3;
                 continue;
             }
-        }
         result.push(bytes[i]);
         i += 1;
     }

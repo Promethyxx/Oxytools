@@ -478,14 +478,13 @@ pub fn redimensionner_poids(input: &Path, output: &Path, max_size_kb: u32) -> bo
         
         let resized = img.resize(new_w, new_h, FilterType::Lanczos3);
         
-        if resized.save(output).is_ok() {
-            if let Ok(metadata) = std::fs::metadata(output) {
+        if resized.save(output).is_ok()
+            && let Ok(metadata) = std::fs::metadata(output) {
                 crate::log_info(&format!("pic::redimensionner_poids ratio={} -> {}Ko (cible={}Ko)", ratio, metadata.len() / 1024, max_size_kb));
                 if metadata.len() <= max_size_bytes {
                     return true;
                 }
             }
-        }
     }
     
     crate::log_error(&format!("pic::redimensionner_poids impossible d'atteindre {}Ko pour {:?}", max_size_kb, input));
@@ -809,11 +808,10 @@ fn collecter_sources_jxl_inner(dir: &Path, out: &mut Vec<std::path::PathBuf>) {
                 if !name.ends_with(" jxl") {
                     collecter_sources_jxl_inner(&path, out);
                 }
-            } else if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-                if est_source_jxl(&ext.to_lowercase()) {
+            } else if let Some(ext) = path.extension().and_then(|e| e.to_str())
+                && est_source_jxl(&ext.to_lowercase()) {
                     out.push(path);
                 }
-            }
         }
     }
 }

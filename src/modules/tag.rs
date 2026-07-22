@@ -136,8 +136,8 @@ pub fn modifier_tag(mkv_path: &Path, tag: &str, valeur: &str) -> Result<(), Stri
     if status.success() { Ok(()) } else { Err("Erreur modification tag".into()) }
 }
 /// 3. Injection complète depuis NFO
-/// Pour une série, cherche seasonXX.nfo dans le dossier parent.
-/// Pour un film, cherche le NFO du même nom que le fichier.
+///    Pour une série, cherche seasonXX.nfo dans le dossier parent.
+///    Pour un film, cherche le NFO du même nom que le fichier.
 pub fn appliquer_tags(mkv_path: &Path, nfo_path: &Path) -> Result<(), String> {
     // Résoudre le bon NFO selon film ou série
     let resolved_nfo = resolve_nfo(mkv_path).unwrap_or_else(|| nfo_path.to_path_buf());
@@ -148,25 +148,22 @@ pub fn appliquer_tags(mkv_path: &Path, nfo_path: &Path) -> Result<(), String> {
     tags.remove("watchedstatus");
     tags.remove("KEYWORDS"); // Statut VU géré séparément
     // Rating dans COMMENT
-    if let Some(rating) = tags.get("value").cloned() {
-        if let Ok(r) = rating.parse::<f64>() {
+    if let Some(rating) = tags.get("value").cloned()
+        && let Ok(r) = rating.parse::<f64>() {
             let rounded = (r * 10.0).round() / 10.0;
             tags.insert("COMMENT".to_string(), format!("{} / 10", rounded));
         }
-    }
     // Year → RELEASETIME
-    if let Some(year) = tags.get("year").cloned() {
-        if !year.is_empty() {
+    if let Some(year) = tags.get("year").cloned()
+        && !year.is_empty() {
             tags.insert("RELEASETIME".to_string(), year);
         }
-    }
     // premiered → DATE_RELEASED (année seulement)
-    if let Some(premiered) = tags.remove("premiered") {
-        if !premiered.is_empty() {
+    if let Some(premiered) = tags.remove("premiered")
+        && !premiered.is_empty() {
             let annee = premiered.split('-').next().unwrap_or(&premiered).to_string();
             tags.insert("DATE_RELEASED".to_string(), annee);
         }
-    }
     let xml_content = creer_xml_tags(&tags);
     let temp_xml = "temp_meta.xml";
     std::fs::write(temp_xml, xml_content).map_err(|e| e.to_string())?;
@@ -242,15 +239,15 @@ fn resolve_poster(mkv_path: &Path) -> Option<std::path::PathBuf> {
 }
 
 /// 4. Injection Poster uniquement (film ou série)
-/// Pour une série : injecte seasonXX-poster.jpg
-/// Pour un film   : injecte stem-poster.jpg / poster.jpg
-/// Pas de fanart ni clearlogo
+///    Pour une série : injecte seasonXX-poster.jpg
+///    Pour un film   : injecte stem-poster.jpg / poster.jpg
+///    Pas de fanart ni clearlogo
 pub fn ajouter_images_mkv(mkv_path: &Path) -> Result<(), String> {
     let poster_path = match resolve_poster(mkv_path) {
         Some(p) => p,
         None => return Ok(()), // Pas de poster trouvé, rien à faire
     };
-    let mime = if poster_path.extension().map_or(false, |e| e == "png") {
+    let mime = if poster_path.extension().is_some_and(|e| e == "png") {
         "image/png"
     } else {
         "image/jpeg"
@@ -266,7 +263,7 @@ pub fn ajouter_images_mkv(mkv_path: &Path) -> Result<(), String> {
 
 /// 4b. Injection d'un poster choisi manuellement (override custom)
 pub fn injecter_poster_custom(mkv_path: &Path, poster_path: &Path) -> Result<(), String> {
-    let mime = if poster_path.extension().map_or(false, |e| e.eq_ignore_ascii_case("png")) {
+    let mime = if poster_path.extension().is_some_and(|e| e.eq_ignore_ascii_case("png")) {
         "image/png"
     } else {
         "image/jpeg"
