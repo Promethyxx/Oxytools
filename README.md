@@ -27,7 +27,6 @@ Oxytools_Office is a restricted version of Oxytools with less modules and does n
 | Pictures (JPG, JXL, PNG, WebP…) | ✅ | ✅ |
 | Scraper (Fanart, TMDB) | ✅ | ❌ |
 | Tagger (MKV tagging) | ✅ | ❌ |
-| Tools (directory and file listing)| ✅ | ✅ | ✅ |
 | Video (mkv, mp4, webm) | ✅ | ❌ |
 | Bundled binaries (ffmpeg, ffprobe, mkvpropedit) | ✅ | ❌ |
 | Internet access | ✅ | ❌ |
