@@ -20,7 +20,7 @@ pub enum FormatEntree {
 
 #[derive(Debug, Clone, Copy)]
 pub enum FormatSortie {
-    Docx, Html, Md, Odt, Tex, Plain, Pdf,
+    Docx, Html, Md, Odt, Tex, Plain, Pdf, Rtf, Epub,
 }
 
 pub fn detecter_format_entree(path: &Path) -> Option<FormatEntree> {
@@ -51,6 +51,8 @@ pub fn detecter_format_sortie(output: &Path) -> Option<FormatSortie> {
         "odt"  => Some(FormatSortie::Odt),
         "tex"  => Some(FormatSortie::Tex),
         "txt"  => Some(FormatSortie::Plain),
+        "rtf"  => Some(FormatSortie::Rtf),
+        "epub" => Some(FormatSortie::Epub),
         "pdf"  => Some(FormatSortie::Pdf),
         _ => None,
     })
@@ -81,6 +83,236 @@ fn md_vers_html(texte: &str) -> String {
 /// HTML → Markdown via html2md
 fn html_vers_md(html: &str) -> String {
     html2md::parse_html(html)
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  MARKDOWN STRUCTURÉ — pour préserver gras/italique/titres vers DOCX/ODT/RTF
+// ════════════════════════════════════════════════════════════════════════
+
+#[derive(Debug, Clone)]
+enum Inline {
+    Text(String),
+    Bold(String),
+    Italic(String),
+    BoldItalic(String),
+}
+
+#[derive(Debug, Clone)]
+enum Block {
+    Heading(u8, Vec<Inline>),
+    Paragraph(Vec<Inline>),
+}
+
+/// Parse le Markdown en une liste de blocs avec mise en forme (titres, gras, italique)
+/// au lieu de tout aplatir en texte brut.
+fn md_vers_blocs(texte: &str) -> Vec<Block> {
+    use pulldown_cmark::{Event, HeadingLevel, Options, Parser, Tag, TagEnd};
+
+    let mut opts = Options::empty();
+    opts.insert(Options::ENABLE_TABLES);
+    opts.insert(Options::ENABLE_STRIKETHROUGH);
+    opts.insert(Options::ENABLE_TASKLISTS);
+    let parser = Parser::new_ext(texte, opts);
+
+    let mut blocks = Vec::new();
+    let mut current: Vec<Inline> = Vec::new();
+    let mut heading_level: Option<u8> = None;
+    let mut bold_depth = 0u32;
+    let mut italic_depth = 0u32;
+
+    for event in parser {
+        match event {
+            Event::Start(Tag::Heading { level, .. }) => {
+                heading_level = Some(match level {
+                    HeadingLevel::H1 => 1, HeadingLevel::H2 => 2, HeadingLevel::H3 => 3,
+                    HeadingLevel::H4 => 4, HeadingLevel::H5 => 5, HeadingLevel::H6 => 6,
+                });
+                current.clear();
+            }
+            Event::End(TagEnd::Heading(_)) => {
+                if let Some(level) = heading_level.take() {
+                    blocks.push(Block::Heading(level, std::mem::take(&mut current)));
+                }
+            }
+            Event::Start(Tag::Paragraph) => current.clear(),
+            Event::End(TagEnd::Paragraph) => {
+                if heading_level.is_none() && !current.is_empty() {
+                    blocks.push(Block::Paragraph(std::mem::take(&mut current)));
+                }
+            }
+            Event::Start(Tag::Item) => current.clear(),
+            Event::End(TagEnd::Item) => {
+                if !current.is_empty() {
+                    current.insert(0, Inline::Text("• ".to_string()));
+                    blocks.push(Block::Paragraph(std::mem::take(&mut current)));
+                }
+            }
+            Event::Start(Tag::Strong) => bold_depth += 1,
+            Event::End(TagEnd::Strong) => bold_depth = bold_depth.saturating_sub(1),
+            Event::Start(Tag::Emphasis) => italic_depth += 1,
+            Event::End(TagEnd::Emphasis) => italic_depth = italic_depth.saturating_sub(1),
+            Event::Text(t) | Event::Code(t) => {
+                let inline = match (bold_depth > 0, italic_depth > 0) {
+                    (true, true) => Inline::BoldItalic(t.to_string()),
+                    (true, false) => Inline::Bold(t.to_string()),
+                    (false, true) => Inline::Italic(t.to_string()),
+                    (false, false) => Inline::Text(t.to_string()),
+                };
+                current.push(inline);
+            }
+            Event::SoftBreak | Event::HardBreak => current.push(Inline::Text(" ".to_string())),
+            _ => {}
+        }
+    }
+    blocks
+}
+
+fn xml_escape(s: &str) -> String {
+    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
+}
+
+/// Blocs structurés → paragraphes DOCX (XML interne, à insérer dans <w:body>)
+fn blocs_vers_docx_xml(blocks: &[Block]) -> String {
+    let mut xml = String::new();
+    for block in blocks {
+        match block {
+            Block::Heading(level, inlines) => {
+                let taille = (44i32 - (*level as i32 - 1) * 6).max(20);
+                xml.push_str("\n    <w:p><w:pPr><w:rPr><w:b/><w:sz w:val=\"");
+                xml.push_str(&taille.to_string());
+                xml.push_str("\"/></w:rPr></w:pPr>");
+                for inline in inlines {
+                    xml.push_str(&docx_run(inline, true, &taille.to_string()));
+                }
+                xml.push_str("</w:p>");
+            }
+            Block::Paragraph(inlines) => {
+                xml.push_str("\n    <w:p>");
+                for inline in inlines {
+                    xml.push_str(&docx_run(inline, false, "22"));
+                }
+                xml.push_str("</w:p>");
+            }
+        }
+    }
+    xml
+}
+
+fn docx_run(inline: &Inline, force_bold: bool, taille: &str) -> String {
+    let (texte, bold, italic) = match inline {
+        Inline::Text(t) => (t, false, false),
+        Inline::Bold(t) => (t, true, false),
+        Inline::Italic(t) => (t, false, true),
+        Inline::BoldItalic(t) => (t, true, true),
+    };
+    let bold = bold || force_bold;
+    let mut rpr = String::from("<w:rPr>");
+    if bold { rpr.push_str("<w:b/>"); }
+    if italic { rpr.push_str("<w:i/>"); }
+    rpr.push_str("<w:sz w:val=\""); rpr.push_str(taille); rpr.push_str("\"/>");
+    rpr.push_str("</w:rPr>");
+    format!("<w:r>{}<w:t xml:space=\"preserve\">{}</w:t></w:r>", rpr, xml_escape(texte))
+}
+
+/// Blocs structurés → paragraphes ODT (XML interne, à insérer dans <office:text>)
+fn blocs_vers_odt_xml(blocks: &[Block]) -> String {
+    let mut xml = String::new();
+    for block in blocks {
+        match block {
+            Block::Heading(level, inlines) => {
+                xml.push_str(&format!("\n      <text:h text:outline-level=\"{}\">", level));
+                for inline in inlines {
+                    xml.push_str(&odt_span(inline, true));
+                }
+                xml.push_str("</text:h>");
+            }
+            Block::Paragraph(inlines) => {
+                xml.push_str("\n      <text:p>");
+                for inline in inlines {
+                    xml.push_str(&odt_span(inline, false));
+                }
+                xml.push_str("</text:p>");
+            }
+        }
+    }
+    xml
+}
+
+fn odt_span(inline: &Inline, force_bold: bool) -> String {
+    let (texte, bold, italic) = match inline {
+        Inline::Text(t) => (t, false, false),
+        Inline::Bold(t) => (t, true, false),
+        Inline::Italic(t) => (t, false, true),
+        Inline::BoldItalic(t) => (t, true, true),
+    };
+    let bold = bold || force_bold;
+    match (bold, italic) {
+        (false, false) => xml_escape(texte),
+        (true, false) => format!("<text:span text:style-name=\"OxyBold\">{}</text:span>", xml_escape(texte)),
+        (false, true) => format!("<text:span text:style-name=\"OxyItalic\">{}</text:span>", xml_escape(texte)),
+        (true, true) => format!("<text:span text:style-name=\"OxyBoldItalic\">{}</text:span>", xml_escape(texte)),
+    }
+}
+
+/// Blocs structurés → RTF
+fn blocs_vers_rtf(blocks: &[Block]) -> String {
+    let mut rtf = String::new();
+    for block in blocks {
+        match block {
+            Block::Heading(level, inlines) => {
+                let taille = (44i32 - (*level as i32 - 1) * 6).max(20);
+                rtf.push_str(&format!(r"\fs{}\b ", taille));
+                for inline in inlines {
+                    rtf.push_str(&rtf_run(inline, true));
+                }
+                rtf.push_str(r"\b0\fs22\par");
+            }
+            Block::Paragraph(inlines) => {
+                for inline in inlines {
+                    rtf.push_str(&rtf_run(inline, false));
+                }
+                rtf.push_str(r"\par");
+            }
+        }
+        rtf.push('\n');
+    }
+    rtf
+}
+
+fn rtf_escape(s: &str) -> String {
+    let mut out = String::new();
+    for ch in s.chars() {
+        match ch {
+            '\\' => out.push_str(r"\\"),
+            '{' => out.push_str(r"\{"),
+            '}' => out.push_str(r"\}"),
+            c if c.is_ascii() && !c.is_control() => out.push(c),
+            c => {
+                let mut buf = [0u16; 2];
+                for unit in c.encode_utf16(&mut buf) {
+                    out.push_str(&format!(r"\u{}?", *unit as i16));
+                }
+            }
+        }
+    }
+    out
+}
+
+fn rtf_run(inline: &Inline, force_bold: bool) -> String {
+    let (texte, bold, italic) = match inline {
+        Inline::Text(t) => (t, false, false),
+        Inline::Bold(t) => (t, true, false),
+        Inline::Italic(t) => (t, false, true),
+        Inline::BoldItalic(t) => (t, true, true),
+    };
+    let bold = bold || force_bold;
+    let mut out = String::new();
+    if bold { out.push_str(r"\b "); }
+    if italic { out.push_str(r"\i "); }
+    out.push_str(&rtf_escape(texte));
+    if italic { out.push_str(r"\i0 "); }
+    if bold { out.push_str(r"\b0 "); }
+    out
 }
 
 /// HTML → texte brut (strip des tags)
@@ -163,6 +395,15 @@ fn lire_odt_texte(path: &Path) -> Result<String, String> {
     }
 
     extraire_texte_xml(&xml_content, &["text:p", "text:h", "text:span"])
+}
+
+/// Extraire le texte d'un fichier PDF via lopdf
+fn lire_pdf_texte(path: &Path) -> Result<String, String> {
+    let doc = Document::load(path)
+        .map_err(|e| format!("Erreur chargement PDF : {}", e))?;
+    let pages: Vec<u32> = doc.get_pages().keys().copied().collect();
+    doc.extract_text(&pages)
+        .map_err(|e| format!("Erreur extraction texte PDF : {}", e))
 }
 
 /// Extraire le texte d'un XML en cherchant les balises spécifiées
@@ -489,6 +730,12 @@ pub fn convertir(input: &Path, output: &Path) -> bool {
                 std::fs::write(output, html).map_err(|e| format!("Erreur écriture : {}", e))
             })
         }
+        (Some(FormatEntree::Pdf), Some(FormatSortie::Html)) => {
+            lire_pdf_texte(input).and_then(|t| {
+                let html = texte_vers_html(&t);
+                std::fs::write(output, html).map_err(|e| format!("Erreur écriture : {}", e))
+            })
+        }
 
         // ── Vers Markdown ──
         (Some(FormatEntree::Html), Some(FormatSortie::Md)) => {
@@ -499,6 +746,11 @@ pub fn convertir(input: &Path, output: &Path) -> bool {
         }
         (Some(FormatEntree::Docx) | Some(FormatEntree::Dotx), Some(FormatSortie::Md)) => {
             lire_docx_texte(input).and_then(|t| {
+                std::fs::write(output, t).map_err(|e| format!("Erreur écriture : {}", e))
+            })
+        }
+        (Some(FormatEntree::Pdf), Some(FormatSortie::Md)) => {
+            lire_pdf_texte(input).and_then(|t| {
                 std::fs::write(output, t).map_err(|e| format!("Erreur écriture : {}", e))
             })
         }
@@ -527,17 +779,70 @@ pub fn convertir(input: &Path, output: &Path) -> bool {
                 std::fs::write(output, t).map_err(|e| format!("Erreur écriture : {}", e))
             })
         }
+        (Some(FormatEntree::Pdf), Some(FormatSortie::Plain)) => {
+            lire_pdf_texte(input).and_then(|t| {
+                std::fs::write(output, t).map_err(|e| format!("Erreur écriture : {}", e))
+            })
+        }
+
+        // ── Depuis Markdown, avec mise en forme préservée (gras/italique/titres) ──
+        (Some(FormatEntree::Md), Some(FormatSortie::Docx)) => {
+            lire_texte(input).map(|t| md_vers_blocs(&t)).and_then(|b| ecrire_docx_riche(&b, output))
+        }
+        (Some(FormatEntree::Md), Some(FormatSortie::Odt)) => {
+            lire_texte(input).map(|t| md_vers_blocs(&t)).and_then(|b| ecrire_odt_riche(&b, output))
+        }
+        (Some(FormatEntree::Md), Some(FormatSortie::Rtf)) => {
+            lire_texte(input).map(|t| md_vers_blocs(&t)).and_then(|b| ecrire_rtf_riche(&b, output))
+        }
 
         // ── Vers DOCX (basique : texte dans un docx minimal) ──
         (_, Some(FormatSortie::Docx)) => {
+            let texte = match fmt_in {
+                Some(FormatEntree::Html) => lire_texte(input).map(|h| html_vers_texte(&h)),
+                Some(FormatEntree::Docx) | Some(FormatEntree::Dotx) => lire_docx_texte(input),
+                Some(FormatEntree::Odt) => lire_odt_texte(input),
+                Some(FormatEntree::Pdf) => lire_pdf_texte(input),
+                _ => lire_texte(input),
+            };
+            texte.and_then(|t| ecrire_docx_simple(&t, output))
+        }
+
+        // ── Vers ODT (basique : texte dans un odt minimal) ──
+        (_, Some(FormatSortie::Odt)) => {
+            let texte = match fmt_in {
+                Some(FormatEntree::Html) => lire_texte(input).map(|h| html_vers_texte(&h)),
+                Some(FormatEntree::Docx) | Some(FormatEntree::Dotx) => lire_docx_texte(input),
+                Some(FormatEntree::Odt) => lire_odt_texte(input),
+                Some(FormatEntree::Pdf) => lire_pdf_texte(input),
+                _ => lire_texte(input),
+            };
+            texte.and_then(|t| ecrire_odt_simple(&t, output))
+        }
+
+        // ── Vers RTF (basique : texte dans un rtf minimal) ──
+        (_, Some(FormatSortie::Rtf)) => {
+            let texte = match fmt_in {
+                Some(FormatEntree::Html) => lire_texte(input).map(|h| html_vers_texte(&h)),
+                Some(FormatEntree::Docx) | Some(FormatEntree::Dotx) => lire_docx_texte(input),
+                Some(FormatEntree::Odt) => lire_odt_texte(input),
+                Some(FormatEntree::Pdf) => lire_pdf_texte(input),
+                _ => lire_texte(input),
+            };
+            texte.and_then(|t| ecrire_rtf_simple(&t, output))
+        }
+
+        // ── Vers EPUB (basique : un seul chapitre XHTML) ──
+        (_, Some(FormatSortie::Epub)) => {
             let texte = match fmt_in {
                 Some(FormatEntree::Md) => lire_texte(input).map(|t| { let h = md_vers_html(&t); html_vers_texte(&h) }),
                 Some(FormatEntree::Html) => lire_texte(input).map(|h| html_vers_texte(&h)),
                 Some(FormatEntree::Docx) | Some(FormatEntree::Dotx) => lire_docx_texte(input),
                 Some(FormatEntree::Odt) => lire_odt_texte(input),
+                Some(FormatEntree::Pdf) => lire_pdf_texte(input),
                 _ => lire_texte(input),
             };
-            texte.and_then(|t| ecrire_docx_simple(&t, output))
+            texte.and_then(|t| ecrire_epub_simple(&t, output))
         }
 
         // ── Copie directe si même format ou inconnu ──
@@ -581,6 +886,7 @@ pub fn extraire_texte(input: &Path, output: &Path) -> bool {
             let html = md_vers_html(&t);
             html_vers_texte(&html)
         }),
+        Some(FormatEntree::Pdf) => lire_pdf_texte(input),
         _ => lire_texte(input),
     };
     match result {
@@ -596,6 +902,18 @@ pub fn extraire_texte(input: &Path, output: &Path) -> bool {
 
 /// Écrire un DOCX minimal (un seul paragraphe de texte)
 fn ecrire_docx_simple(texte: &str, output: &Path) -> Result<(), String> {
+    let mut corps = String::new();
+    for ligne in texte.lines() {
+        corps.push_str(&format!("\n    <w:p><w:r><w:t xml:space=\"preserve\">{}</w:t></w:r></w:p>", xml_escape(ligne)));
+    }
+    ecrire_docx_avec_corps(&corps, output)
+}
+
+fn ecrire_docx_riche(blocks: &[Block], output: &Path) -> Result<(), String> {
+    ecrire_docx_avec_corps(&blocs_vers_docx_xml(blocks), output)
+}
+
+fn ecrire_docx_avec_corps(corps_xml: &str, output: &Path) -> Result<(), String> {
     use std::io::Write;
     let file = std::fs::File::create(output)
         .map_err(|e| format!("Erreur création DOCX : {}", e))?;
@@ -636,17 +954,204 @@ fn ecrire_docx_simple(texte: &str, output: &Path) -> Result<(), String> {
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
   <w:body>"#);
 
+    doc_xml.push_str(corps_xml);
+
+    // Word exige une section de propriétés (taille de page, marges) directement
+    // dans <w:body> — sans ça, le fichier est structurellement invalide et Word
+    // le signale comme corrompu (ou refuse de l'ouvrir).
+    doc_xml.push_str(
+        "\n    <w:sectPr>\
+         \n      <w:pgSz w:w=\"11906\" w:h=\"16838\"/>\
+         \n      <w:pgMar w:top=\"1417\" w:right=\"1417\" w:bottom=\"1417\" w:left=\"1417\" w:header=\"708\" w:footer=\"708\" w:gutter=\"0\"/>\
+         \n    </w:sectPr>"
+    );
+    doc_xml.push_str("\n  </w:body>\n</w:document>");
+
+    zip_writer.write_all(doc_xml.as_bytes())
+        .map_err(|e| format!("Erreur écriture : {}", e))?;
+
+    zip_writer.finish()
+        .map_err(|e| format!("Erreur finalisation ZIP : {}", e))?;
+
+    Ok(())
+}
+
+/// Écrire un ODT minimal (un seul paragraphe de texte par ligne)
+fn ecrire_odt_simple(texte: &str, output: &Path) -> Result<(), String> {
+    let mut corps = String::new();
+    for ligne in texte.lines() {
+        corps.push_str(&format!("\n      <text:p>{}</text:p>", xml_escape(ligne)));
+    }
+    ecrire_odt_avec_corps(&corps, "", output)
+}
+
+fn ecrire_odt_riche(blocks: &[Block], output: &Path) -> Result<(), String> {
+    let styles = r#"
+    <style:style style:name="OxyBold" style:family="text"><style:text-properties fo:font-weight="bold"/></style:style>
+    <style:style style:name="OxyItalic" style:family="text"><style:text-properties fo:font-style="italic"/></style:style>
+    <style:style style:name="OxyBoldItalic" style:family="text"><style:text-properties fo:font-weight="bold" fo:font-style="italic"/></style:style>"#;
+    ecrire_odt_avec_corps(&blocs_vers_odt_xml(blocks), styles, output)
+}
+
+fn ecrire_odt_avec_corps(corps_xml: &str, styles_xml: &str, output: &Path) -> Result<(), String> {
+    use std::io::Write;
+    let file = std::fs::File::create(output)
+        .map_err(|e| format!("Erreur création ODT : {}", e))?;
+    let mut zip_writer = zip::ZipWriter::new(file);
+
+    // Le fichier "mimetype" doit être le premier de l'archive et NON compressé
+    // (exigence du format ODF, sinon certains lecteurs le rejettent).
+    let stored_options = zip::write::SimpleFileOptions::default()
+        .compression_method(zip::CompressionMethod::Stored);
+    zip_writer.start_file("mimetype", stored_options)
+        .map_err(|e| format!("Erreur ZIP : {}", e))?;
+    zip_writer.write_all(b"application/vnd.oasis.opendocument.text")
+        .map_err(|e| format!("Erreur écriture : {}", e))?;
+
+    let options = zip::write::SimpleFileOptions::default()
+        .compression_method(zip::CompressionMethod::Deflated);
+
+    // META-INF/manifest.xml
+    zip_writer.start_file("META-INF/manifest.xml", options)
+        .map_err(|e| format!("Erreur ZIP : {}", e))?;
+    zip_writer.write_all(br#"<?xml version="1.0" encoding="UTF-8"?>
+<manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0" manifest:version="1.2">
+  <manifest:file-entry manifest:full-path="/" manifest:version="1.2" manifest:media-type="application/vnd.oasis.opendocument.text"/>
+  <manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/>
+</manifest:manifest>"#).map_err(|e| format!("Erreur écriture : {}", e))?;
+
+    // content.xml
+    zip_writer.start_file("content.xml", options)
+        .map_err(|e| format!("Erreur ZIP : {}", e))?;
+
+    let mut content_xml = String::from(
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\
+         <office:document-content xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" \
+         xmlns:text=\"urn:oasis:names:tc:opendocument:xmlns:text:1.0\" \
+         xmlns:style=\"urn:oasis:names:tc:opendocument:xmlns:style:1.0\" \
+         xmlns:fo=\"urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0\" \
+         office:version=\"1.2\">"
+    );
+    if !styles_xml.is_empty() {
+        content_xml.push_str("\n  <office:automatic-styles>");
+        content_xml.push_str(styles_xml);
+        content_xml.push_str("\n  </office:automatic-styles>");
+    }
+    content_xml.push_str("\n  <office:body>\n    <office:text>");
+    content_xml.push_str(corps_xml);
+    content_xml.push_str("\n    </office:text>\n  </office:body>\n</office:document-content>");
+
+    zip_writer.write_all(content_xml.as_bytes())
+        .map_err(|e| format!("Erreur écriture : {}", e))?;
+
+    zip_writer.finish()
+        .map_err(|e| format!("Erreur finalisation ZIP : {}", e))?;
+
+    Ok(())
+}
+
+/// Écrire un RTF minimal (texte brut avec échappement Unicode)
+fn ecrire_rtf_simple(texte: &str, output: &Path) -> Result<(), String> {
+    let mut rtf = String::from(r"{\rtf1\ansi\deff0{\fonttbl{\f0 Calibri;}}\f0\fs22");
+    for ligne in texte.lines() {
+        rtf.push('\n');
+        rtf.push_str(&rtf_escape(ligne));
+        rtf.push_str(r"\par");
+    }
+    rtf.push('}');
+
+    std::fs::write(output, rtf).map_err(|e| format!("Erreur écriture RTF : {}", e))
+}
+
+fn ecrire_rtf_riche(blocks: &[Block], output: &Path) -> Result<(), String> {
+    let mut rtf = String::from(r"{\rtf1\ansi\deff0{\fonttbl{\f0 Calibri;}}\f0\fs22" );
+    rtf.push('\n');
+    rtf.push_str(&blocs_vers_rtf(blocks));
+    rtf.push('}');
+
+    std::fs::write(output, rtf).map_err(|e| format!("Erreur écriture RTF : {}", e))
+}
+
+/// Écrire un EPUB minimal (un seul chapitre XHTML)
+fn ecrire_epub_simple(texte: &str, output: &Path) -> Result<(), String> {
+    use std::io::Write;
+    let file = std::fs::File::create(output)
+        .map_err(|e| format!("Erreur création EPUB : {}", e))?;
+    let mut zip_writer = zip::ZipWriter::new(file);
+
+    // "mimetype" doit être le premier fichier de l'archive et NON compressé.
+    let stored_options = zip::write::SimpleFileOptions::default()
+        .compression_method(zip::CompressionMethod::Stored);
+    zip_writer.start_file("mimetype", stored_options)
+        .map_err(|e| format!("Erreur ZIP : {}", e))?;
+    zip_writer.write_all(b"application/epub+zip")
+        .map_err(|e| format!("Erreur écriture : {}", e))?;
+
+    let options = zip::write::SimpleFileOptions::default()
+        .compression_method(zip::CompressionMethod::Deflated);
+
+    // META-INF/container.xml — pointe vers le package OPF
+    zip_writer.start_file("META-INF/container.xml", options)
+        .map_err(|e| format!("Erreur ZIP : {}", e))?;
+    zip_writer.write_all(br#"<?xml version="1.0" encoding="UTF-8"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles>
+    <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>
+  </rootfiles>
+</container>"#).map_err(|e| format!("Erreur écriture : {}", e))?;
+
+    // OEBPS/content.opf — métadonnées + manifeste + spine
+    zip_writer.start_file("OEBPS/content.opf", options)
+        .map_err(|e| format!("Erreur ZIP : {}", e))?;
+    zip_writer.write_all(br#"<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="bookid">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:identifier id="bookid">urn:oxytools:generated</dc:identifier>
+    <dc:title>Document</dc:title>
+    <dc:language>fr</dc:language>
+    <meta property="dcterms:modified">2024-01-01T00:00:00Z</meta>
+  </metadata>
+  <manifest>
+    <item id="content" href="content.xhtml" media-type="application/xhtml+xml"/>
+    <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+  </manifest>
+  <spine>
+    <itemref idref="content"/>
+  </spine>
+</package>"#).map_err(|e| format!("Erreur écriture : {}", e))?;
+
+    // OEBPS/nav.xhtml — table des matières minimale, exigée par EPUB 3
+    zip_writer.start_file("OEBPS/nav.xhtml", options)
+        .map_err(|e| format!("Erreur ZIP : {}", e))?;
+    zip_writer.write_all(br#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
+<head><title>Navigation</title></head>
+<body>
+  <nav epub:type="toc" id="toc">
+    <ol><li><a href="content.xhtml">Document</a></li></ol>
+  </nav>
+</body>
+</html>"#).map_err(|e| format!("Erreur écriture : {}", e))?;
+
+    // OEBPS/content.xhtml — le contenu réel
+    zip_writer.start_file("OEBPS/content.xhtml", options)
+        .map_err(|e| format!("Erreur ZIP : {}", e))?;
+    let mut xhtml = String::from(
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\
+         <!DOCTYPE html>\n\
+         <html xmlns=\"http://www.w3.org/1999/xhtml\">\n\
+         <head><title>Document</title><meta charset=\"utf-8\"/></head>\n<body>"
+    );
     for ligne in texte.lines() {
         let escaped = ligne
             .replace('&', "&amp;")
             .replace('<', "&lt;")
             .replace('>', "&gt;");
-        doc_xml.push_str(&format!("\n    <w:p><w:r><w:t xml:space=\"preserve\">{}</w:t></w:r></w:p>", escaped));
+        xhtml.push_str(&format!("\n  <p>{}</p>", escaped));
     }
-
-    doc_xml.push_str("\n  </w:body>\n</w:document>");
-
-    zip_writer.write_all(doc_xml.as_bytes())
+    xhtml.push_str("\n</body>\n</html>");
+    zip_writer.write_all(xhtml.as_bytes())
         .map_err(|e| format!("Erreur écriture : {}", e))?;
 
     zip_writer.finish()
@@ -1127,7 +1632,7 @@ pub fn pdf_rotate(input: &Path, output: &Path, rotation: u16, pages_cibles: Opti
 //  PDF COMPRESS
 // ════════════════════════════════════════════════════════════════════════
 
-fn pdf_compresser_interne(input: &Path, output: &Path) -> Result<u64, String> {
+fn pdf_compresser_interne(input: &Path, output: &Path, niveau: u32) -> Result<u64, String> {
     let taille_avant = std::fs::metadata(input).map(|m| m.len()).unwrap_or(0);
 
     let mut doc = Document::load(input)
@@ -1141,7 +1646,7 @@ fn pdf_compresser_interne(input: &Path, output: &Path) -> Result<u64, String> {
     let options = SaveOptions::builder()
         .use_object_streams(true)
         .use_xref_streams(true)
-        .compression_level(9)
+        .compression_level(niveau.min(9))
         .build();
 
     let mut file = std::fs::File::create(output)
@@ -1153,17 +1658,17 @@ fn pdf_compresser_interne(input: &Path, output: &Path) -> Result<u64, String> {
     Ok(taille_avant.saturating_sub(taille_apres))
 }
 
-pub fn pdf_compresser(input: &Path, output: &Path) -> Result<u64, String> {
-    crate::log_info(&format!("pdf_compresser | {:?} -> {}", input, output.display()));
+pub fn pdf_compresser(input: &Path, output: &Path, niveau: u32) -> Result<u64, String> {
+    crate::log_info(&format!("pdf_compresser | niveau={} | {:?} -> {}", niveau, input, output.display()));
     if est_pdf(input) {
-        let result = pdf_compresser_interne(input, output);
+        let result = pdf_compresser_interne(input, output, niveau);
         if let Ok(bytes_gagnés) = &result {
             crate::log_info(&format!("pdf_compresser OK | {} octets économisés", bytes_gagnés));
         }
         return result;
     }
     let pdf_tmp = vers_pdf_temp(input)?;
-    let result = pdf_compresser_interne(&pdf_tmp, output);
+    let result = pdf_compresser_interne(&pdf_tmp, output, niveau);
     nettoyer_temp(&pdf_tmp);
     result
 }
@@ -1252,6 +1757,12 @@ fn pdf_organiser_interne(input: &Path, output: &Path, nouvel_ordre: &[u32]) -> R
         dict.set("Kids", Object::Array(new_kids));
         dict.set("Count", Object::Integer(new_count));
     }
+
+    // Les pages retirées du Kids restent orphelines dans la table d'objets
+    // (flux de contenu, images, polices) tant qu'on ne les élague pas —
+    // sans ça le fichier garde son poids d'origine malgré les pages en moins.
+    doc.prune_objects();
+    doc.renumber_objects();
 
     sauvegarder(&mut doc, output)
 }
@@ -1504,7 +2015,7 @@ fn pdf_watermark_interne(
                 Operation::new("gs", vec!["GSwm".into()]),
                 Operation::new("BT", vec![]),
                 Operation::new("Tf", vec!["Fwm".into(), taille_police.into()]),
-                Operation::new("rg", vec![0.7.into(), 0.7.into(), 0.7.into()]),
+                Operation::new("rg", vec![0.5.into(), 0.5.into(), 0.5.into()]),
                 Operation::new("Tm", vec![
                     cos_a.into(), sin_a.into(),
                     (-sin_a).into(), cos_a.into(),

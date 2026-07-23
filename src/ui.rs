@@ -276,11 +276,22 @@ impl eframe::App for OxytoolsApp {
                     ui.separator();
                     match self.doc_action.as_str() {
                         "Convert" => {
+                            let input_exts: std::collections::HashSet<String> = self.current_files.iter()
+                                .filter_map(|p| p.extension().and_then(|e| e.to_str()).map(|e| e.to_lowercase()))
+                                .collect();
+                            let formats_dispo: Vec<&str> = ["docx", "epub", "html", "md", "odt", "pdf", "rtf", "txt"]
+                                .into_iter()
+                                .filter(|f| !input_exts.contains(*f))
+                                .collect();
+                            if input_exts.contains(self.format_choisi.as_str())
+                                && let Some(&premier) = formats_dispo.first() {
+                                    self.format_choisi = premier.to_string();
+                                }
                             ui.horizontal(|ui| {
                                 ui.label(self.lang.format_label);
                                 egui::ComboBox::from_id_salt("dfmt").selected_text(&self.format_choisi).show_ui(ui, |ui| {
-                                    for f in ["docx","epub","html","md","odt","pdf","rtf","txt"] {
-                                        ui.selectable_value(&mut self.format_choisi, f.into(), f);
+                                    for f in &formats_dispo {
+                                        ui.selectable_value(&mut self.format_choisi, (*f).into(), *f);
                                     }
                                 });
                             });
@@ -312,6 +323,10 @@ impl eframe::App for OxytoolsApp {
                         },
                         "pdf_compress" => {
                             ui.label(self.lang.doc_compress_hint);
+                            ui.horizontal(|ui| {
+                                ui.label(self.lang.doc_compress_niveau);
+                                ui.add(egui::Slider::new(&mut self.pdf_compress_niveau, 0..=9));
+                            });
                         },
                         "pdf_crop" => {
                             ui.label(self.lang.doc_margins);

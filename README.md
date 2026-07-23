@@ -49,17 +49,14 @@ FFmpeg, FFprobe : https://ffmpeg.org — LGPLv2.1+
 mkvpropedit (MKVToolNix) : https://mkvtoolnix.download — GPLv2.
 You can also find them in assest in the releases.
 
-### Linux Arm
-- Oxytools
-   - cargo build --profile dist --target=aarch64-unknown-linux-gnu
-- Oxytools_Office
-   - cargo build --profile dist --no-default-features --features bundled --target=aarch64-unknown-linux-gnu
-
-### Linux x64, Windows x64
-- Oxytools
-   - cargo build --profile dist
-- Oxytools_Office
-   - cargo build --profile dist --no-default-features --features bundled
+| Version| OS | Command |
+|---|---|---|
+| Oxytools | Linux x64 | cargo dist |
+| Oxytools | Windows x64 | cargo dist |
+| Oxytools | Linux arm | cargo dist-arm|
+| Oxytools Office | Linux x64 | cargo dist-office |
+| Oxytools Office | Windows x64 | cargo dist-office |
+| Oxytools Office | Linux arm | cargo dist-office-arm|
 ---
 ## Quick Start
 
@@ -77,9 +74,6 @@ This project is licensed under the GNU General Public License v3.0 — see Licen
 ---
 ## Roadmap
 ## 🔴 NOW
- - ### Main
-    - Dispatch monolithic main
-    - Security audit and quality control
 ## 🟡 NEXT
  - ### Release:
     - Chocolatey

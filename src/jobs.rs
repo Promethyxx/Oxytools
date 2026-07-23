@@ -83,6 +83,7 @@ impl OxytoolsApp {
         let pdf_num_debut = self.pdf_num_debut;
         let pdf_num_position = self.pdf_num_position.clone();
         let pdf_num_taille = self.pdf_num_taille;
+        let pdf_compress_niveau = self.pdf_compress_niveau;
         let pdf_owner_pass = self.pdf_owner_pass.clone();
         let pdf_user_pass = self.pdf_user_pass.clone();
         let pdf_allow_print = self.pdf_allow_print;
@@ -317,8 +318,8 @@ impl OxytoolsApp {
                                     .map_err(|e| format!("pdf_rotate failed: {}", e))
                             },
                             "pdf_compress" => {
-                                log_info(&format!("Doc pdf_compress: {:?}", input));
-                                modules::doc::pdf_compresser(&input, &output)
+                                log_info(&format!("Doc pdf_compress: niveau={} | {:?}", pdf_compress_niveau, input));
+                                modules::doc::pdf_compresser(&input, &output, pdf_compress_niveau)
                                     .map(|_| ())
                                     .map_err(|e| format!("pdf_compress failed: {}", e))
                             },

@@ -899,7 +899,7 @@ fn test_doc_pdf_compress() {
     let output = format!("{OUT}/doc_pdf_comp.pdf");
     cleanup(&output);
     let pages_source = pdf_page_count(&input);
-    let result = crate::modules::doc::pdf_compresser(Path::new(&input), Path::new(&output));
+    let result = crate::modules::doc::pdf_compresser(Path::new(&input), Path::new(&output), 9);
     assert!(result.is_ok(), "pdf_compresser échoué : {:?}", result);
     assert_output(&output, "pdf compress");
     assert_pdf_pages(&output, pages_source, "pdf compress (nombre de pages inchangé)");
