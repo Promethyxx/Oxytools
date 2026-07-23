@@ -1421,15 +1421,13 @@ pub fn pdf_proteger(
 // ════════════════════════════════════════════════════════════════════════
 
 pub fn pdf_dechiffrer(input: &Path, output: &Path, mot_de_passe: &str) -> Result<(), String> {
-    let mut doc = Document::load(input)
-        .map_err(|e| format!("Erreur chargement PDF : {}", e))?;
-
-    if !doc.is_encrypted() {
-        return sauvegarder(&mut doc, output);
-    }
-
-    doc.decrypt(mot_de_passe)
-        .map_err(|e| format!("Mot de passe incorrect ou erreur déchiffrement : {}", e))?;
+    // Document::load() seul ne fonctionne pas ici : sa tentative automatique de
+    // déchiffrement avec un mot de passe vide échoue sur un PDF protégé par un
+    // vrai mot de passe, et la quasi-totalité des objets n'est alors jamais
+    // chargée — un decrypt() après coup n'a donc presque rien à déchiffrer.
+    // load_with_password() charge et déchiffre en une seule passe avec le bon mot de passe.
+    let mut doc = Document::load_with_password(input, mot_de_passe)
+        .map_err(|e| format!("Mot de passe incorrect ou erreur chargement/déchiffrement : {}", e))?;
 
     doc.trailer.remove(b"Encrypt");
 
