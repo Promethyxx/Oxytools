@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 pub struct Lang {
     // Status bar
     pub drop_files: &'static str,
@@ -102,6 +100,8 @@ pub struct Lang {
     // Video
     pub video_stream_copy: &'static str,
     pub video_quality_slider: &'static str,
+    pub video_codec_label: &'static str,
+    pub video_accel_label: &'static str,
 
     // Scrapper
     pub scrap_tmdb_key: &'static str,       // movies only
@@ -271,6 +271,8 @@ pub const EN: Lang = Lang {
 
     video_stream_copy: "Stream copy",
     video_quality_slider: "Quality (1=fast, 8=quality)",
+    video_codec_label: "Codec:",
+    video_accel_label: "Acceleration:",
 
     scrap_tmdb_key: "TMDB API Key (movies only):",
     scrap_fanart_key: "Fanart API Key (covers only):",
@@ -436,6 +438,8 @@ pub const FR: Lang = Lang {
 
     video_stream_copy: "Copie flux",
     video_quality_slider: "Qualité (1=rapide, 8=qualité)",
+    video_codec_label: "Codec :",
+    video_accel_label: "Accélération :",
 
     scrap_tmdb_key: "TMDB API Key (films uniquement) :",
     scrap_fanart_key: "Fanart API Key (covers uniquement) :",

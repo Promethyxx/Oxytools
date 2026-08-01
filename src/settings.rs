@@ -121,6 +121,12 @@ impl OxytoolsApp {
                     if let Some(speed) = vid.get("speed").and_then(|s| s.as_integer()) {
                         self.video_speed = speed as u32;
                     }
+                    if let Some(codec) = vid.get("codec").and_then(|c| c.as_str()) {
+                        self.video_codec = codec.to_string();
+                    }
+                    if let Some(accel) = vid.get("accel").and_then(|a| a.as_str()) {
+                        self.video_accel = accel.to_string();
+                    }
                 }
             }
         // ── Charger le dernier profil multi-replace ──────────────
@@ -251,6 +257,8 @@ impl OxytoolsApp {
                 if let Some(vid_table) = video.as_table_mut() {
                     vid_table.insert("copie_flux".to_string(), toml::Value::Boolean(self.copie_flux));
                     vid_table.insert("speed".to_string(), toml::Value::Integer(self.video_speed as i64));
+                    vid_table.insert("codec".to_string(), toml::Value::String(self.video_codec.clone()));
+                    vid_table.insert("accel".to_string(), toml::Value::String(self.video_accel.clone()));
                 }
             }
         }

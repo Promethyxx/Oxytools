@@ -359,6 +359,35 @@ fn test_pic_compresser_svg() {
 }
 
 #[test]
+fn test_pic_convertir_raw_vers_png() {
+    setup();
+    let output = format!("{OUT}/pic_raw2png.png");
+    cleanup(&output);
+    // Vérifie le vrai chemin public (convertir), pas la fonction interne
+    // directement — c'est ce chemin qui était court-circuité avant le fix
+    // ("format RAW non supporté" renvoyé sans jamais démosaïquer).
+    assert!(crate::modules::pic::convertir(Path::new(&format!("{TEST_PIC}/dng.dng")), Path::new(&output)),
+        "ÉCHEC convertir RAW→PNG — la conversion RAW a échoué");
+    assert_output(&output, "RAW→PNG");
+    let (w, h) = image_dims(&output);
+    assert!(w > 1 && h > 1, "ÉCHEC RAW→PNG — dimensions suspectes ({w}x{h}), le démosaïquage a probablement échoué");
+    cleanup(&output);
+}
+
+#[test]
+fn test_pic_compresser_raw() {
+    setup();
+    let output = format!("{OUT}/pic_raw_c.png");
+    cleanup(&output);
+    assert!(crate::modules::pic::compresser(Path::new(&format!("{TEST_PIC}/dng.dng")), Path::new(&output), 2),
+        "ÉCHEC compresser RAW — la compression RAW a échoué");
+    assert_output(&output, "compresser RAW");
+    let (w, h) = image_dims(&output);
+    assert!(w > 1 && h > 1, "ÉCHEC compresser RAW — dimensions suspectes ({w}x{h})");
+    cleanup(&output);
+}
+
+#[test]
 fn test_pic_compresser_psd() {
     setup();
     let output = format!("{OUT}/pic_psd_c.png");
@@ -474,6 +503,18 @@ fn test_pic_redimensionner_poids() {
     assert!(taille <= 55 * 1024,
         "ÉCHEC resize max 50Ko — fichier fait {} octets, largement au-dessus de la cible", taille);
     cleanup(&output);
+}
+
+#[test]
+fn test_pic_redimensionner_poids_echec_nettoie() {
+    setup();
+    let output = format!("{OUT}/pic_resize_impossible.jpg");
+    cleanup(&output);
+    // Cible volontairement irréaliste (0Ko) pour forcer un échec total et
+    // vérifier que le fichier n'est pas laissé sur le disque malgré le `false`.
+    let result = crate::modules::pic::redimensionner_poids(Path::new(&format!("{TEST_PIC}/jpg.jpg")), Path::new(&output), 0);
+    assert!(!result, "redimensionner_poids aurait dû échouer avec une cible de 0Ko");
+    assert!(!Path::new(&output).exists(), "ÉCHEC nettoyage — le fichier de sortie existe encore après un échec total");
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -645,6 +686,69 @@ fn test_pic_supprimer_exif() {
     let tags_apres = crate::modules::pic::lire_exif(Path::new(&output));
     assert!(tags_apres.is_empty(), "ÉCHEC supprimer EXIF — {} tags encore présents après suppression", tags_apres.len());
     assert_dims_preservees(&input, &output, "supprimer EXIF");
+    cleanup(&output);
+}
+
+#[test]
+fn test_pic_watermark_accents() {
+    setup();
+    let input = format!("{TEST_PIC}/jpg.jpg");
+    let output = format!("{OUT}/pic_watermark.jpg");
+    cleanup(&output);
+    // Texte accentué délibérément — c'est exactement le cas que la police
+    // bitmap maison ratait (rendu en carrés pleins avant le passage à resvg).
+    assert!(crate::modules::pic::watermark(Path::new(&input), Path::new(&output), "Été à Montréal", 40.0, 0.5));
+    assert_output(&output, "watermark accents");
+    assert_dims_preservees(&input, &output, "watermark accents");
+    // Vérification réelle : le watermark doit avoir modifié des pixels —
+    // sinon la fonction n'a rien dessiné du tout silencieusement.
+    let avant = image::open(&input).unwrap().to_rgba8();
+    let apres = image::open(&output).unwrap().to_rgba8();
+    let pixels_differents = avant.pixels().zip(apres.pixels()).filter(|(a, b)| a != b).count();
+    assert!(pixels_differents > 0, "ÉCHEC watermark — aucun pixel modifié, le texte n'a probablement pas été dessiné");
+    cleanup(&output);
+}
+
+#[test]
+fn test_pic_meme_accents() {
+    setup();
+    let input = format!("{TEST_PIC}/jpg.jpg");
+    let output = format!("{OUT}/pic_meme.jpg");
+    cleanup(&output);
+    let (w_in, h_in) = image_dims(&input);
+    assert!(crate::modules::pic::meme(Path::new(&input), Path::new(&output), "En haut à gauche", "Légende du bas"));
+    assert_output(&output, "meme accents");
+    let (w_out, h_out) = image_dims(&output);
+    assert_eq!(w_out, w_in, "ÉCHEC meme — largeur modifiée alors qu'elle ne devrait pas l'être");
+    // Une bande (haut + bas) est ajoutée, chacune de hauteur max(h/8, 40).
+    let bar_h = (h_in / 8).max(40);
+    assert_eq!(h_out, h_in + 2 * bar_h, "ÉCHEC meme — hauteur des bandes texte incorrecte");
+    cleanup(&output);
+}
+
+#[test]
+fn test_pic_upscale() {
+    setup();
+    let input = format!("{TEST_PIC}/jpg.jpg");
+    let output = format!("{OUT}/pic_upscale.jpg");
+    cleanup(&output);
+    let (w_in, h_in) = image_dims(&input);
+    assert!(crate::modules::pic::upscale(Path::new(&input), Path::new(&output), 2));
+    assert_output(&output, "upscale 2x");
+    assert_image_dims(&output, w_in * 2, h_in * 2, "upscale 2x");
+    cleanup(&output);
+}
+
+#[test]
+fn test_pic_html_to_image() {
+    setup();
+    let output = format!("{OUT}/pic_html2img.png");
+    cleanup(&output);
+    assert!(crate::modules::pic::html_to_image(Path::new(&format!("{TEST_DOC}/html.html")), Path::new(&output), 600));
+    assert_output(&output, "html_to_image");
+    let (w, h) = image_dims(&output);
+    assert_eq!(w, 600, "ÉCHEC html_to_image — largeur différente de celle demandée");
+    assert!(h > 0, "ÉCHEC html_to_image — hauteur nulle");
     cleanup(&output);
 }
 
@@ -1320,7 +1424,7 @@ fn test_video_mkv_vers_webm() {
     let input = std::path::PathBuf::from(&input_str);
     let output = format!("{OUT}/vid_mkv2webm.webm");
     cleanup(&output);
-    run_ffmpeg(|| crate::modules::video::traiter_video(&input, Path::new(&output), false, false, 1), "mkv→webm");
+    run_ffmpeg(|| crate::modules::video::traiter_video(&input, Path::new(&output), false, false, 1, "auto", "auto"), "mkv→webm");
     assert_output(&output, "mkv→webm");
     assert_video_codec(&output, "vp9", "mkv→webm");
     assert_duree_preservee(&input_str, &output, "mkv→webm");
@@ -1334,7 +1438,7 @@ fn test_video_mkv_vers_mp4() {
     let input = std::path::PathBuf::from(&input_str);
     let output = format!("{OUT}/vid_mkv2mp4.mp4");
     cleanup(&output);
-    run_ffmpeg(|| crate::modules::video::traiter_video(&input, Path::new(&output), false, false, 1), "mkv→mp4");
+    run_ffmpeg(|| crate::modules::video::traiter_video(&input, Path::new(&output), false, false, 1, "auto", "auto"), "mkv→mp4");
     assert_output(&output, "mkv→mp4");
     assert_video_codec(&output, "h264", "mkv→mp4");
     assert_duree_preservee(&input_str, &output, "mkv→mp4");
@@ -1348,7 +1452,7 @@ fn test_video_mp4_vers_mkv() {
     let input = std::path::PathBuf::from(&input_str);
     let output = format!("{OUT}/vid_mp42mkv.mkv");
     cleanup(&output);
-    run_ffmpeg(|| crate::modules::video::traiter_video(&input, Path::new(&output), false, false, 1), "mp4→mkv");
+    run_ffmpeg(|| crate::modules::video::traiter_video(&input, Path::new(&output), false, false, 1, "auto", "auto"), "mp4→mkv");
     assert_output(&output, "mp4→mkv");
     assert_video_codec(&output, "h264", "mp4→mkv");
     assert_duree_preservee(&input_str, &output, "mp4→mkv");
@@ -1362,7 +1466,7 @@ fn test_video_webm_vers_mp4() {
     let input = std::path::PathBuf::from(&input_str);
     let output = format!("{OUT}/vid_webm2mp4.mp4");
     cleanup(&output);
-    run_ffmpeg(|| crate::modules::video::traiter_video(&input, Path::new(&output), false, false, 1), "webm→mp4");
+    run_ffmpeg(|| crate::modules::video::traiter_video(&input, Path::new(&output), false, false, 1, "auto", "auto"), "webm→mp4");
     assert_output(&output, "webm→mp4");
     assert_video_codec(&output, "h264", "webm→mp4");
     assert_duree_preservee(&input_str, &output, "webm→mp4");
@@ -1376,12 +1480,39 @@ fn test_video_copie_flux() {
     let input = std::path::PathBuf::from(&input_str);
     let output = format!("{OUT}/vid_copy.mp4");
     cleanup(&output);
-    run_ffmpeg(|| crate::modules::video::traiter_video(&input, Path::new(&output), true, false, 1), "copie flux");
+    run_ffmpeg(|| crate::modules::video::traiter_video(&input, Path::new(&output), true, false, 1, "auto", "auto"), "copie flux");
     assert_output(&output, "copie flux");
     // copie_flux=true → "-c copy", le codec source doit être conservé tel quel, pas réencodé.
     let codec_source = probe_stream_field(&input_str, "v:0", "codec_name");
     let codec_sortie = probe_stream_field(&output, "v:0", "codec_name");
     assert_eq!(codec_source, codec_sortie, "ÉCHEC copie flux — codec vidéo changé alors que -c copy ne devrait pas réencoder");
     assert_duree_preservee(&input_str, &output, "copie flux");
+    cleanup(&output);
+}
+
+#[test]
+fn test_video_codecs_disponibles() {
+    setup();
+    let liste = crate::modules::video::codecs_et_accelerations_disponibles();
+    assert_eq!(liste.len(), 4, "ÉCHEC codecs_disponibles — 4 codecs attendus (h264/hevc/av1/vp9)");
+    for (codec, accels) in &liste {
+        // "software" doit toujours être proposé, quel que soit le matériel détecté.
+        assert!(accels.contains(&"software"), "ÉCHEC codecs_disponibles — {} n'a pas d'option software", codec);
+        println!("  {} : {:?}", codec, accels);
+    }
+}
+
+#[test]
+fn test_video_codec_hevc_explicite() {
+    setup();
+    let input_str = format!("{TEST_VIDEO}/mkv.mkv");
+    let input = std::path::PathBuf::from(&input_str);
+    let output = format!("{OUT}/vid_hevc.mp4");
+    cleanup(&output);
+    // Codec explicitement choisi par l'utilisateur (logiciel, pour un résultat
+    // reproductible indépendamment du GPU de la machine qui lance le test).
+    run_ffmpeg(|| crate::modules::video::traiter_video(&input, Path::new(&output), false, false, 4, "hevc", "software"), "hevc explicite");
+    assert_output(&output, "hevc explicite");
+    assert_video_codec(&output, "hevc", "hevc explicite (choix utilisateur respecté)");
     cleanup(&output);
 }

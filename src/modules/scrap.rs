@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use chrono::Local;
 use regex::Regex;
 use reqwest::blocking::Client;
@@ -86,10 +85,11 @@ pub struct Producer {
 pub fn download_image_bytes(poster_path: &str) -> Option<Vec<u8>> {
     let url = format!("https://image.tmdb.org/t/p/w92{}", poster_path);
     let client = Client::new();
-    if let Ok(res) = client.get(url).send()
-        && let Ok(bytes) = res.bytes() {
+    if let Ok(res) = client.get(url).send() {
+        if let Ok(bytes) = res.bytes() {
             return Some(bytes.to_vec());
         }
+    }
     None
 }
 
@@ -111,7 +111,9 @@ pub fn extract_series_info(filename: &str) -> Option<(String, u32)> {
         };
         // Nettoyer le titre : remplacer . _ - par espaces, trim
         let title = raw_title
-            .replace(['.', '_', '-'], " ")
+            .replace('.', " ")
+            .replace('_', " ")
+            .replace('-', " ")
             .split_whitespace()
             .collect::<Vec<_>>()
             .join(" ");
@@ -185,10 +187,11 @@ pub fn detect_series(paths: &[PathBuf]) -> Option<(String, BTreeSet<u32>)> {
         }
     }
 
-    if let Some(title) = title_found
-        && !seasons.is_empty() {
+    if let Some(title) = title_found {
+        if !seasons.is_empty() {
             return Some((title, seasons));
         }
+    }
     None
 }
 
@@ -244,11 +247,12 @@ pub fn save_metadata(input_path: PathBuf, data: ScrapeResult, fanart_key: &str, 
     }
 
     // Certification
-    if let Some(cert) = &data.certification
-        && cert != "N/A" {
+    if let Some(cert) = &data.certification {
+        if cert != "N/A" {
             xml.push_str(&format!("  <mpaa>{}</mpaa>\n", escape_xml(cert)));
             xml.push_str(&format!("  <certification>{}</certification>\n", escape_xml(cert)));
         }
+    }
 
     // IDs
     if let Some(imdb) = &data.imdb_id {
@@ -350,25 +354,28 @@ pub fn save_metadata(input_path: PathBuf, data: ScrapeResult, fanart_key: &str, 
         let out_path = posters_dir.join(format!("{}_poster.jpg", base_name));
         let client_clone = client.clone();
         std::thread::spawn(move || {
-            if let Ok(res) = client_clone.get(poster_url).send()
-                && let Ok(bytes) = res.bytes() {
+            if let Ok(res) = client_clone.get(poster_url).send() {
+                if let Ok(bytes) = res.bytes() {
                     let _ = fs::write(out_path, bytes);
                 }
+            }
         });
     }
 
-    if fetch_fanart
-        && let Some(ref path) = data.backdrop_path {
+    if fetch_fanart {
+        if let Some(ref path) = data.backdrop_path {
             let fanart_url = format!("https://image.tmdb.org/t/p/original{}", path);
             let out_path = posters_dir.join(format!("{}_fanart.jpg", base_name));
             let client_clone = client.clone();
             std::thread::spawn(move || {
-                if let Ok(res) = client_clone.get(fanart_url).send()
-                    && let Ok(bytes) = res.bytes() {
+                if let Ok(res) = client_clone.get(fanart_url).send() {
+                    if let Ok(bytes) = res.bytes() {
                         let _ = fs::write(out_path, bytes);
                     }
+                }
             });
         }
+    }
 
     if !fetch_clearlogo { return; }
     let fanart_api_key = if fanart_key.is_empty() {
@@ -395,8 +402,8 @@ pub fn save_metadata(input_path: PathBuf, data: ScrapeResult, fanart_key: &str, 
 
     let out_logo_path = posters_dir.join(format!("{}_clearlogo.png", base_name));
     std::thread::spawn(move || {
-        if let Ok(res) = client.get(&logo_url).send()
-            && let Ok(json) = res.json::<Value>() {
+        if let Ok(res) = client.get(&logo_url).send() {
+            if let Ok(json) = res.json::<Value>() {
                 let logo_path = if is_series {
                     json["hdtvlogo"]
                         .as_array()
@@ -412,12 +419,15 @@ pub fn save_metadata(input_path: PathBuf, data: ScrapeResult, fanart_key: &str, 
                         .and_then(|v| v["url"].as_str())
                 };
 
-                if let Some(url) = logo_path
-                    && let Ok(img_res) = Client::new().get(url).send()
-                        && let Ok(bytes) = img_res.bytes() {
+                if let Some(url) = logo_path {
+                    if let Ok(img_res) = Client::new().get(url).send() {
+                        if let Ok(bytes) = img_res.bytes() {
                             let _ = fs::write(out_logo_path, bytes);
                         }
+                    }
+                }
             }
+        }
     });
 }
 
@@ -610,28 +620,32 @@ pub fn save_series_metadata(
         let out = extras_dir.join(format!("{}_poster.jpg", base_name));
         let c = client.clone();
         std::thread::spawn(move || {
-            if let Ok(res) = c.get(url).send()
-                && let Ok(bytes) = res.bytes() { let _ = fs::write(out, bytes); }
+            if let Ok(res) = c.get(url).send() {
+                if let Ok(bytes) = res.bytes() { let _ = fs::write(out, bytes); }
+            }
         });
     }
-    if fetch_fanart
-        && let Some(ref path) = data.backdrop_path {
+    if fetch_fanart {
+        if let Some(ref path) = data.backdrop_path {
             let url = format!("https://image.tmdb.org/t/p/original{}", path);
             let out = extras_dir.join(format!("{}_fanart.jpg", base_name));
             let c = client.clone();
             std::thread::spawn(move || {
-                if let Ok(res) = c.get(url).send()
-                    && let Ok(bytes) = res.bytes() { let _ = fs::write(out, bytes); }
+                if let Ok(res) = c.get(url).send() {
+                    if let Ok(bytes) = res.bytes() { let _ = fs::write(out, bytes); }
+                }
             });
         }
+    }
     for season in data.seasons.iter().filter(|s| s.number > 0 && detected_seasons.contains(&s.number)) {
         if let Some(ref pp) = season.poster_path {
             let url = format!("https://image.tmdb.org/t/p/original{}", pp);
             let out = extras_dir.join(format!("{}_season{:02}_poster.jpg", base_name, season.number));
             let c = client.clone();
             std::thread::spawn(move || {
-                if let Ok(res) = c.get(url).send()
-                    && let Ok(bytes) = res.bytes() { let _ = fs::write(out, bytes); }
+                if let Ok(res) = c.get(url).send() {
+                    if let Ok(bytes) = res.bytes() { let _ = fs::write(out, bytes); }
+                }
             });
         }
     }
@@ -654,17 +668,20 @@ pub fn save_series_metadata(
     };
     let out_logo = extras_dir.join(format!("{}_clearlogo.png", base_name));
     std::thread::spawn(move || {
-        if let Ok(res) = client.get(&logo_url).send()
-            && let Ok(json) = res.json::<Value>() {
+        if let Ok(res) = client.get(&logo_url).send() {
+            if let Ok(json) = res.json::<Value>() {
                 let url = json["hdtvlogo"]
                     .as_array()
                     .or_else(|| json["clearlogo"].as_array())
                     .and_then(|arr| arr.first())
                     .and_then(|v| v["url"].as_str());
-                if let Some(u) = url
-                    && let Ok(img) = Client::new().get(u).send()
-                        && let Ok(bytes) = img.bytes() { let _ = fs::write(out_logo, bytes); }
+                if let Some(u) = url {
+                    if let Ok(img) = Client::new().get(u).send() {
+                        if let Ok(bytes) = img.bytes() { let _ = fs::write(out_logo, bytes); }
+                    }
+                }
             }
+        }
     });
 }
 
@@ -752,7 +769,7 @@ fn parse_detail(d: &Value, id: i64, is_series: bool) -> Option<ScrapeResult> {
         d["release_dates"]["results"].as_array()
             .and_then(|arr| arr.iter().find(|c| c["iso_3166_1"].as_str() == Some("FR")))
             .and_then(|c| c["release_dates"].as_array())
-            .and_then(|releases| releases.iter().find(|r| r["certification"].as_str().is_some_and(|s| !s.is_empty())))
+            .and_then(|releases| releases.iter().find(|r| r["certification"].as_str().map_or(false, |s| !s.is_empty())))
             .and_then(|r| r["certification"].as_str()).map(|r| format!("FR:{}", r))
     };
 
@@ -858,7 +875,9 @@ pub fn search_tmdb(query: &str, is_series: bool, tmdb_key: &str) -> Result<Vec<S
     let clean_query = re_year
         .replace(query, "")
         .to_string()
-        .replace(['.', '_', '-'], " ");
+        .replace('.', " ")
+        .replace('_', " ")
+        .replace('-', " ");
 
     let url = if is_series {
         "https://api.themoviedb.org/3/search/tv"
@@ -896,9 +915,11 @@ pub fn search_tmdb(query: &str, is_series: bool, tmdb_key: &str) -> Result<Vec<S
                 .get(detail_url)
                 .send()
                 .and_then(|resp| resp.json::<Value>())
-                && let Some(result) = parse_detail(&d, id, is_series) {
+            {
+                if let Some(result) = parse_detail(&d, id, is_series) {
                     list.push(result);
                 }
+            }
         }
     }
     Ok(list)

@@ -48,6 +48,7 @@ impl OxytoolsApp {
         let status_arc = Arc::clone(&self.status);
         let conv_progress = Arc::clone(&self.conv_progress);
         let active_pids = Arc::clone(&self.active_pids);
+        let fichiers_produits = Arc::clone(&self.fichiers_produits);
         let lang = self.lang;
         let module = self.module_actif;
         let fmt = self.format_choisi.clone();
@@ -56,6 +57,8 @@ impl OxytoolsApp {
         let copie = self.copie_flux;
         #[cfg(feature = "api")]
         let video_speed = self.video_speed;
+        let video_codec = self.video_codec.clone();
+        let video_accel = self.video_accel.clone();
         #[cfg(feature = "api")]
         let audio_action = self.audio_action.clone();
         #[cfg(feature = "api")]
@@ -261,8 +264,8 @@ impl OxytoolsApp {
                     },
                     #[cfg(feature = "api")]
                     ModuleType::Video => {
-                        log_info(&format!("Video: copie_flux={} speed={} | {:?}", copie, video_speed, input));
-                        match modules::video::traiter_video(&input, &output, copie, false, video_speed) {
+                        log_info(&format!("Video: copie_flux={} speed={} codec={} accel={} | {:?}", copie, video_speed, video_codec, video_accel, input));
+                        match modules::video::traiter_video(&input, &output, copie, false, video_speed, &video_codec, &video_accel) {
                             Ok(child) => {
                                 let dur = utils::get_duration_secs(&input);
                                 utils::wait_ffmpeg_with_progress(child, dur, &conv_progress, &active_pids)
@@ -306,8 +309,16 @@ impl OxytoolsApp {
                                         let paths: Vec<&Path> = pdf_merge_list.iter().map(|p| p.as_path()).collect();
                                         let output_merge = parent.join("merged_oxytools.pdf");
                                         log_info(&format!("Doc pdf_merge: {} fichiers -> {:?}", paths.len(), output_merge));
-                                        modules::doc::pdf_merge(&paths, &output_merge)
-                                            .map_err(|e| format!("pdf_merge failed: {}", e))
+                                        let resultat = modules::doc::pdf_merge(&paths, &output_merge)
+                                            .map_err(|e| format!("pdf_merge failed: {}", e));
+                                        if resultat.is_ok() {
+                                            // Le merge combine plusieurs fichiers en un seul — la file
+                                            // d'attente doit basculer sur ce résultat, sinon toute
+                                            // opération suivante (delete pages, etc.) tourne à tort sur
+                                            // les fichiers d'origine plutôt que sur le fichier fusionné.
+                                            *fichiers_produits.lock().unwrap_or_else(|e| e.into_inner()) = Some(vec![output_merge.clone()]);
+                                        }
+                                        resultat
                                     }
                                 }
                             },

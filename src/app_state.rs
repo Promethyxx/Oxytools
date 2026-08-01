@@ -95,6 +95,8 @@ pub struct OxytoolsApp {
         pub(crate) save_video_format: bool,
         #[cfg(feature = "api")]
         pub(crate) video_speed: u32,
+        pub(crate) video_codec: String,
+        pub(crate) video_accel: String,
         pub(crate) image_action: String,
         pub(crate) jxl_mode: String,
         pub(crate) rotation_angle: u32,
@@ -155,6 +157,7 @@ pub struct OxytoolsApp {
         pub(crate) job_queue: Arc<Mutex<Vec<PathBuf>>>,
         pub(crate) conv_progress: Arc<Mutex<f32>>,
         pub(crate) active_pids: Arc<Mutex<Vec<u32>>>,
+        pub(crate) fichiers_produits: Arc<Mutex<Option<Vec<PathBuf>>>>,
 }
 impl Default for OxytoolsApp {
     fn default() -> Self {
@@ -211,6 +214,8 @@ impl Default for OxytoolsApp {
                 save_video_format: false,
                 #[cfg(feature = "api")]
                 video_speed: 4,
+                video_codec: "auto".to_string(),
+                video_accel: "auto".to_string(),
                 image_action: "Convert".into(),
                 jxl_mode: "lossless".into(),
                 rotation_angle: 90,
@@ -271,6 +276,7 @@ impl Default for OxytoolsApp {
                 job_queue: Arc::new(Mutex::new(Vec::new())),
                 conv_progress: Arc::new(Mutex::new(-1.0f32)),
                 active_pids: Arc::new(Mutex::new(Vec::new())),
+                fichiers_produits: Arc::new(Mutex::new(None)),
                 rename_cfg: modules::rename::RenameConfig::default(),
                 rename_previews: Vec::new(),
                 rename_results: Vec::new(),

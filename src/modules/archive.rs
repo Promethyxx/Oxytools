@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use std::fs;
 use std::io::{Write, Seek};
 use std::path::{Path, PathBuf};
@@ -42,7 +41,7 @@ fn ajouter_dossier_zip<W: Write + Seek>(
         let name = relative.to_string_lossy().replace('\\', "/");
 
         if path.is_dir() {
-            zip_writer.add_directory(format!("{}/", name), options)
+            zip_writer.add_directory(&format!("{}/", name), options)
                 .map_err(|e| format!("Erreur zip add_directory : {}", e))?;
             ajouter_dossier_zip(zip_writer, base, &path, options)?;
         } else {
@@ -160,16 +159,14 @@ pub fn extraire(input: &Path, destination: &Path) -> bool {
         "7z"  => extraire_7z(input, destination),
         "gz" | "tgz" => extraire_tar(input, destination),
         "tar" => {
-            // tar non compresse
-            let file = fs::File::open(input).map_err(|e| format!("{}", e));
-            match file {
-                Ok(f) => {
+            // tar non compressé
+            fs::File::open(input)
+                .map_err(|e| e.to_string())
+                .and_then(|f| {
                     let mut archive = tar::Archive::new(f);
                     archive.unpack(destination)
                         .map_err(|e| format!("Erreur extraction tar : {}", e))
-                }
-                Err(e) => Err(e),
-            }
+                })
         }
         _ => Err(format!("Format d'archive non reconnu : .{}", ext)),
     };
@@ -248,7 +245,7 @@ fn ajouter_dossier_zip_exclusions<W: Write + Seek>(
         }
 
         if path.is_dir() {
-            zip_writer.add_directory(format!("{}/", name), options)
+            zip_writer.add_directory(&format!("{}/", name), options)
                 .map_err(|e| format!("Erreur zip add_directory : {}", e))?;
             ajouter_dossier_zip_exclusions(zip_writer, base, &path, options, exclusions)?;
         } else {

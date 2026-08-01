@@ -30,6 +30,13 @@ impl eframe::App for OxytoolsApp {
             self.apply_theme(ctx);
             self.verifier_deps();
         }
+        // Si un job en arrière-plan a produit un résultat qui remplace la file
+        // d'attente (ex: un merge combinant plusieurs PDF en un seul), on
+        // bascule dessus ici — sinon une opération suivante tournerait à tort
+        // sur les fichiers d'origine plutôt que sur le résultat produit.
+        if let Some(nouveaux) = self.fichiers_produits.lock().unwrap_or_else(|e| e.into_inner()).take() {
+            self.current_files = nouveaux;
+        }
         ctx.input(|i| {
             if !i.raw.dropped_files.is_empty() {
                 self.current_files = i.raw.dropped_files.iter().filter_map(|f| {
@@ -705,6 +712,51 @@ impl eframe::App for OxytoolsApp {
                             }
                         });
                         if ui.checkbox(&mut self.copie_flux, self.lang.video_stream_copy).changed() { self.save_config(); }
+                    });
+                    // Codec/accélération n'ont aucun effet en mode copie de flux
+                    // (-c copy conserve le codec source tel quel).
+                    ui.add_enabled_ui(!self.copie_flux, |ui| {
+                        let dispo = modules::video::codecs_et_accelerations_disponibles();
+                        ui.horizontal(|ui| {
+                            ui.label(self.lang.video_codec_label);
+                            egui::ComboBox::from_id_salt("vcodec").selected_text(&self.video_codec).show_ui(ui, |ui| {
+                                if ui.selectable_value(&mut self.video_codec, "auto".into(), "auto").changed() {
+                                    self.save_config();
+                                }
+                                for (codec, _) in &dispo {
+                                    if ui.selectable_value(&mut self.video_codec, codec.to_string(), *codec).changed() {
+                                        self.save_config();
+                                    }
+                                }
+                            });
+                        });
+                        // Liste des accélérations réellement utilisables pour le codec choisi
+                        // (ou l'union de toutes si "auto") — on ne propose jamais une option
+                        // vouée à échouer sur cette machine.
+                        let accels_pour_codec: Vec<&str> = if self.video_codec == "auto" {
+                            let mut tous: Vec<&str> = dispo.iter().flat_map(|(_, a)| a.iter().copied()).collect();
+                            tous.sort();
+                            tous.dedup();
+                            tous
+                        } else {
+                            dispo.iter()
+                                .find(|(c, _)| *c == self.video_codec)
+                                .map(|(_, a)| a.clone())
+                                .unwrap_or_else(|| vec!["software"])
+                        };
+                        ui.horizontal(|ui| {
+                            ui.label(self.lang.video_accel_label);
+                            egui::ComboBox::from_id_salt("vaccel").selected_text(&self.video_accel).show_ui(ui, |ui| {
+                                if ui.selectable_value(&mut self.video_accel, "auto".into(), "auto").changed() {
+                                    self.save_config();
+                                }
+                                for accel in &accels_pour_codec {
+                                    if ui.selectable_value(&mut self.video_accel, accel.to_string(), *accel).changed() {
+                                        self.save_config();
+                                    }
+                                }
+                            });
+                        });
                     });
                     if ui.add(egui::Slider::new(&mut self.video_speed, 0..=8).text(self.lang.video_quality_slider)).changed() {
                         self.save_config();

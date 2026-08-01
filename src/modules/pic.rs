@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use image::imageops::FilterType;
 use image::ImageEncoder;
 use std::fs::File;
@@ -59,8 +58,7 @@ pub fn compresser(input: &Path, output: &Path, qualite: u32) -> bool {
             "psd" => return convertir_psd(input, output),
             "jxl" => return compresser_jxl_qualite(input, output, qualite),
             "dng" | "cr2" | "nef" | "arw" | "orf" | "rw2" => {
-                crate::log_warn(&format!("pic::compresser format RAW non supporté pour {:?}", input));
-                return false;
+                return compresser_raw(input, output);
             },
             _ => {}
         }
@@ -309,8 +307,7 @@ pub fn convertir(input: &Path, output: &Path) -> bool {
             "psd" => return convertir_psd(input, output),
             "jxl" => return convertir_jxl(input, output),
             "dng" | "cr2" | "nef" | "arw" | "orf" | "rw2" => {
-                crate::log_warn(&format!("pic::convertir format RAW non supporté pour {:?}", input));
-                return false;
+                return convertir_raw(input, output);
             },
             _ => {}
         }
@@ -462,31 +459,63 @@ pub fn redimensionner_poids(input: &Path, output: &Path, max_size_kb: u32) -> bo
             return false;
         }
     };
-    
+
     let (orig_w, orig_h) = (img.width(), img.height());
     let max_size_bytes = max_size_kb as u64 * 1024;
-    
-    // Essayer différents ratios jusqu'à obtenir la taille voulue
-    for ratio in 1..=10 {
-        let new_w = orig_w / ratio;
-        let new_h = orig_h / ratio;
-        
-        if new_w < 10 || new_h < 10 {
-            crate::log_warn(&format!("pic::redimensionner_poids trop petit à ratio={} ({}x{}) pour {:?}", ratio, new_w, new_h, input));
-            break;
-        }
-        
-        let resized = img.resize(new_w, new_h, FilterType::Lanczos3);
-        
-        if resized.save(output).is_ok()
-            && let Ok(metadata) = std::fs::metadata(output) {
-                crate::log_info(&format!("pic::redimensionner_poids ratio={} -> {}Ko (cible={}Ko)", ratio, metadata.len() / 1024, max_size_kb));
-                if metadata.len() <= max_size_bytes {
+    let est_jpeg = output.extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.eq_ignore_ascii_case("jpg") || e.eq_ignore_ascii_case("jpeg"))
+        .unwrap_or(false);
+
+    let taille_fichier = |path: &Path| std::fs::metadata(path).map(|m| m.len()).unwrap_or(u64::MAX);
+
+    // Phase A (JPEG uniquement) : baisser la qualité à dimensions inchangées
+    // avant de toucher à la taille de l'image — la plupart du temps ça suffit,
+    // sans jamais réduire visuellement l'image.
+    if est_jpeg {
+        for qualite in (1..=10).rev() {
+            if sauvegarder_jpeg(&img, output, qualite) {
+                let taille = taille_fichier(output);
+                crate::log_info(&format!("pic::redimensionner_poids qualite={} -> {}Ko (cible={}Ko)", qualite * 10, taille / 1024, max_size_kb));
+                if taille <= max_size_bytes {
                     return true;
                 }
             }
+        }
     }
-    
+
+    // Phase B : réduction progressive des dimensions, par paliers de 10% plutôt
+    // que par ratios entiers (1/2, 1/3...) qui surcompressaient largement plus
+    // que nécessaire.
+    for pourcent in (10..=90).rev().step_by(10) {
+        let new_w = (orig_w * pourcent) / 100;
+        let new_h = (orig_h * pourcent) / 100;
+
+        if new_w < 10 || new_h < 10 {
+            crate::log_warn(&format!("pic::redimensionner_poids trop petit à {}% ({}x{}) pour {:?}", pourcent, new_w, new_h, input));
+            break;
+        }
+
+        let resized = img.resize(new_w, new_h, FilterType::Lanczos3);
+        let sauvegarde_ok = if est_jpeg {
+            sauvegarder_jpeg(&resized, output, 6) // qualité 60%, raisonnable une fois redimensionné
+        } else {
+            resized.save(output).is_ok()
+        };
+
+        if sauvegarde_ok {
+            let taille = taille_fichier(output);
+            crate::log_info(&format!("pic::redimensionner_poids {}% -> {}Ko (cible={}Ko)", pourcent, taille / 1024, max_size_kb));
+            if taille <= max_size_bytes {
+                return true;
+            }
+        }
+    }
+
+    // Échec : ne pas laisser un fichier de sortie trop lourd alors que le job
+    // est signalé en échec — sans ça, l'appelant croit qu'aucun fichier n'a
+    // été produit alors que le dernier essai (trop gros) traîne sur le disque.
+    let _ = std::fs::remove_file(output);
     crate::log_error(&format!("pic::redimensionner_poids impossible d'atteindre {}Ko pour {:?}", max_size_kb, input));
     false
 }
@@ -530,11 +559,6 @@ fn convertir_svg(input: &Path, output: &Path) -> bool {
     };
 
     image::DynamicImage::ImageRgba8(img).save(output).is_ok()
-}
-
-/// Compression SVG (rasterise sans redimensionnement)
-fn compresser_svg(input: &Path, output: &Path) -> bool {
-    convertir_svg(input, output)
 }
 
 // === FONCTIONS POUR FORMAT JXL ===
@@ -621,23 +645,86 @@ fn convertir_raw(input: &Path, output: &Path) -> bool {
 
     let width = decoded.width;
     let height = decoded.height;
-    
-    // Extraire les données selon le type
-    let image_data: Vec<u8> = match decoded.data {
-        rawloader::RawImageData::Integer(ref data) => {
-            data.iter().map(|&val| (val >> 8) as u8).collect()
-        },
-        rawloader::RawImageData::Float(ref data) => {
-            data.iter().map(|&val| (val.clamp(0.0, 1.0) * 255.0) as u8).collect()
-        },
-    };
 
-    let img = match image::RgbImage::from_raw(width as u32, height as u32, image_data) {
+    // rawloader ne fournit que les données brutes du capteur (mosaïque de
+    // Bayer, une seule valeur par photosite) — PAS une image RGB déjà
+    // assemblée. Les utiliser telles quelles comme si c'était du RGB
+    // entrelacé produit soit un échec systématique (mauvaise taille de
+    // buffer), soit une image totalement corrompue. Il faut démosaïquer.
+    let data_u16: Vec<u16> = match &decoded.data {
+        rawloader::RawImageData::Integer(d) => d.clone(),
+        rawloader::RawImageData::Float(d) => {
+            d.iter().map(|&v| (v.clamp(0.0, 1.0) * 65535.0) as u16).collect()
+        }
+    };
+    if data_u16.len() != width * height {
+        return false;
+    }
+
+    let mut rgb: Vec<u8> = vec![0u8; width * height * 3];
+
+    // Démosaïquage simple par bloc 2x2 : pour chaque bloc, on identifie la
+    // couleur de chaque photosite via cfa.color_at(), on moyenne les deux
+    // verts, et on applique ce même triplet RGB aux 4 pixels du bloc.
+    // Volontairement simple (pas d'interpolation fine type AHD/VNG et pas de
+    // correction colorimétrique via xyz_to_cam) — l'objectif est une image
+    // couleur correcte plutôt qu'un rendu de qualité studio.
+    for by in (0..height).step_by(2) {
+        for bx in (0..width).step_by(2) {
+            let mut somme = [0f32; 3];
+            let mut compte = [0u32; 3];
+            for dy in 0..2 {
+                for dx in 0..2 {
+                    let (r, c) = (by + dy, bx + dx);
+                    if r >= height || c >= width { continue; }
+                    let couleur = (decoded.cfa.color_at(r, c) as usize).min(2); // "E" (4e couleur rare) traité comme B
+                    let brut = data_u16[r * width + c] as f32;
+                    let noir = decoded.blacklevels[couleur] as f32;
+                    let blanc = decoded.whitelevels[couleur] as f32;
+                    let normalise = ((brut - noir) / (blanc - noir).max(1.0)).clamp(0.0, 1.0);
+                    let balance = normalise * decoded.wb_coeffs[couleur];
+                    somme[couleur] += balance;
+                    compte[couleur] += 1;
+                }
+            }
+            let mut triplet = [0u8; 3];
+            for (canal, t) in triplet.iter_mut().enumerate() {
+                let moyenne = if compte[canal] > 0 { somme[canal] / compte[canal] as f32 } else { 0.0 };
+                // Les données capteur sont en lumière linéaire — correction
+                // gamma approximative pour un rendu visuellement correct.
+                let gamma = moyenne.clamp(0.0, 1.0).powf(1.0 / 2.2);
+                *t = (gamma * 255.0) as u8;
+            }
+            for dy in 0..2 {
+                for dx in 0..2 {
+                    let (r, c) = (by + dy, bx + dx);
+                    if r >= height || c >= width { continue; }
+                    let idx = (r * width + c) * 3;
+                    rgb[idx] = triplet[0];
+                    rgb[idx + 1] = triplet[1];
+                    rgb[idx + 2] = triplet[2];
+                }
+            }
+        }
+    }
+
+    let img = match image::RgbImage::from_raw(width as u32, height as u32, rgb) {
         Some(i) => i,
         None => return false,
     };
 
-    image::DynamicImage::ImageRgb8(img).save(output).is_ok()
+    // Recadrage selon les zones du capteur non exploitables (bords masqués).
+    let (top, right, bottom, left) = (decoded.crops[0], decoded.crops[1], decoded.crops[2], decoded.crops[3]);
+    let recadre = if top + bottom < height && left + right < width && (top + right + bottom + left) > 0 {
+        image::imageops::crop_imm(
+            &img, left as u32, top as u32,
+            (width - left - right) as u32, (height - top - bottom) as u32,
+        ).to_image()
+    } else {
+        img
+    };
+
+    image::DynamicImage::ImageRgb8(recadre).save(output).is_ok()
 }
 
 /// Compression RAW (décode sans redimensionnement)
@@ -678,11 +765,6 @@ fn convertir_psd(input: &Path, output: &Path) -> bool {
     };
 
     image::DynamicImage::ImageRgba8(img).save(output).is_ok()
-}
-
-/// Compression PSD (décode sans redimensionnement)
-fn compresser_psd(input: &Path, output: &Path) -> bool {
-    convertir_psd(input, output)
 }
 
 // ════════════════════════════════════════════════════════════════════════
@@ -808,10 +890,11 @@ fn collecter_sources_jxl_inner(dir: &Path, out: &mut Vec<std::path::PathBuf>) {
                 if !name.ends_with(" jxl") {
                     collecter_sources_jxl_inner(&path, out);
                 }
-            } else if let Some(ext) = path.extension().and_then(|e| e.to_str())
-                && est_source_jxl(&ext.to_lowercase()) {
+            } else if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+                if est_source_jxl(&ext.to_lowercase()) {
                     out.push(path);
                 }
+            }
         }
     }
 }
@@ -822,6 +905,71 @@ fn collecter_sources_jxl_inner(dir: &Path, out: &mut Vec<std::path::PathBuf>) {
 
 /// Ajoute un watermark texte en diagonal au centre de l'image.
 /// taille = taille du texte en pixels, opacite = 0.0..1.0
+/// Rend du texte via resvg avec une vraie police système (accents/Unicode gérés
+/// nativement, contrairement à une police bitmap maison) et retourne une image
+/// RGBA à fond transparent, juste assez grande pour contenir le texte.
+/// Base de polices système, chargée une seule fois pour tout le process —
+/// la recharger à chaque appel de rendre_texte_svg() était inutilement lent
+/// (et risquait de cumuler la lenteur sur chaque watermark/meme/html_to_image).
+static FONT_DB: std::sync::OnceLock<std::sync::Arc<resvg::usvg::fontdb::Database>> = std::sync::OnceLock::new();
+
+fn font_db() -> std::sync::Arc<resvg::usvg::fontdb::Database> {
+    FONT_DB.get_or_init(|| {
+        let mut db = resvg::usvg::fontdb::Database::new();
+        db.load_system_fonts();
+        std::sync::Arc::new(db)
+    }).clone()
+}
+
+fn rendre_texte_svg(texte: &str, taille: f32, couleur_hex: &str) -> Option<image::RgbaImage> {
+    let echappe = texte
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;");
+
+    // Estimation large de la taille du canvas nécessaire — resvg rognera
+    // naturellement les zones vides, une estimation généreuse suffit.
+    let largeur = (texte.chars().count() as f32 * taille * 0.65).ceil().max(1.0) as u32 + 10;
+    let hauteur = (taille * 1.5).ceil() as u32 + 10;
+
+    let svg = format!(
+        r#"<svg xmlns="http://www.w3.org/2000/svg" width="{largeur}" height="{hauteur}">
+<text x="5" y="{baseline}" font-family="sans-serif" font-size="{taille}" fill="{couleur_hex}">{echappe}</text>
+</svg>"#,
+        baseline = (taille * 1.0).ceil() as u32,
+    );
+
+    let opt = resvg::usvg::Options {
+        fontdb: font_db(),
+        ..Default::default()
+    };
+
+    let tree = resvg::usvg::Tree::from_str(&svg, &opt).ok()?;
+    let size = tree.size();
+    let mut pixmap = resvg::tiny_skia::Pixmap::new(size.width() as u32, size.height() as u32)?;
+    resvg::render(&tree, resvg::tiny_skia::Transform::default(), &mut pixmap.as_mut());
+
+    image::RgbaImage::from_raw(pixmap.width(), pixmap.height(), pixmap.data().to_vec())
+}
+
+/// Compose une image de texte (fond transparent) sur une image de base, à la
+/// position donnée, en appliquant une opacité globale supplémentaire.
+fn composer_texte(base: &mut image::RgbaImage, texte_img: &image::RgbaImage, x: u32, y: u32, opacite: f32) {
+    let (bw, bh) = (base.width(), base.height());
+    for (tx, ty, px) in texte_img.enumerate_pixels() {
+        let alpha = ((px[3] as f32) * opacite.clamp(0.0, 1.0)) as u8;
+        if alpha == 0 { continue; }
+        let dx = x + tx;
+        let dy = y + ty;
+        if dx < bw && dy < bh {
+            let dest = base.get_pixel_mut(dx, dy);
+            dest[0] = blend_channel(dest[0], px[0], alpha);
+            dest[1] = blend_channel(dest[1], px[1], alpha);
+            dest[2] = blend_channel(dest[2], px[2], alpha);
+        }
+    }
+}
+
 pub fn watermark(input: &Path, output: &Path, texte: &str, taille: f32, opacite: f32) -> bool {
     crate::log_info(&format!("pic::watermark | texte='{}' taille={} opacite={} | {:?} -> {}", texte, taille, opacite, input, output.display()));
     let img = match image::open(input) {
@@ -834,26 +982,26 @@ pub fn watermark(input: &Path, output: &Path, texte: &str, taille: f32, opacite:
     let mut rgba = img.to_rgba8();
     let (w, h) = (rgba.width(), rgba.height());
 
-    // Dessiner le texte caractère par caractère en mode très simple
-    // On utilise une approche bitmap basique sans dépendance de police
+    let texte_img = match rendre_texte_svg(texte, taille, "#ffffff") {
+        Some(t) => t,
+        None => {
+            crate::log_error("pic::watermark rendu texte échoué");
+            return false;
+        }
+    };
+    let (tw, th) = (texte_img.width(), texte_img.height());
+    let start_x = w.saturating_sub(tw) / 2;
+    let start_y = h.saturating_sub(th) / 2;
+
+    // Rectangle semi-transparent gris derrière le texte, pour la lisibilité
     let alpha = (opacite.clamp(0.0, 1.0) * 255.0) as u8;
-    let char_w = (taille * 0.6) as u32;
-    let char_h = taille as u32;
-    let text_total_w = texte.len() as u32 * char_w;
-
-    // Position centrée, rotation simulée par décalage diagonal
-    let start_x = w.saturating_sub(text_total_w) / 2;
-    let start_y = h.saturating_sub(char_h) / 2;
-
-    // Dessiner un rectangle semi-transparent derrière le texte
-    for dy in 0..char_h.min(h) {
-        for dx in 0..text_total_w.min(w) {
+    let bg_alpha = alpha / 3;
+    for dy in 0..th.min(h) {
+        for dx in 0..tw.min(w) {
             let px = start_x + dx;
             let py = start_y + dy;
             if px < w && py < h {
                 let pixel = rgba.get_pixel_mut(px, py);
-                // Blend avec couleur grise semi-transparente
-                let bg_alpha = alpha / 3;
                 pixel[0] = blend_channel(pixel[0], 128, bg_alpha);
                 pixel[1] = blend_channel(pixel[1], 128, bg_alpha);
                 pixel[2] = blend_channel(pixel[2], 128, bg_alpha);
@@ -861,29 +1009,7 @@ pub fn watermark(input: &Path, output: &Path, texte: &str, taille: f32, opacite:
         }
     }
 
-    // Dessiner le texte avec des pixels blancs (police bitmap 5x7 simplifiée)
-    let scale = (taille / 14.0).max(1.0) as u32;
-    for (ci, ch) in texte.chars().enumerate() {
-        let glyph = get_bitmap_glyph(ch);
-        for (row, bits) in glyph.iter().enumerate() {
-            for col in 0..5 {
-                if bits & (1 << (4 - col)) != 0 {
-                    for sy in 0..scale {
-                        for sx in 0..scale {
-                            let px = start_x + (ci as u32) * char_w + col * scale + sx;
-                            let py = start_y + (row as u32) * scale + sy;
-                            if px < w && py < h {
-                                let pixel = rgba.get_pixel_mut(px, py);
-                                pixel[0] = blend_channel(pixel[0], 255, alpha);
-                                pixel[1] = blend_channel(pixel[1], 255, alpha);
-                                pixel[2] = blend_channel(pixel[2], 255, alpha);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
+    composer_texte(&mut rgba, &texte_img, start_x, start_y, opacite);
 
     image::DynamicImage::ImageRgba8(rgba).save(output).is_ok()
 }
@@ -892,54 +1018,6 @@ fn blend_channel(bg: u8, fg: u8, alpha: u8) -> u8 {
     let a = alpha as u16;
     let result = (fg as u16 * a + bg as u16 * (255 - a)) / 255;
     result as u8
-}
-
-/// Retourne un glyphe bitmap 5x7 pour un caractère (simplifié)
-fn get_bitmap_glyph(ch: char) -> [u8; 7] {
-    match ch.to_ascii_uppercase() {
-        'A' => [0b01110, 0b10001, 0b10001, 0b11111, 0b10001, 0b10001, 0b10001],
-        'B' => [0b11110, 0b10001, 0b11110, 0b10001, 0b10001, 0b10001, 0b11110],
-        'C' => [0b01110, 0b10001, 0b10000, 0b10000, 0b10000, 0b10001, 0b01110],
-        'D' => [0b11110, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b11110],
-        'E' => [0b11111, 0b10000, 0b10000, 0b11110, 0b10000, 0b10000, 0b11111],
-        'F' => [0b11111, 0b10000, 0b10000, 0b11110, 0b10000, 0b10000, 0b10000],
-        'G' => [0b01110, 0b10001, 0b10000, 0b10111, 0b10001, 0b10001, 0b01110],
-        'H' => [0b10001, 0b10001, 0b10001, 0b11111, 0b10001, 0b10001, 0b10001],
-        'I' => [0b01110, 0b00100, 0b00100, 0b00100, 0b00100, 0b00100, 0b01110],
-        'J' => [0b00111, 0b00010, 0b00010, 0b00010, 0b00010, 0b10010, 0b01100],
-        'K' => [0b10001, 0b10010, 0b10100, 0b11000, 0b10100, 0b10010, 0b10001],
-        'L' => [0b10000, 0b10000, 0b10000, 0b10000, 0b10000, 0b10000, 0b11111],
-        'M' => [0b10001, 0b11011, 0b10101, 0b10101, 0b10001, 0b10001, 0b10001],
-        'N' => [0b10001, 0b11001, 0b10101, 0b10011, 0b10001, 0b10001, 0b10001],
-        'O' => [0b01110, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b01110],
-        'P' => [0b11110, 0b10001, 0b10001, 0b11110, 0b10000, 0b10000, 0b10000],
-        'Q' => [0b01110, 0b10001, 0b10001, 0b10001, 0b10101, 0b10010, 0b01101],
-        'R' => [0b11110, 0b10001, 0b10001, 0b11110, 0b10100, 0b10010, 0b10001],
-        'S' => [0b01110, 0b10001, 0b10000, 0b01110, 0b00001, 0b10001, 0b01110],
-        'T' => [0b11111, 0b00100, 0b00100, 0b00100, 0b00100, 0b00100, 0b00100],
-        'U' => [0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b01110],
-        'V' => [0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b01010, 0b00100],
-        'W' => [0b10001, 0b10001, 0b10001, 0b10101, 0b10101, 0b11011, 0b10001],
-        'X' => [0b10001, 0b10001, 0b01010, 0b00100, 0b01010, 0b10001, 0b10001],
-        'Y' => [0b10001, 0b10001, 0b01010, 0b00100, 0b00100, 0b00100, 0b00100],
-        'Z' => [0b11111, 0b00001, 0b00010, 0b00100, 0b01000, 0b10000, 0b11111],
-        '0' => [0b01110, 0b10001, 0b10011, 0b10101, 0b11001, 0b10001, 0b01110],
-        '1' => [0b00100, 0b01100, 0b00100, 0b00100, 0b00100, 0b00100, 0b01110],
-        '2' => [0b01110, 0b10001, 0b00001, 0b00110, 0b01000, 0b10000, 0b11111],
-        '3' => [0b01110, 0b10001, 0b00001, 0b00110, 0b00001, 0b10001, 0b01110],
-        '4' => [0b00010, 0b00110, 0b01010, 0b10010, 0b11111, 0b00010, 0b00010],
-        '5' => [0b11111, 0b10000, 0b11110, 0b00001, 0b00001, 0b10001, 0b01110],
-        '6' => [0b01110, 0b10000, 0b11110, 0b10001, 0b10001, 0b10001, 0b01110],
-        '7' => [0b11111, 0b00001, 0b00010, 0b00100, 0b01000, 0b01000, 0b01000],
-        '8' => [0b01110, 0b10001, 0b10001, 0b01110, 0b10001, 0b10001, 0b01110],
-        '9' => [0b01110, 0b10001, 0b10001, 0b01111, 0b00001, 0b00001, 0b01110],
-        ' ' => [0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b00000],
-        '-' => [0b00000, 0b00000, 0b00000, 0b11111, 0b00000, 0b00000, 0b00000],
-        '.' => [0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b01100, 0b01100],
-        '!' => [0b00100, 0b00100, 0b00100, 0b00100, 0b00100, 0b00000, 0b00100],
-        '?' => [0b01110, 0b10001, 0b00010, 0b00100, 0b00100, 0b00000, 0b00100],
-        _   => [0b11111, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b11111],
-    }
 }
 
 // ════════════════════════════════════════════════════════════════════════
@@ -985,31 +1063,15 @@ pub fn meme(input: &Path, output: &Path, top_text: &str, bottom_text: &str) -> b
 
 /// Dessine du texte centré dans une bande de l'image (fond noir, texte blanc)
 fn draw_meme_text(canvas: &mut image::RgbaImage, text: &str, width: u32, y_start: u32, bar_height: u32) {
-    let scale = ((bar_height as f32) / 10.0).max(1.0) as u32;
-    let char_w = 6 * scale;
-    let char_h = 7 * scale;
-    let text_total_w = text.len() as u32 * char_w;
-    let x_start = width.saturating_sub(text_total_w) / 2;
-    let y_center = y_start + (bar_height.saturating_sub(char_h)) / 2;
-
-    for (ci, ch) in text.chars().enumerate() {
-        let glyph = get_bitmap_glyph(ch);
-        for (row, bits) in glyph.iter().enumerate() {
-            for col in 0..5u32 {
-                if bits & (1 << (4 - col)) != 0 {
-                    for sy in 0..scale {
-                        for sx in 0..scale {
-                            let px = x_start + (ci as u32) * char_w + col * scale + sx;
-                            let py = y_center + (row as u32) * scale + sy;
-                            if px < canvas.width() && py < canvas.height() {
-                                canvas.put_pixel(px, py, image::Rgba([255, 255, 255, 255]));
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
+    let taille = (bar_height as f32 * 0.6).max(10.0);
+    let texte_img = match rendre_texte_svg(text, taille, "#ffffff") {
+        Some(t) => t,
+        None => return,
+    };
+    let (tw, th) = (texte_img.width(), texte_img.height());
+    let x_start = width.saturating_sub(tw) / 2;
+    let y_center = y_start + bar_height.saturating_sub(th) / 2;
+    composer_texte(canvas, &texte_img, x_start, y_center, 1.0);
 }
 
 // ════════════════════════════════════════════════════════════════════════
@@ -1087,26 +1149,12 @@ pub fn html_to_image(input: &Path, output: &Path, width: u32) -> bool {
     let img_h = (wrapped.len() as u32 * line_h + 2 * margin).max(100);
     let mut canvas = image::RgbaImage::from_pixel(width, img_h, image::Rgba([255, 255, 255, 255]));
 
-    // Dessiner chaque ligne
+    // Dessiner chaque ligne avec une vraie police système (accents/Unicode gérés nativement)
+    let taille = char_h as f32;
     for (li, line) in wrapped.iter().enumerate() {
         let y = margin + li as u32 * line_h;
-        for (ci, ch) in line.chars().enumerate() {
-            let glyph = get_bitmap_glyph(ch);
-            for (row, bits) in glyph.iter().enumerate() {
-                for col in 0..5u32 {
-                    if bits & (1 << (4 - col)) != 0 {
-                        for sy in 0..scale {
-                            for sx in 0..scale {
-                                let px = margin + (ci as u32) * char_w + col * scale + sx;
-                                let py = y + (row as u32) * scale + sy;
-                                if px < width && py < img_h {
-                                    canvas.put_pixel(px, py, image::Rgba([0, 0, 0, 255]));
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+        if let Some(ligne_img) = rendre_texte_svg(line, taille, "#000000") {
+            composer_texte(&mut canvas, &ligne_img, margin, y, 1.0);
         }
     }
 
