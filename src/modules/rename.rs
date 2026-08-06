@@ -201,6 +201,9 @@ pub struct RenameConfig {
     pub ext_mode: ExtMode, pub ext_new: String,
     /// Mode remplacement multiple (si true, utilise replace_list au lieu de find/replace_with)
     pub multi_replace: bool,
+    /// Active réellement l'application des règles du mode multiple (indépendant du fait
+    /// que la liste soit chargée en config, pour éviter un remplacement non désiré).
+    pub multi_replace_enabled: bool,
     pub replace_list: ReplaceList,
 }
 impl Default for RenameConfig {
@@ -216,6 +219,7 @@ impl Default for RenameConfig {
             strip_double_spaces: true, strip_chars: String::new(),
             ext_mode: ExtMode::Unchanged, ext_new: String::new(),
             multi_replace: false,
+            multi_replace_enabled: false,
             replace_list: ReplaceList::new(),
         }
     }
@@ -230,7 +234,9 @@ fn compute_new_name(path: &Path, index: usize, cfg: &RenameConfig) -> String {
 
     // ── Remplacement (simple ou multiple) ───────────────────────
     if cfg.multi_replace {
-        name = cfg.replace_list.apply(&name);
+        if cfg.multi_replace_enabled {
+            name = cfg.replace_list.apply(&name);
+        }
     } else if !cfg.find.is_empty() {
         name = name.replace(&cfg.find, &cfg.replace_with);
     }

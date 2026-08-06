@@ -1,14 +1,12 @@
 // ═══════════════════════════════════════════════════════════════
 //  OXYTOOLS — Rendu de l'interface (egui)
 // ═══════════════════════════════════════════════════════════════
-
 use crate::app_state::{OxytoolsApp, ModuleType};
 #[cfg(feature = "api")]
 use crate::app_state::ScrapeEntry;
 use crate::{modules, utils, log_error, VERSION};
 use eframe::egui;
 use std::sync::{Arc, Mutex};
-
 impl eframe::App for OxytoolsApp {
     fn on_exit(&mut self) {
         // Kill tous les process ffmpeg en cours à la fermeture
@@ -21,7 +19,6 @@ impl eframe::App for OxytoolsApp {
         }
         self.active_pids.lock().unwrap_or_else(|e| e.into_inner()).clear();
     }
-
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
         let ctx = &ctx;
@@ -39,33 +36,12 @@ impl eframe::App for OxytoolsApp {
         }
         ctx.input(|i| {
             if !i.raw.dropped_files.is_empty() {
-                self.current_files = i.raw.dropped_files.iter().filter_map(|f| {
-                    // Standard path (works on Windows and macOS)
-                    if let Some(ref path) = f.path {
-                        return Some(path.clone());
-                    }
-                    // Linux fallback: some DEs provide the path as bytes (file:// URI)
-                    if let Some(ref bytes) = f.bytes {
-                        let text = String::from_utf8_lossy(bytes);
-                        for line in text.lines() {
-                            let line = line.trim();
-                            if line.starts_with("file://") {
-                                let path_str = line.trim_start_matches("file://");
-                                let decoded = utils::percent_decode(path_str);
-                                let p = std::path::PathBuf::from(&decoded);
-                                if p.exists() {
-                                    return Some(p);
-                                }
-                            }
-                        }
-                    }
-                    // Last resort: try the name field
-                    if !f.name.is_empty() {
-                        let p = std::path::PathBuf::from(&f.name);
-                        if p.exists() { return Some(p); }
-                    }
-                    None
-                }).collect();
+                // Depuis egui 0.36, DroppedFile est un trait : path() renvoie
+                // directement un &Path (absolu sur desktop), plus besoin de
+                // fallback via bytes/name comme avant.
+                self.current_files = i.raw.dropped_files.iter()
+                    .map(|f| f.path().to_path_buf())
+                    .collect();
                 self.current_files.sort();
                 if let Some(p) = self.current_files.first() {
                     self.current_stem = p.file_stem().unwrap_or_default().to_string_lossy().to_string();
@@ -776,7 +752,6 @@ impl eframe::App for OxytoolsApp {
                         ui.label(self.lang.scrap_fanart_key);
                         ui.add(egui::TextEdit::singleline(&mut self.fanart_api_key).password(true));
                     });
-
                     // ── Chemin cible du .env ─────────────────────────────────
                     let default_env = self.config_dir().join(".env");
                     let save_target = self.keys_env_path.clone().unwrap_or_else(|| default_env.clone());
@@ -797,7 +772,6 @@ impl eframe::App for OxytoolsApp {
                                 self.save_config();
                             }
                     });
-
                     // ── Save / Load ──────────────────────────────────────────
                     ui.horizontal(|ui| {
                         if ui.button(self.lang.scrap_save_keys).clicked() {
@@ -830,7 +804,6 @@ impl eframe::App for OxytoolsApp {
                                 }
                             }
                         }
-
                         if ui.button(self.lang.scrap_load_keys).clicked()
                             && let Some(p) = rfd::FileDialog::new()
                                 .add_filter("env", &["env", "txt"])
@@ -855,14 +828,11 @@ impl eframe::App for OxytoolsApp {
                                 }
                             }
                     });
-
                     // ── Status save/load ─────────────────────────────────────
                     if !self.scrap_status.is_empty() {
                         ui.label(egui::RichText::new(&self.scrap_status).weak().small());
                     }
-
                     ui.separator();
-
                     // ── Options fanart/clearlogo (point 2) ───────────────────
                     ui.horizontal(|ui| {
                         ui.checkbox(&mut self.fetch_fanart, self.lang.scrap_fetch_fanart);
@@ -879,9 +849,7 @@ impl eframe::App for OxytoolsApp {
                             self.scrap_popup_query = None;
                         }
                     });
-
                     ui.separator();
-
                     // ── Recherche ────────────────────────────────────────────
                     ui.horizontal(|ui| {
                         let status_arc = Arc::clone(&self.status);
@@ -942,13 +910,11 @@ impl eframe::App for OxytoolsApp {
                             }
                         }
                     });
-
                     // Vérifier le flag no_result entre les frames et ouvrir la popup
                     if *self.no_result_flag.lock().unwrap_or_else(|e| e.into_inner()) {
                         *self.no_result_flag.lock().unwrap_or_else(|e| e.into_inner()) = false;
                         self.scrap_popup_query = Some(self.current_stem.clone());
                     }
-
                     // ── Popup aucun résultat ─────────────────────────────────
                     if self.scrap_popup_query.is_some() {
                         let mut open = true;
@@ -970,7 +936,6 @@ impl eframe::App for OxytoolsApp {
                                     if ui.button(self.lang.scrap_retry_search).clicked() {
                                         self.scrap_popup_query = None;
                                         res2.lock().unwrap_or_else(|e| e.into_inner()).clear();
-
                                         // Détecter si c'est un ID numérique ou une URL TMDB
                                         let trimmed = query2.trim().to_string();
                                         let tmdb_id: Option<i64> = trimmed.parse::<i64>().ok().or_else(|| {
@@ -983,7 +948,6 @@ impl eframe::App for OxytoolsApp {
                                             else if trimmed.contains("themoviedb.org/movie/") { Some(false) }
                                             else { None };
                                         let resolved_is_series = is_series_from_url.unwrap_or(is_series2);
-
                                         std::thread::spawn(move || {
                                             let result = if let Some(id) = tmdb_id {
                                                 modules::scrap::fetch_by_tmdb_id(id, resolved_is_series, &tmdb_key2)
@@ -1025,7 +989,6 @@ impl eframe::App for OxytoolsApp {
                             self.scrap_manual_search_enabled = false;
                         }
                     }
-
                     // ── Résultats avec année + images plus grandes + plein écran (point 3) ──
                     let entries = self.results_ui.lock().unwrap_or_else(|e| e.into_inner()).clone();
                     egui::ScrollArea::vertical().max_height(400.0).show(ui, |ui| {
@@ -1081,7 +1044,6 @@ impl eframe::App for OxytoolsApp {
                             ui.separator();
                         }
                     });
-
                     // ── Plein écran image (point 3) ──────────────────────────
                     if self.scrap_fullscreen.is_some() {
                         let mut open = true;
@@ -1147,7 +1109,6 @@ impl eframe::App for OxytoolsApp {
                                 }
                                 *self.status.lock().unwrap_or_else(|e| e.into_inner()) = format!("✅ {ok} images | ⚠️ {err}");
                             }
-
                             // ── Inject NFO + Poster avec checkboxes custom ───
                             ui.horizontal(|ui| {
                                 if ui.button(self.lang.tag_inject_nfo_and_poster).clicked() {
@@ -1232,10 +1193,8 @@ impl eframe::App for OxytoolsApp {
                 ModuleType::Rename => {
                     ui.vertical(|ui| {
                         self.rename_previews = modules::rename::preview(&self.current_files, &self.rename_cfg);
-
                         ui.heading(self.lang.tab_rename);
                         ui.separator();
-
                         // ── Find & Replace ──────────────────────────────────
                         ui.collapsing(self.lang.rename_find_replace, |ui| {
                             ui.horizontal(|ui| {
@@ -1254,6 +1213,9 @@ impl eframe::App for OxytoolsApp {
                                 });
                             } else {
                                 // ── Mode multiple ──
+                                ui.horizontal(|ui| {
+                                    ui.checkbox(&mut self.rename_cfg.multi_replace_enabled, self.lang.rename_enable);
+                                });
                                 ui.horizontal(|ui| {
                                     ui.label(self.lang.rename_find);
                                     ui.add(egui::TextEdit::singleline(&mut self.rename_multi_find).desired_width(150.0));
@@ -1402,7 +1364,6 @@ impl eframe::App for OxytoolsApp {
                                 if let Some(i) = to_remove { self.rename_cfg.replace_list.remove(i); }
                             }
                         });
-
                         // ── Insertion ───────────────────────────────────────
                         ui.collapsing(self.lang.rename_insert, |ui| {
                             ui.horizontal(|ui| {
@@ -1416,7 +1377,6 @@ impl eframe::App for OxytoolsApp {
                                 ui.selectable_value(&mut self.rename_cfg.insert_from_end, true, "↤ From end"); // TODO lang
                             });
                         });
-
                         // ── Suppression de plage ────────────────────────────
                         ui.collapsing(self.lang.rename_delete_range, |ui| {
                             ui.checkbox(&mut self.rename_cfg.delete_enabled, self.lang.rename_enable);
@@ -1429,7 +1389,6 @@ impl eframe::App for OxytoolsApp {
                                 ui.selectable_value(&mut self.rename_cfg.delete_from_end, true, "↤ From end"); // TODO lang
                             });
                         });
-
                         // ── Numérotation ────────────────────────────────────
                         ui.collapsing(self.lang.rename_numbering, |ui| {
                             ui.checkbox(&mut self.rename_cfg.num_enabled, self.lang.rename_enable);
@@ -1458,7 +1417,6 @@ impl eframe::App for OxytoolsApp {
                                 });
                             }
                         });
-
                         // ── Casse ───────────────────────────────────────────
                         ui.collapsing(self.lang.rename_case, |ui| {
                             ui.horizontal(|ui| {
@@ -1474,7 +1432,6 @@ impl eframe::App for OxytoolsApp {
                                 }
                             });
                         });
-
                         // ── Nettoyage ───────────────────────────────────────
                         ui.collapsing(self.lang.rename_clean, |ui| {
                             ui.checkbox(&mut self.rename_cfg.strip_trailing_spaces, self.lang.rename_trim_spaces);
@@ -1485,7 +1442,6 @@ impl eframe::App for OxytoolsApp {
                                 ui.text_edit_singleline(&mut self.rename_cfg.strip_chars);
                             });
                         });
-
                         // ── Extension ───────────────────────────────────────
                         ui.collapsing(self.lang.rename_extension, |ui| {
                             ui.horizontal(|ui| {
@@ -1507,13 +1463,11 @@ impl eframe::App for OxytoolsApp {
                                 });
                             }
                         });
-
                         ui.separator();
                         if ui.button(self.lang.rename_reset).clicked() {
                             self.rename_cfg = modules::rename::RenameConfig::default();
                         }
                         ui.separator();
-
                         // ── Preview ─────────────────────────────────────────
                         if self.current_files.is_empty() {
                             ui.label(self.lang.drop_here);
@@ -1701,7 +1655,6 @@ impl eframe::App for OxytoolsApp {
                 let completed = *self.completed_jobs.lock().unwrap_or_else(|e| e.into_inner());
                 let total = *self.total_jobs.lock().unwrap_or_else(|e| e.into_inner());
                 let ff_progress = *self.conv_progress.lock().unwrap_or_else(|e| e.into_inner());
-
                 if ff_progress >= 0.0 {
                     // Conversion ffmpeg en cours — barre de progression du fichier courant
                     let pct = (ff_progress * 100.0).round() as u32;

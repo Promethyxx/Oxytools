@@ -890,11 +890,10 @@ fn collecter_sources_jxl_inner(dir: &Path, out: &mut Vec<std::path::PathBuf>) {
                 if !name.ends_with(" jxl") {
                     collecter_sources_jxl_inner(&path, out);
                 }
-            } else if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-                if est_source_jxl(&ext.to_lowercase()) {
+            } else if let Some(ext) = path.extension().and_then(|e| e.to_str())
+                && est_source_jxl(&ext.to_lowercase()) {
                     out.push(path);
                 }
-            }
         }
     }
 }

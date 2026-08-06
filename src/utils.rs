@@ -126,26 +126,6 @@ pub fn wait_ffmpeg_with_progress(
     }
 }
 
-pub fn percent_decode(input: &str) -> String {
-    let mut result = Vec::new();
-    let bytes = input.as_bytes();
-    let mut i = 0;
-    while i < bytes.len() {
-        if bytes[i] == b'%' && i + 2 < bytes.len()
-            && let Ok(val) = u8::from_str_radix(
-                std::str::from_utf8(&bytes[i+1..i+3]).unwrap_or(""),
-                16,
-            ) {
-                result.push(val);
-                i += 3;
-                continue;
-            }
-        result.push(bytes[i]);
-        i += 1;
-    }
-    String::from_utf8_lossy(&result).to_string()
-}
-
 pub fn parse_pages_spec(spec: &str) -> Option<Vec<u32>> {
     let trimmed = spec.trim();
     if trimmed.is_empty() || trimmed == "1-end" {
