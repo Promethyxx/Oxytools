@@ -418,8 +418,9 @@ fn extraire_texte_xml(xml: &str, balises_texte: &[&str]) -> Result<String, Strin
     loop {
         match reader.read_event() {
             Ok(Event::Start(ref e)) => {
-                let name_bytes = e.name().into_inner().to_vec();
-                let nom = std::str::from_utf8(&name_bytes).unwrap_or("");
+                // quick-xml 0.42+ : QName est maintenant backé par &str,
+                // plus besoin de passer par des bytes/from_utf8.
+                let nom = e.name().into_inner();
                 if balises_texte.contains(&nom) {
                     dans_balise_texte = true;
                 }
@@ -432,8 +433,7 @@ fn extraire_texte_xml(xml: &str, balises_texte: &[&str]) -> Result<String, Strin
                 }
             }
             Ok(Event::End(ref e)) => {
-                let name_bytes = e.name().into_inner().to_vec();
-                let nom = std::str::from_utf8(&name_bytes).unwrap_or("");
+                let nom = e.name().into_inner();
                 if balises_texte.contains(&nom) {
                     dans_balise_texte = false;
                 }
@@ -446,8 +446,13 @@ fn extraire_texte_xml(xml: &str, balises_texte: &[&str]) -> Result<String, Strin
             }
             Ok(Event::Text(e)) => {
                 if dans_balise_texte || profondeur_para > 0 {
-                    let bytes = e.into_inner();
-                    let t = String::from_utf8_lossy(bytes.as_ref());
+                    // BytesText est maintenant backé par &str (contenu encore échappé) ;
+                    // on résout les entités XML (&amp; etc.) via unescape().
+                    let brut = e.into_inner();
+                    let t = match quick_xml::escape::unescape(&brut) {
+                        Ok(u) => u,
+                        Err(_) => brut,
+                    };
                     texte.push_str(&t);
                 }
             }

@@ -17,10 +17,19 @@ pub fn lire_nfo(nfo_path: &Path) -> Result<HashMap<String, String>, String> {
     loop {
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
-                current_tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
+                // quick-xml 0.42+ : QName est backé par &str.
+                current_tag = e.name().into_inner().to_string();
             }
             Ok(Event::Text(e)) => {
-                let text = e.decode().unwrap_or_default().trim().to_string();
+                // BytesText est backé par &str (contenu encore échappé) ;
+                // decode() a disparu, on résout les entités via unescape().
+                let brut = e.into_inner();
+                let text = match quick_xml::escape::unescape(&brut) {
+                    Ok(u) => u,
+                    Err(_) => brut,
+                }
+                    .trim()
+                    .to_string();
                 if !current_tag.is_empty() && !text.is_empty() {
                     data.entry(current_tag.clone()).or_default().push(text);
                 }
