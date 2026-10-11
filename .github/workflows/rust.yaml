@@ -207,7 +207,6 @@ jobs:
           |---|:---:|:---:|
           | Linux ARM64 | ✅ | ✅ |
           | Linux x64 | ✅ | ✅ |
-          | Mac ARM64 | 🛠️ | 🛠️ |
           | Windows x64 | ✅ | ✅ |
 
           ## Vérifier l'intégrité d'un téléchargement

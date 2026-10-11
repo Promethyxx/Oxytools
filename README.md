@@ -75,6 +75,7 @@ This project is licensed under the GNU General Public License v3.0 — see Licen
 ## 🔴 NOW
    - delete boths linux versions, and replace by flatpak to build
    - delete all mac versions
+   - SHA verification delete txt assets
    - fix tag.rs
 ## 🟡 NEXT
  - ### Release:
