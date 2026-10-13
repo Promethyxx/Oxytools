@@ -42,7 +42,7 @@ jobs:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Run tests
-      run: cargo test --features api -- --test-threads=1
+      run: cargo test -- --test-threads=1
 
   build:
     needs: test
@@ -51,13 +51,13 @@ jobs:
         include:
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            label: Win_x64
+            label: Win-x64
             bin_dir: bin
             asset_tag: Assets_Windows_x64
 
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            label: Lin_x64
+            label: Lin-x64
             bin_dir: bin-linux-x64
             asset_tag: Assets_Linux_x64
             flatpak_arch: x86_64
@@ -108,33 +108,33 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Build
-      run: cargo build --profile dist --target ${{ matrix.target }}
+    - name: Build full
+      run: cargo build --release --target ${{ matrix.target }}
 
-    - name: Prepare Binary (Windows)
+    - name: Prepare full binary (Windows)
       if: runner.os == 'Windows'
-      run: Copy-Item target/${{ matrix.target }}/dist/Oxytools.exe Oxytools_${{ matrix.label }}.exe
+      run: Copy-Item target/${{ matrix.target }}/release/Oxytools.exe Oxytools_full_${{ matrix.label }}.exe
       shell: pwsh
 
-    - name: Prepare Binary (Linux)
+    - name: Prepare full binary (Linux)
       if: runner.os == 'Linux'
       run: |
         mkdir -p stage
-        cp target/${{ matrix.target }}/dist/Oxytools stage/Oxytools_${{ matrix.label }}
-        chmod +x stage/Oxytools_${{ matrix.label }}
+        cp target/${{ matrix.target }}/release/Oxytools stage/Oxytools_full_${{ matrix.label }}
+        chmod +x stage/Oxytools_full_${{ matrix.label }}
 
     - name: Build Office
-      run: cargo build --profile dist --no-default-features --target ${{ matrix.target }}
+      run: cargo build --release --no-default-features --target ${{ matrix.target }}
 
-    - name: Prepare Office Binary (Windows)
+    - name: Prepare Office binary (Windows)
       if: runner.os == 'Windows'
-      run: Copy-Item target/${{ matrix.target }}/dist/Oxytools.exe Oxytools_Office_${{ matrix.label }}.exe
+      run: Copy-Item target/${{ matrix.target }}/release/Oxytools.exe Oxytools_Office_${{ matrix.label }}.exe
       shell: pwsh
 
-    - name: Prepare Office Binary (Linux)
+    - name: Prepare Office binary (Linux)
       if: runner.os == 'Linux'
       run: |
-        cp target/${{ matrix.target }}/dist/Oxytools stage/Oxytools_Office_${{ matrix.label }}
+        cp target/${{ matrix.target }}/release/Oxytools stage/Oxytools_Office_${{ matrix.label }}
         chmod +x stage/Oxytools_Office_${{ matrix.label }}
 
     - name: Setup Flatpak runtime
@@ -146,14 +146,14 @@ jobs:
     - name: Build Flatpaks
       if: runner.os == 'Linux'
       run: |
-        for variant in "" "_Office"; do
-          name="Oxytools${variant}_${{ matrix.label }}"
-          app_id="io.github.Promethyxx.Oxytools${variant//_/}"
+        for variant in full Office; do
+          name="Oxytools_${variant}_${{ matrix.label }}"
+          app_id="io.github.Promethyxx.Oxytools${variant^}"
 
           cat > "${name}.desktop" <<EOF
         [Desktop Entry]
         Type=Application
-        Name=Oxytools${variant//_/ }
+        Name=Oxytools ${variant}
         Exec=oxytools
         Categories=AudioVideo;Utility;
         Terminal=false
@@ -224,14 +224,6 @@ jobs:
     - name: List files
       run: ls -lh Oxytools_*
 
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
-
-    - name: Generate SBOM (CycloneDX)
-      run: |
-        cargo install cargo-cyclonedx --locked
-        cargo cyclonedx --format json
-
     - name: Deploy to GitHub Release
       uses: softprops/action-gh-release@v2
       with:
@@ -245,6 +237,5 @@ jobs:
           | Windows x64 | ✅ | ✅ |
         files: |
           Oxytools_*
-          *.cdx.json
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -36,11 +36,11 @@ jobs:
           touch bin-linux-x64/ffmpeg bin-linux-x64/ffprobe bin-linux-x64/mkvpropedit
           chmod +x bin-linux-x64/*
 
-      - name: Clippy bundled build
+      - name: Clippy full build
         run: cargo clippy --all-targets -- -D warnings
 
-      - name: Clippy office build
-        run: cargo clippy --no-default-features --features api --all-targets -- -D warnings
+      - name: Clippy Office build
+        run: cargo clippy --no-default-features --all-targets -- -D warnings
 
   deny:
     runs-on: ubuntu-latest

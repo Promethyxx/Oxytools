@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use crate::modules;
 
-#[cfg(feature = "api")]
+#[cfg(feature = "full")]
 #[derive(Clone)]
 pub struct ScrapeEntry {
     pub(crate) data: modules::scrap::ScrapeResult,
@@ -17,22 +17,22 @@ pub struct ScrapeEntry {
 #[derive(PartialEq, Clone, Copy, Debug)]
 pub enum ModuleType {
     Archive,
-    #[cfg(feature = "api")]
+    #[cfg(feature = "full")]
     Audio,
     Doc,
     Image,
-    #[cfg(feature = "api")]
+    #[cfg(feature = "full")]
     Scrapper,
-    #[cfg(feature = "api")]
+    #[cfg(feature = "full")]
     Tag,
-    #[cfg(feature = "api")]
+    #[cfg(feature = "full")]
     Video,
     Rename,
     Settings,
 }
 
 pub struct OxytoolsApp {
-    #[cfg(feature = "api")]
+    #[cfg(feature = "full")]
     pub(crate) copie_flux: bool,
     pub(crate) current_files: Vec<PathBuf>,
     pub(crate) current_stem: String,
@@ -40,15 +40,15 @@ pub struct OxytoolsApp {
         pub(crate) module_actif: ModuleType,
         pub(crate) process: Option<std::process::Child>,
         pub(crate) ratio_img: u32,
-        #[cfg(feature = "api")]
+        #[cfg(feature = "full")]
         pub(crate) results_ui: Arc<Mutex<Vec<ScrapeEntry>>>,
         pub(crate) status: Arc<Mutex<String>>,
         pub(crate) deps_manquantes: Vec<String>,
-        #[cfg(feature = "api")]
+        #[cfg(feature = "full")]
         pub(crate) audio_action: String,
-        #[cfg(feature = "api")]
+        #[cfg(feature = "full")]
         pub(crate) audio_formats_dispo: Vec<String>,
-        #[cfg(feature = "api")]
+        #[cfg(feature = "full")]
         pub(crate) tag_edit_val: String,
         pub(crate) use_custom_nfo: bool,
         pub(crate) custom_nfo_path: Option<std::path::PathBuf>,
@@ -87,13 +87,13 @@ pub struct OxytoolsApp {
         pub(crate) archive_backup_dest: String,
         pub(crate) archive_backup_exclusions: String,
         pub(crate) archive_multi_source: String,
-        #[cfg(feature = "api")]
+        #[cfg(feature = "full")]
         pub(crate) save_audio_format: bool,
-        #[cfg(feature = "api")]
+        #[cfg(feature = "full")]
         pub(crate) audio_qualite: u32,
-        #[cfg(feature = "api")]
+        #[cfg(feature = "full")]
         pub(crate) save_video_format: bool,
-        #[cfg(feature = "api")]
+        #[cfg(feature = "full")]
         pub(crate) video_speed: u32,
         pub(crate) video_codec: String,
         pub(crate) video_accel: String,
@@ -162,7 +162,7 @@ pub struct OxytoolsApp {
 impl Default for OxytoolsApp {
     fn default() -> Self {
         Self {
-            #[cfg(feature = "api")]
+            #[cfg(feature = "full")]
             copie_flux: false,
             current_files: Vec::new(),
             current_stem: String::new(),
@@ -170,15 +170,15 @@ impl Default for OxytoolsApp {
                 module_actif: ModuleType::Image,
                 process: None,
                 ratio_img: 2,
-                #[cfg(feature = "api")]
+                #[cfg(feature = "full")]
                 results_ui: Arc::new(Mutex::new(Vec::new())),
                 status: Arc::new(Mutex::new(crate::lang::EN.drop_files.into())),
                 deps_manquantes: Vec::new(),
-                #[cfg(feature = "api")]
+                #[cfg(feature = "full")]
                 audio_action: "Convert".into(),
-                #[cfg(feature = "api")]
+                #[cfg(feature = "full")]
                 audio_formats_dispo: vec!["aac","flac","m4a","mp3","ogg","opus","wav"].into_iter().map(String::from).collect(),
-                #[cfg(feature = "api")]
+                #[cfg(feature = "full")]
                 tag_edit_val: String::new(),
                 use_custom_nfo: false,
                 custom_nfo_path: None,
@@ -206,13 +206,13 @@ impl Default for OxytoolsApp {
                 archive_backup_dest: String::new(),
                 archive_backup_exclusions: ".git, .github, target".into(),
                 archive_multi_source: String::new(),
-                #[cfg(feature = "api")]
+                #[cfg(feature = "full")]
                 save_audio_format: false,
-                #[cfg(feature = "api")]
+                #[cfg(feature = "full")]
                 audio_qualite: 2,
-                #[cfg(feature = "api")]
+                #[cfg(feature = "full")]
                 save_video_format: false,
-                #[cfg(feature = "api")]
+                #[cfg(feature = "full")]
                 video_speed: 4,
                 video_codec: "auto".to_string(),
                 video_accel: "auto".to_string(),

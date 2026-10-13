@@ -1,5 +1,6 @@
 #![windows_subsystem = "windows"]
 pub(crate) const VERSION: &str = env!("CARGO_PKG_VERSION");
+pub(crate) const APP_NAME: &str = if cfg!(feature = "full") { "Oxytools" } else { "Oxytools Office" };
 pub mod lang;
 pub mod logging;
 pub use logging::{log_info, log_warn, log_error};
@@ -25,7 +26,7 @@ impl OxytoolsApp {
     }
 }
 fn main() -> eframe::Result {
-    log_info(&format!("=== OXYTOOLS v{} START ===", VERSION));
+    log_info(&format!("=== OXYTOOLS {} START ===", VERSION));
     let _ = modules::binaries::extraire_deps();
     let mut options = eframe::NativeOptions::default();
     #[cfg(target_os = "windows")]
@@ -38,7 +39,7 @@ fn main() -> eframe::Result {
         options.viewport.icon = Some(std::sync::Arc::new(egui::IconData { rgba: icon_rgba.into_raw(), width, height }));
     }
     let result = eframe::run_native(
-        &format!("Oxytools v{}", VERSION),
+        &format!("{} {}", APP_NAME, VERSION),
         options,
         Box::new(|cc| {
             let mut app = OxytoolsApp::default();
@@ -51,4 +52,3 @@ fn main() -> eframe::Result {
     modules::binaries::cleanup();
     result
 }
-

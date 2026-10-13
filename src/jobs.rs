@@ -53,15 +53,15 @@ impl OxytoolsApp {
         let module = self.module_actif;
         let fmt = self.format_choisi.clone();
         let ratio = self.ratio_img;
-        #[cfg(feature = "api")]
+        #[cfg(feature = "full")]
         let copie = self.copie_flux;
-        #[cfg(feature = "api")]
+        #[cfg(feature = "full")]
         let video_speed = self.video_speed;
         let video_codec = self.video_codec.clone();
         let video_accel = self.video_accel.clone();
-        #[cfg(feature = "api")]
+        #[cfg(feature = "full")]
         let audio_action = self.audio_action.clone();
-        #[cfg(feature = "api")]
+        #[cfg(feature = "full")]
         let audio_qualite = self.audio_qualite;
         let archive_niveau = self.archive_niveau;
         let archive_action = self.archive_action.clone();
@@ -226,7 +226,7 @@ impl OxytoolsApp {
                             },
                         }
                     },
-                    #[cfg(feature = "api")]
+                    #[cfg(feature = "full")]
                     ModuleType::Audio => {
                         match audio_action.as_str() {
                             "extract" => {
@@ -262,7 +262,7 @@ impl OxytoolsApp {
                             },
                         }
                     },
-                    #[cfg(feature = "api")]
+                    #[cfg(feature = "full")]
                     ModuleType::Video => {
                         log_info(&format!("Video: copie_flux={} speed={} codec={} accel={} | {:?}", copie, video_speed, video_codec, video_accel, input));
                         match modules::video::traiter_video(&input, &output, copie, false, video_speed, &video_codec, &video_accel) {

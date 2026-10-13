@@ -12,25 +12,25 @@ const EXT: &str = "";
 // ════════════════════════════════════════════════════════════════════════
 //  BINAIRES EMBARQUÉS PAR PLATEFORME
 // ════════════════════════════════════════════════════════════════════════
-#[cfg(all(feature = "bundled", target_os = "windows", target_arch = "x86_64"))]
+#[cfg(all(feature = "full", target_os = "windows", target_arch = "x86_64"))]
 mod embedded {
     pub const FFMPEG:      &[u8] = include_bytes!("../../bin/ffmpeg.exe");
     pub const FFPROBE:     &[u8] = include_bytes!("../../bin/ffprobe.exe");
     pub const MKVPROPEDIT: &[u8] = include_bytes!("../../bin/mkvpropedit.exe");
 }
-#[cfg(all(feature = "bundled", target_os = "linux", target_arch = "x86_64"))]
+#[cfg(all(feature = "full", target_os = "linux", target_arch = "x86_64"))]
 mod embedded {
     pub const FFMPEG:      &[u8] = include_bytes!("../../bin-linux-x64/ffmpeg");
     pub const FFPROBE:     &[u8] = include_bytes!("../../bin-linux-x64/ffprobe");
     pub const MKVPROPEDIT: &[u8] = include_bytes!("../../bin-linux-x64/mkvpropedit");
 }
-#[cfg(all(feature = "bundled", target_os = "linux", target_arch = "aarch64"))]
+#[cfg(all(feature = "full", target_os = "linux", target_arch = "aarch64"))]
 mod embedded {
     pub const FFMPEG:      &[u8] = include_bytes!("../../bin-linux-arm/ffmpeg");
     pub const FFPROBE:     &[u8] = include_bytes!("../../bin-linux-arm/ffprobe");
     pub const MKVPROPEDIT: &[u8] = include_bytes!("../../bin-linux-arm/mkvpropedit");
 }
-#[cfg(all(feature = "bundled", target_os = "macos", target_arch = "aarch64"))]
+#[cfg(all(feature = "full", target_os = "macos", target_arch = "aarch64"))]
 mod embedded {
     pub const FFMPEG:      &[u8] = include_bytes!("../../bin-mac-arm/ffmpeg");
     pub const FFPROBE:     &[u8] = include_bytes!("../../bin-mac-arm/ffprobe");
@@ -52,7 +52,7 @@ fn sha256_hex(data: &[u8]) -> String {
 //  EXTRACTION
 // ════════════════════════════════════════════════════════════════════════
 pub fn extraire_deps() -> Result<(), String> {
-    #[cfg(feature = "bundled")]
+    #[cfg(feature = "full")]
     {
         let temp_dir = std::env::temp_dir().join("oxytools_tools");
         crate::log_info(&format!("binaries::extraire_deps | dossier temp={:?}", temp_dir));

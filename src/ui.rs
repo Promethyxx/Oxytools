@@ -2,7 +2,7 @@
 //  OXYTOOLS — Rendu de l'interface (egui)
 // ═══════════════════════════════════════════════════════════════
 use crate::app_state::{OxytoolsApp, ModuleType};
-#[cfg(feature = "api")]
+#[cfg(feature = "full")]
 use crate::app_state::ScrapeEntry;
 use crate::{modules, utils, log_error, VERSION};
 use eframe::egui;
@@ -46,7 +46,7 @@ impl eframe::App for OxytoolsApp {
                 if let Some(p) = self.current_files.first() {
                     self.current_stem = p.file_stem().unwrap_or_default().to_string_lossy().to_string();
                 }
-                #[cfg(feature = "api")]
+                #[cfg(feature = "full")]
                 self.results_ui.lock().unwrap_or_else(|e| e.into_inner()).clear();
                 if !self.current_files.is_empty() {
                     *self.status.lock().unwrap_or_else(|e| e.into_inner()) = self.lang.files_loaded.replace("{}", &self.current_files.len().to_string());
@@ -61,7 +61,7 @@ impl eframe::App for OxytoolsApp {
             ctx.request_repaint();
         }
         egui::CentralPanel::default().show(ui, |ui| {
-            ui.vertical_centered(|ui| ui.heading(format!("OXYTOOLS v{}", VERSION)));
+            ui.vertical_centered(|ui| ui.heading(format!("{} {}", crate::APP_NAME.to_uppercase(), VERSION)));
             if !self.deps_manquantes.is_empty() {
                 ui.colored_label(egui::Color32::RED, self.lang.missing.replace("{}", &self.deps_manquantes.join(", ")));
             }
@@ -69,13 +69,13 @@ impl eframe::App for OxytoolsApp {
             ui.horizontal_wrapped(|ui| {
                 let mut mods = vec![];
                 mods.push((ModuleType::Archive, self.lang.tab_archive));
-                #[cfg(feature = "api")] mods.push((ModuleType::Audio, self.lang.tab_audio));
+                #[cfg(feature = "full")] mods.push((ModuleType::Audio, self.lang.tab_audio));
                 mods.push((ModuleType::Doc, self.lang.tab_doc));
                 mods.push((ModuleType::Image, self.lang.tab_image));
                 mods.push((ModuleType::Rename, self.lang.tab_rename));
-                #[cfg(feature = "api")] mods.push((ModuleType::Scrapper, self.lang.tab_scrapper));
-                #[cfg(feature = "api")] mods.push((ModuleType::Tag, self.lang.tab_tag));
-                #[cfg(feature = "api")] mods.push((ModuleType::Video, self.lang.tab_video));
+                #[cfg(feature = "full")] mods.push((ModuleType::Scrapper, self.lang.tab_scrapper));
+                #[cfg(feature = "full")] mods.push((ModuleType::Tag, self.lang.tab_tag));
+                #[cfg(feature = "full")] mods.push((ModuleType::Video, self.lang.tab_video));
                 mods.push((ModuleType::Settings, self.lang.tab_settings));
                 for (m, txt) in mods {
                     if ui.selectable_value(&mut self.module_actif, m, txt).clicked() {
@@ -637,7 +637,7 @@ impl eframe::App for OxytoolsApp {
                         _ => {}
                     }
                 },
-                #[cfg(feature = "api")]
+                #[cfg(feature = "full")]
                 ModuleType::Audio => {
                     ui.horizontal(|ui| {
                         ui.label(self.lang.action_label);
@@ -679,7 +679,7 @@ impl eframe::App for OxytoolsApp {
                         _ => {}
                     }
                 },
-                #[cfg(feature = "api")]
+                #[cfg(feature = "full")]
                 ModuleType::Video => {
                     ui.horizontal(|ui| {
                         egui::ComboBox::from_id_salt("vfmt").selected_text(&self.format_choisi).show_ui(ui, |ui| {
@@ -741,7 +741,7 @@ impl eframe::App for OxytoolsApp {
                         self.save_config();
                     }
                 },
-                #[cfg(feature = "api")]
+                #[cfg(feature = "full")]
                 ModuleType::Scrapper => {
                     // ── Champs clés ──────────────────────────────────────────
                     ui.horizontal(|ui| {
@@ -1060,7 +1060,7 @@ impl eframe::App for OxytoolsApp {
                         if !open { self.scrap_fullscreen = None; }
                     }
                 },
-                #[cfg(feature = "api")]
+                #[cfg(feature = "full")]
                 ModuleType::Tag => {
                     let has_files = !self.current_files.is_empty();
                     ui.vertical(|ui| {
@@ -1624,7 +1624,7 @@ impl eframe::App for OxytoolsApp {
                 },
             }
             let mut hide_exec = self.module_actif == ModuleType::Settings || self.module_actif == ModuleType::Rename;
-            #[cfg(feature = "api")]
+            #[cfg(feature = "full")]
             { hide_exec = hide_exec || self.module_actif == ModuleType::Scrapper || self.module_actif == ModuleType::Tag; }
             if !self.current_files.is_empty() && !hide_exec {
                 ui.separator();
@@ -1643,7 +1643,7 @@ impl eframe::App for OxytoolsApp {
                                 if let Some(p) = self.current_files.first() {
                                     self.current_stem = p.file_stem().unwrap_or_default().to_string_lossy().to_string();
                                 }
-                                #[cfg(feature = "api")]
+                                #[cfg(feature = "full")]
                                 self.results_ui.lock().unwrap_or_else(|e| e.into_inner()).clear();
                                 *self.status.lock().unwrap_or_else(|e| e.into_inner()) = self.lang.files_loaded.replace("{}", &self.current_files.len().to_string());
                             }

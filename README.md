@@ -1,4 +1,4 @@
-# Oxytools & Oxytools_Office
+# Oxytools_full & Oxytools_Office
 
 ![Oxytools Logo](assets/oxytools_dark.png)
 
@@ -7,18 +7,21 @@
 
 # Oxytools
 
-Oxytools is a Rust portable GUI toolkit that brings together a collection - such as conversion, renaming, tagging, and scraping - with bundled binaries (ffmpeg, ffprobe, mkvpropedit).
+Oxytools_full is a Rust portable GUI toolkit that brings together a collection of tools such as conversion, renaming, tagging, and scraping, with bundled binaries (ffmpeg, ffprobe, mkvpropedit).
 
-Oxytools_Office is a restricted version of Oxytools with less modules and does not include an API or network connectivity. It is designed for professional use.
+Oxytools_Office is a restricted version of Oxytools_full with fewer modules, and does not include an API or network connectivity. It is designed for professional use.
 
 ---
+
 ## Languages supported
 - English
 - French
+
 ---
+
 ## Modules and key differences
 
-| Differences | Oxytools | Oxytools_Office |
+| Differences | Oxytools_full | Oxytools_Office |
 |--------|:-----:|:----------:|
 | Archives (7Z, TAR, ZIP) | ✅ | ✅ |
 | Audio (AAC, FLAC, MP3, OGG) | ✅ | ❌ |
@@ -30,47 +33,53 @@ Oxytools_Office is a restricted version of Oxytools with less modules and does n
 | Video (mkv, mp4, webm) | ✅ | ❌ |
 | Bundled binaries (ffmpeg, ffprobe, mkvpropedit) | ✅ | ❌ |
 | Internet access | ✅ | ❌ |
+
 ---
+
 ## Platforms
 
-|| Linux x64 | Windows x64 |
+|| Linux x64 (Flatpak) | Windows x64 |
 |---|:---:|:---:|
-| Oxytools | ✅ | ✅ |
-| Oxytools_Desk | ✅ | ✅ |
-
-The source code is Mac ARM ready.
-I don't have any Mac, so I need to compile this with Github CI, which cost a lot of ratio.
+| Oxytools_full | ✅ | ✅ |
+| Oxytools_Office | ✅ | ✅ |
 
 ---
+
 ## Building from source
-You need those binaries to build
-FFmpeg, FFprobe : https://ffmpeg.org — LGPLv2.1+
-mkvpropedit (MKVToolNix) : https://mkvtoolnix.download — GPLv2.
-You can also find them in assest in the releases.
 
-| Version| OS | Command |
-|---|---|---|
-| Oxytools | Linux x64 | cargo dist |
-| Oxytools | Windows x64 | cargo dist |
-| Oxytools | Linux arm | cargo dist-arm|
-| Oxytools Office | Linux x64 | cargo dist-office |
-| Oxytools Office | Windows x64 | cargo dist-office |
-| Oxytools Office | Linux arm | cargo dist-office-arm|
+You need those binaries to build:
+- FFmpeg, FFprobe : https://ffmpeg.org — LGPLv2.1+
+- mkvpropedit (MKVToolNix) : https://mkvtoolnix.download — GPLv2
+
+You can also find them in the assets of the releases.
+
+| Version | Command |
+|---|---|
+| Oxytools_full | `cargo build --release` |
+| Oxytools_Office | `cargo office` |
+
+The executable is generated in `target/release/`.
+
 ---
+
 ## Quick Start
 
 1. Download the latest release from [Releases](../../releases)
-2. Run the executable - no installation needed
+2. Run it:
+   - Windows: run the `.exe` - no installation needed
+   - Linux: install the Flatpak with `flatpak install --user Oxytools_full_Lin-x64.flatpak`, then run `flatpak run io.github.Promethyxx.OxytoolsFull` (`OxytoolsOffice` for Oxytools_Office)
 3. Drop your files or browse to select them
 4. Choose your output format
 5. Click "Execute"
 
 ---
+
 ## License
 
 This project is licensed under the GNU General Public License v3.0 — see Licenses.md for details.
 
 ---
+
 ## Roadmap
 ## 🔴 NOW
    - fix tag.rs
@@ -82,4 +91,5 @@ This project is licensed under the GNU General Public License v3.0 — see Licen
 ## 🔵 LATER
 * ### Tag
     * Tag management, complete custom field, add field
+
 ---

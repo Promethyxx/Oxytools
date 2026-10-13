@@ -45,9 +45,9 @@ impl OxytoolsApp {
             ModuleType::Image => self.format_choisi = String::new(),
             ModuleType::Doc => self.format_choisi = String::new(),
             ModuleType::Rename => {},
-            #[cfg(feature = "api")]
+            #[cfg(feature = "full")]
             ModuleType::Video => self.format_choisi = String::new(),
-            #[cfg(feature = "api")]
+            #[cfg(feature = "full")]
             ModuleType::Audio => self.format_choisi = String::new(),
             ModuleType::Archive => self.format_choisi = String::new(),
             _ => (),
@@ -99,7 +99,7 @@ impl OxytoolsApp {
                         self.archive_multi_source = s.to_string();
                     }
                 }
-                #[cfg(feature = "api")]
+                #[cfg(feature = "full")]
                 if let Some(aud) = parsed.get("audio") {
                     if let Some(fmt) = aud.get("format").and_then(|f| f.as_str())
                         && self.module_actif == ModuleType::Audio {
@@ -109,7 +109,7 @@ impl OxytoolsApp {
                         self.audio_qualite = q as u32;
                     }
                 }
-                #[cfg(feature = "api")]
+                #[cfg(feature = "full")]
                 if let Some(vid) = parsed.get("video") {
                     if let Some(fmt) = vid.get("format").and_then(|f| f.as_str())
                         && self.module_actif == ModuleType::Video {
@@ -226,7 +226,7 @@ impl OxytoolsApp {
                     arc_table.insert("multi_source".to_string(), toml::Value::String(self.archive_multi_source.clone()));
                 }
             }
-        #[cfg(feature = "api")]
+        #[cfg(feature = "full")]
         {
             if self.save_audio_format && !self.format_choisi.is_empty() && self.module_actif == ModuleType::Audio {
                 let audio = parsed.entry("audio").or_insert(toml::Value::Table(toml::Table::new()));
