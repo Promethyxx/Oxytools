@@ -34,7 +34,7 @@ Oxytools_Office is a restricted version of Oxytools with less modules and does n
 ## Platforms
 
 | | Linux ARM64 | Linux x64 | Windows x64 |
-|---|:---:|:---:|:---:|:---:|
+|---|:---:|:---:|:---:|
 | Oxytools | ✅ | ✅ | ✅ |
 | Oxytools_Desk | ✅ | ✅ | ✅ |
 

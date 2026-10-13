@@ -34,12 +34,9 @@ jobs:
 
     - name: Download assets (Linux x64)
       run: |
-        # Crée le dossier bin-linux-x64 attendu par include_bytes!
         mkdir -p bin-linux-x64
         gh release download Assets_Linux_x64 --dir bin-linux-x64 --repo ${{ github.repository }}
         chmod +x bin-linux-x64/*
-        
-        # Crée le lien symbolique "bin" vers "bin-linux-x64" au besoin
         ln -s bin-linux-x64 bin
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -63,12 +60,14 @@ jobs:
             label: Lin_x64
             bin_dir: bin-linux-x64
             asset_tag: Assets_Linux_x64
+            flatpak_arch: x86_64
 
           - os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
             label: Lin_arm64
             bin_dir: bin-linux-arm
             asset_tag: Assets_Mac_ARM
+            flatpak_arch: aarch64
 
     runs-on: ${{ matrix.os }}
     name: Build ${{ matrix.label }}
@@ -96,7 +95,7 @@ jobs:
       if: runner.os == 'Linux'
       run: |
         sudo apt-get update
-        sudo apt-get install -y gcc g++ cmake pkg-config libfontconfig1-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev libgl1-mesa-dev libwayland-dev libxkbcommon-dev libssl-dev
+        sudo apt-get install -y gcc g++ cmake pkg-config libfontconfig1-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev libgl1-mesa-dev libwayland-dev libxkbcommon-dev libssl-dev flatpak flatpak-builder
 
     - name: Download assets (Windows)
       if: runner.os == 'Windows'
@@ -127,8 +126,9 @@ jobs:
     - name: Prepare Binary (Linux)
       if: runner.os == 'Linux'
       run: |
-        cp target/${{ matrix.target }}/dist/Oxytools Oxytools_${{ matrix.label }}
-        chmod +x Oxytools_${{ matrix.label }}
+        mkdir -p stage
+        cp target/${{ matrix.target }}/dist/Oxytools stage/Oxytools_${{ matrix.label }}
+        chmod +x stage/Oxytools_${{ matrix.label }}
 
     - name: Build Office
       run: cargo build --profile dist --no-default-features --target ${{ matrix.target }}
@@ -141,21 +141,77 @@ jobs:
     - name: Prepare Office Binary (Linux)
       if: runner.os == 'Linux'
       run: |
-        cp target/${{ matrix.target }}/dist/Oxytools Oxytools_Office_${{ matrix.label }}
-        chmod +x Oxytools_Office_${{ matrix.label }}
+        cp target/${{ matrix.target }}/dist/Oxytools stage/Oxytools_Office_${{ matrix.label }}
+        chmod +x stage/Oxytools_Office_${{ matrix.label }}
+
+    - name: Setup Flatpak runtime
+      if: runner.os == 'Linux'
+      run: |
+        flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+        flatpak install --user -y --noninteractive flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08
+
+    - name: Build Flatpaks
+      if: runner.os == 'Linux'
+      run: |
+        for variant in "" "_Office"; do
+          name="Oxytools${variant}_${{ matrix.label }}"
+          app_id="io.github.Promethyxx.Oxytools${variant//_/}"
+
+          cat > "${name}.desktop" <<EOF
+        [Desktop Entry]
+        Type=Application
+        Name=Oxytools${variant//_/ }
+        Exec=oxytools
+        Categories=AudioVideo;Utility;
+        Terminal=false
+        EOF
+
+          cat > "${name}.yaml" <<EOF
+        app-id: ${app_id}
+        runtime: org.freedesktop.Platform
+        runtime-version: '24.08'
+        sdk: org.freedesktop.Sdk
+        command: oxytools
+        finish-args:
+          - --share=ipc
+          - --share=network
+          - --socket=x11
+          - --socket=wayland
+          - --device=dri
+          - --filesystem=host
+        modules:
+          - name: oxytools
+            buildsystem: simple
+            build-commands:
+              - install -Dm755 oxytools /app/bin/oxytools
+              - install -Dm644 app.desktop /app/share/applications/${app_id}.desktop
+            sources:
+              - type: file
+                path: stage/${name}
+                dest-filename: oxytools
+              - type: file
+                path: ${name}.desktop
+                dest-filename: app.desktop
+        EOF
+
+          flatpak-builder --user --force-clean --disable-rofiles-fuse --arch=${{ matrix.flatpak_arch }} --repo=repo-${name} build-${name} "${name}.yaml"
+          flatpak build-bundle --arch=${{ matrix.flatpak_arch }} repo-${name} "${name}.flatpak" "${app_id}"
+        done
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: binaries-${{ matrix.label }}
-        path: Oxytools_*
+        path: |
+          Oxytools_*.exe
+          Oxytools_*.flatpak
+        if-no-files-found: error
 
   release:
     needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      id-token: write   # nécessaire pour la signature keyless cosign (OIDC)
 
     steps:
     - uses: actions/checkout@v5
@@ -175,26 +231,13 @@ jobs:
     - name: List files
       run: ls -lh Oxytools_*
 
-    - name: Générer les sommes de contrôle (SHA256SUMS)
-      run: sha256sum Oxytools_* > SHA256SUMS.txt && cat SHA256SUMS.txt
-
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
 
-    - name: Générer le SBOM (CycloneDX)
+    - name: Generate SBOM (CycloneDX)
       run: |
         cargo install cargo-cyclonedx --locked
         cargo cyclonedx --format json
-
-    - name: Install cosign
-      uses: sigstore/cosign-installer@v3
-
-    - name: Signer les sommes de contrôle (keyless, via l'identité OIDC du workflow)
-      run: |
-        cosign sign-blob --yes \
-          --output-signature SHA256SUMS.txt.sig \
-          --output-certificate SHA256SUMS.txt.pem \
-          SHA256SUMS.txt
 
     - name: Deploy to GitHub Release
       uses: softprops/action-gh-release@v2
@@ -205,28 +248,11 @@ jobs:
           ## Platforms
           || Oxytools | Oxytools_Office |
           |---|:---:|:---:|
-          | Linux ARM64 | ✅ | ✅ |
-          | Linux x64 | ✅ | ✅ |
+          | Linux ARM64 (Flatpak) | ✅ | ✅ |
+          | Linux x64 (Flatpak) | ✅ | ✅ |
           | Windows x64 | ✅ | ✅ |
-
-          ## Vérifier l'intégrité d'un téléchargement
-          ```
-          sha256sum -c SHA256SUMS.txt --ignore-missing
-          ```
-
-          ## Vérifier l'authenticité (que le binaire vient bien de ce workflow GitHub Actions)
-          ```
-          cosign verify-blob SHA256SUMS.txt \
-            --signature SHA256SUMS.txt.sig \
-            --certificate SHA256SUMS.txt.pem \
-            --certificate-identity-regexp "https://github.com/Promethyxx/Oxytools/.github/workflows/rust.yaml@.*" \
-            --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
-          ```
         files: |
           Oxytools_*
-          SHA256SUMS.txt
-          SHA256SUMS.txt.sig
-          SHA256SUMS.txt.pem
           *.cdx.json
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
