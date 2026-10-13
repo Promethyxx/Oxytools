@@ -24,22 +24,11 @@ mod embedded {
     pub const FFPROBE:     &[u8] = include_bytes!("../../bin-linux-x64/ffprobe");
     pub const MKVPROPEDIT: &[u8] = include_bytes!("../../bin-linux-x64/mkvpropedit");
 }
-#[cfg(all(feature = "full", target_os = "linux", target_arch = "aarch64"))]
-mod embedded {
-    pub const FFMPEG:      &[u8] = include_bytes!("../../bin-linux-arm/ffmpeg");
-    pub const FFPROBE:     &[u8] = include_bytes!("../../bin-linux-arm/ffprobe");
-    pub const MKVPROPEDIT: &[u8] = include_bytes!("../../bin-linux-arm/mkvpropedit");
-}
-#[cfg(all(feature = "full", target_os = "macos", target_arch = "aarch64"))]
-mod embedded {
-    pub const FFMPEG:      &[u8] = include_bytes!("../../bin-mac-arm/ffmpeg");
-    pub const FFPROBE:     &[u8] = include_bytes!("../../bin-mac-arm/ffprobe");
-    pub const MKVPROPEDIT: &[u8] = include_bytes!("../../bin-mac-arm/mkvpropedit");
-}
 
 // ════════════════════════════════════════════════════════════════════════
 //  INTÉGRITÉ — SHA-256 des binaires embarqués/extraits
 // ════════════════════════════════════════════════════════════════════════
+#[cfg(feature = "full")]
 fn sha256_hex(data: &[u8]) -> String {
     use sha2::{Digest, Sha256};
     let mut hasher = Sha256::new();

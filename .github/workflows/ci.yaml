@@ -231,7 +231,7 @@ jobs:
         name: Oxytools v${{ steps.version.outputs.version }}
         body: |
           ## Platforms
-          || Oxytools | Oxytools_Office |
+          || Oxytools_full | Oxytools_Office |
           |---|:---:|:---:|
           | Linux x64 (Flatpak) | ✅ | ✅ |
           | Windows x64 | ✅ | ✅ |
