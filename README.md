@@ -33,10 +33,10 @@ Oxytools_Office is a restricted version of Oxytools with less modules and does n
 ---
 ## Platforms
 
-| | Linux ARM64 | Linux x64 | Windows x64 |
-|---|:---:|:---:|:---:|
-| Oxytools | ✅ | ✅ | ✅ |
-| Oxytools_Desk | ✅ | ✅ | ✅ |
+|| Linux x64 | Windows x64 |
+|---|:---:|:---:|
+| Oxytools | ✅ | ✅ |
+| Oxytools_Desk | ✅ | ✅ |
 
 The source code is Mac ARM ready.
 I don't have any Mac, so I need to compile this with Github CI, which cost a lot of ratio.
@@ -73,9 +73,6 @@ This project is licensed under the GNU General Public License v3.0 — see Licen
 ---
 ## Roadmap
 ## 🔴 NOW
-   - delete boths linux versions, and replace by flatpak to build
-   - delete all mac versions
-   - SHA verification delete txt assets
    - fix tag.rs
 ## 🟡 NEXT
  - ### Release:
