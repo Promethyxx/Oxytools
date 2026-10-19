@@ -6,7 +6,7 @@ fn log_path() -> std::path::PathBuf {
         .unwrap_or_default()
         .parent()
         .unwrap_or(std::path::Path::new("."))
-        .join("config");
+        .join("oxytools_config");
     let _ = std::fs::create_dir_all(&dir);
     dir.join("oxytools.log")
 }

@@ -1606,12 +1606,12 @@ impl eframe::App for OxytoolsApp {
                                     self.custom_config_dir = None;
                                     // Supprimer config_dir du bootstrap
                                     let bootstrap_dir = Self::exe_config_dir();
-                                    if let Ok(c) = std::fs::read_to_string(bootstrap_dir.join("oxytools.toml"))
+                                    if let Ok(c) = std::fs::read_to_string(bootstrap_dir.join("settings.toml"))
                                         && let Ok(mut parsed) = c.parse::<toml::Table>() {
                                             if let Some(app) = parsed.get_mut("app").and_then(|a| a.as_table_mut()) {
                                                 app.remove("config_dir");
                                             }
-                                            let _ = std::fs::write(bootstrap_dir.join("oxytools.toml"), toml::to_string(&parsed).unwrap_or_default());
+                                            let _ = std::fs::write(bootstrap_dir.join("settings.toml"), toml::to_string(&parsed).unwrap_or_default());
                                         }
                                 }
                         });

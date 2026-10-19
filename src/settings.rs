@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-//  OXYTOOLS — Chargement et sauvegarde de la configuration (oxytools.toml)
+//  OXYTOOLS — Chargement et sauvegarde de la configuration (settings.toml)
 // ═══════════════════════════════════════════════════════════════
 
 use crate::app_state::{OxytoolsApp, ModuleType};
@@ -14,7 +14,7 @@ impl OxytoolsApp {
             .parent()
             .unwrap_or(std::path::Path::new("."))
             .to_path_buf()
-            .join("config");
+            .join("oxytools_config");
         let _ = std::fs::create_dir_all(&dir);
         dir
     }
@@ -29,9 +29,9 @@ impl OxytoolsApp {
         }
     }
     pub(crate) fn load_config(&mut self) {
-        // Bootstrap : lire custom_config_dir depuis le oxytools.toml à côté de l'exe
+        // Bootstrap : lire custom_config_dir depuis le settings.toml à côté de l'exe
         if self.custom_config_dir.is_none() {
-            let bootstrap = Self::exe_config_dir().join("oxytools.toml");
+            let bootstrap = Self::exe_config_dir().join("settings.toml");
             if let Ok(c) = std::fs::read_to_string(&bootstrap)
                 && let Ok(parsed) = c.parse::<toml::Table>()
                     && let Some(p) = parsed.get("app").and_then(|a| a.get("config_dir")).and_then(|v| v.as_str()) {
@@ -52,7 +52,7 @@ impl OxytoolsApp {
             ModuleType::Archive => self.format_choisi = String::new(),
             _ => (),
         }
-        if let Ok(c) = std::fs::read_to_string(self.config_dir().join("oxytools.toml"))
+        if let Ok(c) = std::fs::read_to_string(self.config_dir().join("settings.toml"))
             && let Ok(parsed) = c.parse::<toml::Table>() {
                 if let Some(theme) = parsed.get("display").and_then(|d| d.get("theme")).and_then(|t| t.as_str()) {
                     self.current_theme = theme.to_string();
@@ -130,7 +130,7 @@ impl OxytoolsApp {
                 }
             }
         // ── Charger le dernier profil multi-replace ──────────────
-        if let Ok(c) = std::fs::read_to_string(self.config_dir().join("oxytools.toml"))
+        if let Ok(c) = std::fs::read_to_string(self.config_dir().join("settings.toml"))
             && let Ok(parsed) = c.parse::<toml::Table>()
                 && let Some(rn) = parsed.get("rename")
                     && let Some(p) = rn.get("last_list_path").and_then(|v| v.as_str()) {
@@ -142,9 +142,9 @@ impl OxytoolsApp {
                                 self.rename_last_list_path = Some(path);
                             }
                     }
-        // Charger le path custom de .env si enregistré dans oxytools.toml
+        // Charger le path custom de .env si enregistré dans settings.toml
         let custom_env_path: Option<PathBuf> = {
-            std::fs::read_to_string(self.config_dir().join("oxytools.toml"))
+            std::fs::read_to_string(self.config_dir().join("settings.toml"))
                 .ok()
                 .and_then(|c| c.parse::<toml::Table>().ok())
                 .and_then(|t| t.get("scrapper")?.as_table()?.get("keys_path")?.as_str().map(PathBuf::from))
@@ -156,7 +156,7 @@ impl OxytoolsApp {
         if let Ok(k) = std::env::var("FANART_API_KEY") { self.fanart_api_key = k; }
     }
     pub(crate) fn save_config(&self) {
-        let mut parsed = if let Ok(c) = std::fs::read_to_string(self.config_dir().join("oxytools.toml")) {
+        let mut parsed = if let Ok(c) = std::fs::read_to_string(self.config_dir().join("settings.toml")) {
             c.parse::<toml::Table>().unwrap_or_else(|_| toml::Table::new())
         } else {
             toml::Table::new()
@@ -275,11 +275,11 @@ impl OxytoolsApp {
         }
         let toml_str = toml::to_string(&parsed).unwrap_or_default();
         // Sauver dans le config_dir effectif
-        let _ = std::fs::write(self.config_dir().join("oxytools.toml"), &toml_str);
+        let _ = std::fs::write(self.config_dir().join("settings.toml"), &toml_str);
         // Sauver aussi dans le bootstrap exe pour que custom_config_dir survive au redémarrage
         if self.custom_config_dir.is_some() {
             let bootstrap_dir = Self::exe_config_dir();
-            let mut bootstrap_parsed = std::fs::read_to_string(bootstrap_dir.join("oxytools.toml"))
+            let mut bootstrap_parsed = std::fs::read_to_string(bootstrap_dir.join("settings.toml"))
                 .ok()
                 .and_then(|c| c.parse::<toml::Table>().ok())
                 .unwrap_or_default();
@@ -291,7 +291,7 @@ impl OxytoolsApp {
                     t.remove("config_dir");
                 }
             }
-            let _ = std::fs::write(bootstrap_dir.join("oxytools.toml"), toml::to_string(&bootstrap_parsed).unwrap_or_default());
+            let _ = std::fs::write(bootstrap_dir.join("settings.toml"), toml::to_string(&bootstrap_parsed).unwrap_or_default());
         }
     }
 }
