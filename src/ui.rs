@@ -1464,9 +1464,53 @@ impl eframe::App for OxytoolsApp {
                             }
                         });
                         ui.separator();
-                        if ui.button(self.lang.rename_reset).clicked() {
-                            self.rename_cfg = modules::rename::RenameConfig::default();
-                        }
+                        ui.horizontal(|ui| {
+                            let has_files = !self.current_files.is_empty();
+                            if ui.add_enabled(has_files, egui::Button::new(self.lang.rename_apply)).clicked() {
+                                self.rename_results = modules::rename::apply_renames(&self.rename_previews);
+                                let mut applied: Vec<modules::rename::RenameResult> = Vec::new();
+                                for r in &self.rename_results {
+                                    if r.success {
+                                        if let Some(pos) = self.current_files.iter().position(|f| *f == r.original) {
+                                            let parent = r.original.parent().unwrap_or(std::path::Path::new(""));
+                                            self.current_files[pos] = parent.join(&r.new_name);
+                                        }
+                                        applied.push(modules::rename::RenameResult {
+                                            original: r.original.clone(),
+                                            new_name: r.new_name.clone(),
+                                            success: true,
+                                            error: None,
+                                        });
+                                    }
+                                }
+                                if !applied.is_empty() {
+                                    self.rename_undo_stack.push(applied);
+                                }
+                            }
+                            if ui.add_enabled(has_files, egui::Button::new(self.lang.clear_all)).clicked() {
+                                self.current_files.clear();
+                            }
+                            if ui.button(self.lang.rename_reset).clicked() {
+                                self.rename_cfg = modules::rename::RenameConfig::default();
+                            }
+                            if let Some(last) = self.rename_undo_stack.last() {
+                                let count = last.len();
+                                if ui.button(self.lang.rename_undo.replace("{}", &count.to_string())).clicked() {
+                                    let batch = self.rename_undo_stack.pop().unwrap();
+                                    let undo_results = modules::rename::undo_renames(&batch);
+                                    for r in &undo_results {
+                                        if r.success {
+                                            let parent = r.original.parent().unwrap_or(std::path::Path::new(""));
+                                            let restored = parent.join(&r.new_name);
+                                            if let Some(pos) = self.current_files.iter().position(|f| *f == r.original) {
+                                                self.current_files[pos] = restored;
+                                            }
+                                        }
+                                    }
+                                    self.rename_results = undo_results;
+                                }
+                            }
+                        });
                         ui.separator();
                         // ── Preview ─────────────────────────────────────────
                         if self.current_files.is_empty() {
@@ -1503,44 +1547,6 @@ impl eframe::App for OxytoolsApp {
                                     }
                                 } else {
                                     ui.colored_label(egui::Color32::LIGHT_GREEN, format!("✅ {} {}", ok, self.lang.rename_done));
-                                }
-                            }
-                            if ui.button(self.lang.rename_apply).clicked() {
-                                self.rename_results = modules::rename::apply_renames(&self.rename_previews);
-                                let mut applied: Vec<modules::rename::RenameResult> = Vec::new();
-                                for r in &self.rename_results {
-                                    if r.success {
-                                        if let Some(pos) = self.current_files.iter().position(|f| *f == r.original) {
-                                            let parent = r.original.parent().unwrap_or(std::path::Path::new(""));
-                                            self.current_files[pos] = parent.join(&r.new_name);
-                                        }
-                                        applied.push(modules::rename::RenameResult {
-                                            original: r.original.clone(),
-                                            new_name: r.new_name.clone(),
-                                            success: true,
-                                            error: None,
-                                        });
-                                    }
-                                }
-                                if !applied.is_empty() {
-                                    self.rename_undo_stack.push(applied);
-                                }
-                            }
-                            if let Some(last) = self.rename_undo_stack.last() {
-                                let count = last.len();
-                                if ui.button(format!("↩ Undo ({})", count)).clicked() {
-                                    let batch = self.rename_undo_stack.pop().unwrap();
-                                    let undo_results = modules::rename::undo_renames(&batch);
-                                    for r in &undo_results {
-                                        if r.success {
-                                            let parent = r.original.parent().unwrap_or(std::path::Path::new(""));
-                                            let restored = parent.join(&r.new_name);
-                                            if let Some(pos) = self.current_files.iter().position(|f| *f == r.original) {
-                                                self.current_files[pos] = restored;
-                                            }
-                                        }
-                                    }
-                                    self.rename_results = undo_results;
                                 }
                             }
                         }
@@ -1610,6 +1616,30 @@ impl eframe::App for OxytoolsApp {
                                 }
                         });
                         ui.label(egui::RichText::new(self.lang.settings_config_dir_hint).small().weak());
+                        #[cfg(all(feature = "full", windows))]
+                        {
+                            ui.separator();
+                            ui.heading(self.lang.settings_shell_heading);
+                            let installed = crate::shell::is_installed();
+                            ui.horizontal(|ui| {
+                                let label = if installed { self.lang.settings_shell_update } else { self.lang.settings_shell_install };
+                                if ui.button(label).clicked() {
+                                    let msg = match crate::shell::install(self.lang) {
+                                        Ok(_) => self.lang.settings_shell_done_installed.to_string(),
+                                        Err(e) => format!("⚠️ {}", e),
+                                    };
+                                    *self.status.lock().unwrap_or_else(|e| e.into_inner()) = msg;
+                                }
+                                if installed && ui.button(self.lang.settings_shell_remove).clicked() {
+                                    let msg = match crate::shell::uninstall() {
+                                        Ok(_) => self.lang.settings_shell_done_removed.to_string(),
+                                        Err(e) => format!("⚠️ {}", e),
+                                    };
+                                    *self.status.lock().unwrap_or_else(|e| e.into_inner()) = msg;
+                                }
+                            });
+                            ui.label(egui::RichText::new(self.lang.settings_shell_hint).small().weak());
+                        }
                         ui.separator();
                         ui.heading("Logs");
                         if ui.button("📋 Open log file").clicked() {
@@ -1675,7 +1705,7 @@ impl eframe::App for OxytoolsApp {
                     ctx.request_repaint_after(std::time::Duration::from_millis(100));
                 }
             });
-            if !self.current_files.is_empty() && ui.button(self.lang.clear_all).clicked() { self.current_files.clear(); }
+            if self.module_actif != ModuleType::Rename && !self.current_files.is_empty() && ui.button(self.lang.clear_all).clicked() { self.current_files.clear(); }
         });
     }
 }

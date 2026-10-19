@@ -1,6 +1,6 @@
 [package]
 name = "Oxytools"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2024"
 license = "GPL-3.0-or-later"
 default-run = "Oxytools"
@@ -12,7 +12,7 @@ path = "src/main.rs"
 [dependencies]
 chrono = "0.4"
 dotenvy = "0.15"
-eframe = "0.36"
+eframe = "0.37"
 flate2 = "1"
 html2md = "0.2"
 image = { version = "0.25", features = ["avif", "exr", "gif", "hdr", "ico", "jpeg", "png", "tiff", "webp"] }
@@ -41,6 +41,9 @@ zune-jpegxl = "0.5"
 
 [build-dependencies]
 winres = "0.1"
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.56"
 
 [profile.release]
 opt-level = "s"

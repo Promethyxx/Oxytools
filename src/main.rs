@@ -10,6 +10,8 @@ pub mod app_state;
 pub mod settings;
 pub mod jobs;
 pub mod ui;
+#[cfg(feature = "full")]
+pub mod shell;
 use app_state::OxytoolsApp;
 #[cfg(test)]
 #[path = "test.rs"]
@@ -26,8 +28,23 @@ impl OxytoolsApp {
     }
 }
 fn main() -> eframe::Result {
+    #[cfg(feature = "full")]
+    let launch = shell::launch_from_args();
+    #[cfg(feature = "full")]
+    if matches!(launch, shell::Launch::Exit) {
+        return Ok(());
+    }
     log_info(&format!("=== OXYTOOLS {} START ===", VERSION));
     let _ = modules::binaries::extraire_deps();
+    #[cfg(feature = "full")]
+    if let shell::Launch::Tag(action, files) = &launch {
+        let mut app = OxytoolsApp::default();
+        app.load_config();
+        shell::run_tag(*action, files, app.lang, app.lang_id);
+        log_info("=== OXYTOOLS FERMETURE ===");
+        modules::binaries::cleanup();
+        return Ok(());
+    }
     let mut options = eframe::NativeOptions::default();
     #[cfg(target_os = "windows")]
     let icon_bytes: &[u8] = include_bytes!("../assets/Oxytools_icon.ico");
@@ -44,6 +61,10 @@ fn main() -> eframe::Result {
         Box::new(|cc| {
             let mut app = OxytoolsApp::default();
             app.load_config();
+            #[cfg(feature = "full")]
+            if let shell::Launch::Scrap(files) = launch {
+                app.open_scrap(files);
+            }
             app.apply_theme(&cc.egui_ctx);
             Ok(Box::new(app))
         }),

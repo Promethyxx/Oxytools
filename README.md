@@ -84,7 +84,6 @@ This project is licensed under the GNU General Public License v3.0 — see Licen
 ## 🔴 NOW
    #- tag.rs
       - fix tagging efficiency
-      - shell extension
       - Tag management, complete custom field, add field
    #- renamer move button up next to reinitialize
 ## 🟡 NEXT

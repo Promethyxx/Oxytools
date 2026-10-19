@@ -165,6 +165,7 @@ pub struct Lang {
     pub rename_original: &'static str,
     pub rename_new_name: &'static str,
     pub rename_apply: &'static str,
+    pub rename_undo: &'static str,
     pub rename_done: &'static str,
 
     // Settings
@@ -176,6 +177,20 @@ pub struct Lang {
     pub settings_config_dir: &'static str,
     pub settings_config_dir_hint: &'static str,
     pub settings_config_dir_reset: &'static str,
+    pub settings_shell_heading: &'static str,
+    pub settings_shell_install: &'static str,
+    pub settings_shell_update: &'static str,
+    pub settings_shell_remove: &'static str,
+    pub settings_shell_hint: &'static str,
+    pub settings_shell_done_installed: &'static str,
+    pub settings_shell_done_removed: &'static str,
+    pub shell_scrap: &'static str,
+    pub shell_tag_vu: &'static str,
+    pub shell_tag_full: &'static str,
+    pub shell_tag_nfo: &'static str,
+    pub shell_tag_poster: &'static str,
+    pub shell_tag_reset: &'static str,
+    pub shell_tag_result: &'static str,
 }
 
 pub const EN: Lang = Lang {
@@ -332,7 +347,8 @@ pub const EN: Lang = Lang {
     rename_reset: "↺ Reset",
     rename_original: "Original",
     rename_new_name: "→ New name",
-    rename_apply: "🔥 Apply rename",
+    rename_apply: "🔥 Apply",
+    rename_undo: "↩ Undo ({})",
     rename_done: "files renamed",
 
     settings_heading: "Settings",
@@ -343,6 +359,20 @@ pub const EN: Lang = Lang {
     settings_config_dir: "Config folder:",
     settings_config_dir_hint: "Restart required to apply",
     settings_config_dir_reset: "Reset to default",
+    settings_shell_heading: "Explorer context menu",
+    settings_shell_install: "➕ Add to context menu",
+    settings_shell_update: "🔄 Update entries",
+    settings_shell_remove: "🗑 Remove from context menu",
+    settings_shell_hint: "Adds Oxytools to the right-click menu of .mkv files and folders (Windows 11: under Show more options). Update after moving the exe or changing language.",
+    settings_shell_done_installed: "✅ Context menu installed",
+    settings_shell_done_removed: "✅ Context menu removed",
+    shell_scrap: "Scrapper",
+    shell_tag_vu: "Tag: mark as WATCHED",
+    shell_tag_full: "Tag: inject NFO + poster",
+    shell_tag_nfo: "Tag: inject tags from NFO",
+    shell_tag_poster: "Tag: add poster / fanart",
+    shell_tag_reset: "Tag: reset tags",
+    shell_tag_result: "✅ {} done · ⚠️ {} failed",
 };
 
 pub const FR: Lang = Lang {
@@ -499,7 +529,8 @@ pub const FR: Lang = Lang {
     rename_reset: "↺ Réinitialiser",
     rename_original: "Original",
     rename_new_name: "→ Nouveau nom",
-    rename_apply: "🔥 Appliquer renommage",
+    rename_apply: "🔥 Appliquer",
+    rename_undo: "↩ Annuler ({})",
     rename_done: "fichiers renommés",
 
     settings_heading: "Paramètres",
@@ -510,6 +541,20 @@ pub const FR: Lang = Lang {
     settings_config_dir: "Dossier config :",
     settings_config_dir_hint: "Redémarrage requis pour appliquer",
     settings_config_dir_reset: "Réinitialiser",
+    settings_shell_heading: "Menu contextuel de l'Explorateur",
+    settings_shell_install: "➕ Ajouter au menu contextuel",
+    settings_shell_update: "🔄 Mettre à jour les entrées",
+    settings_shell_remove: "🗑 Retirer du menu contextuel",
+    settings_shell_hint: "Ajoute Oxytools au clic droit des fichiers .mkv et des dossiers (Windows 11 : sous « Afficher plus d'options »). À mettre à jour après un déplacement de l'exe ou un changement de langue.",
+    settings_shell_done_installed: "✅ Menu contextuel installé",
+    settings_shell_done_removed: "✅ Menu contextuel retiré",
+    shell_scrap: "Scrapper",
+    shell_tag_vu: "Tag : marquer VU",
+    shell_tag_full: "Tag : injecter NFO + poster",
+    shell_tag_nfo: "Tag : injecter tags depuis NFO",
+    shell_tag_poster: "Tag : ajouter poster / fanart",
+    shell_tag_reset: "Tag : réinitialiser les tags",
+    shell_tag_result: "✅ {} réussi(s) · ⚠️ {} échec(s)",
 };
 
 // ─── Helpers de formatage ───────────────────────────────────────────────────
