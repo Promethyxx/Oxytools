@@ -82,7 +82,6 @@ This project is licensed under the GNU General Public License v3.0 — see Licen
 
 ## Roadmap
 ## 🔴 NOW
-   - add .env location possibility
    #- tag.rs
       - fix tagging efficiency
       - Tag management, complete custom field, add field
