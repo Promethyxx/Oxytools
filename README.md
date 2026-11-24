@@ -80,15 +80,19 @@ This project is licensed under the GNU General Public License v3.0 — see Licen
 
 ---
 
-## Roadmap
-## 🔴 NOW
-   #- tag.rs
-      - fix tagging efficiency
-      - Tag management, complete custom field, add field
+# Roadmap
+
+## 🟢 IN PROGRESS
+- feat: Tag management, complete custom field, add field
+- chore:
+  - Replace unmaintained crates with maintained alternatives
+  - Update deny.toml
+- docs:
+  - Update SECURITY.md
+  - Add CHANGELOG.md
+    - Configure git-cliff
 ## 🟡 NEXT
- - ### Release:
-    - Chocolatey
-    - MS Store
-    - Winget
+- WinGet release
 ## 🔵 LATER
+- ci: Automate WinGet updates through CI pull requests
 ---
