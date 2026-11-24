@@ -83,7 +83,8 @@ This project is licensed under the GNU General Public License v3.0 — see Licen
 # Roadmap
 
 ## 🟢 IN PROGRESS
-- feat: Tag management, complete custom field, add field
+- feat:
+  - Tag management, complete custom field, add field
 - chore:
   - Replace unmaintained crates with maintained alternatives
   - Update deny.toml
@@ -94,5 +95,6 @@ This project is licensed under the GNU General Public License v3.0 — see Licen
 ## 🟡 NEXT
 - WinGet release
 ## 🔵 LATER
-- ci: Automate WinGet updates through CI pull requests
+- ci:
+  - Automate WinGet updates through CI pull requests
 ---
