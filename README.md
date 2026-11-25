@@ -85,6 +85,8 @@ This project is licensed under the GNU General Public License v3.0 — see Licen
 ## 🟢 IN PROGRESS
 - feat:
   - Tag management, complete custom field, add field
+- fix:
+  - pdf merge
 - chore:
   - Replace unmaintained crates with maintained alternatives
   - Update deny.toml
