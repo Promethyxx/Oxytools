@@ -40,7 +40,7 @@ zune-core = "0.5"
 zune-jpegxl = "0.5"
 
 [build-dependencies]
-winres = "0.1"
+winresource = "0.1"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.56"
